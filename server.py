@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+import re
 from typing import Dict, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, Response, FileResponse
@@ -22,7 +23,6 @@ VOICE_MAP = {
     "ja": {"male": "ja-JP-KeitaNeural", "female": "ja-JP-NanamiNeural"}
 }
 
-# Clean language mapping dictionary
 LANG_NAMES = {
     "ur": "Urdu",
     "en": "English",
@@ -92,6 +92,15 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
+def clean_output(raw_text: str) -> str:
+    # Thinking process ya notes ko filter out karna
+    if "Here's a thinking process" in raw_text or "<think>" in raw_text:
+        lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+        for line in reversed(lines):
+            if not line.startswith(("-", "*", "1", "2", "3", "4", "5", "#", "Here", "Literal", "Combined", "Target")):
+                return line.strip('"').strip()
+    return raw_text.strip('"').strip()
+
 async def pure_translate(text: str, src_lang: str, tgt_lang: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
@@ -102,15 +111,10 @@ async def pure_translate(text: str, src_lang: str, tgt_lang: str) -> str:
     source = resolve_lang(src_lang)
     target = resolve_lang(tgt_lang)
 
-    # Bulletproof prompt with strict anti-Arabic leak rule
     system_prompt = (
-        f"You are a professional language translator.\n"
-        f"Your ONLY task is to translate the user input from {source} into {target}.\n"
-        f"RULES:\n"
-        f"1. You MUST output ONLY the translated text in {target}.\n"
-        f"2. DO NOT output Arabic unless the target language is explicitly Arabic.\n"
-        f"3. DO NOT answer questions or chat. ONLY translate the sentence.\n"
-        f"4. Do NOT include pronunciation, notes, or quotes."
+        f"You are a translator. Translate the text from {source} to {target}.\n"
+        f"Respond ONLY with the direct translation in {target}.\n"
+        "Never output your thinking process, explanations, breakdown, or notes. Single raw sentence only."
     )
 
     groq_client = AsyncOpenAI(
@@ -118,31 +122,23 @@ async def pure_translate(text: str, src_lang: str, tgt_lang: str) -> str:
         api_key=clean_key
     )
 
-    # Discover active models dynamically
-    active_models = []
-    try:
-        models_data = await groq_client.models.list()
-        active_models = [m.id for m in models_data.data if "whisper" not in m.id and "guard" not in m.id]
-    except Exception:
-        pass
+    # Strictly use non-thinking, fast Llama models
+    clean_models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
 
-    if not active_models:
-        active_models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
-
-    for model_name in active_models:
+    for model_name in clean_models:
         try:
             response = await groq_client.chat.completions.create(
                 model=model_name,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"Translate this into {target}: {text}"}
+                    {"role": "user", "content": text}
                 ],
                 temperature=0.0,
-                max_tokens=200
+                max_tokens=150
             )
             content = response.choices[0].message.content
             if content and content.strip():
-                return content.strip()
+                return clean_output(content)
         except Exception:
             continue
 
