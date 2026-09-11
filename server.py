@@ -26,8 +26,8 @@ VOICE_MAP = {
 LANG_NAMES = {
     "ur": "Urdu",
     "en": "English",
-    "ms": "Malay (Bahasa Melayu)",
-    "zh": "Mandarin Chinese",
+    "ms": "Malay",
+    "zh": "Chinese",
     "ar": "Arabic",
     "es": "Spanish",
     "ru": "Russian",
@@ -92,15 +92,6 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-def clean_output(raw_text: str) -> str:
-    # Thinking process ya notes ko filter out karna
-    if "Here's a thinking process" in raw_text or "<think>" in raw_text:
-        lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
-        for line in reversed(lines):
-            if not line.startswith(("-", "*", "1", "2", "3", "4", "5", "#", "Here", "Literal", "Combined", "Target")):
-                return line.strip('"').strip()
-    return raw_text.strip('"').strip()
-
 async def pure_translate(text: str, src_lang: str, tgt_lang: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
@@ -111,36 +102,39 @@ async def pure_translate(text: str, src_lang: str, tgt_lang: str) -> str:
     source = resolve_lang(src_lang)
     target = resolve_lang(tgt_lang)
 
-    system_prompt = (
-        f"You are a translator. Translate the text from {source} to {target}.\n"
-        f"Respond ONLY with the direct translation in {target}.\n"
-        "Never output your thinking process, explanations, breakdown, or notes. Single raw sentence only."
-    )
-
+    # Hard-locked few-shot prompt: Never allows Arabic drift
     groq_client = AsyncOpenAI(
         base_url="https://api.groq.com/openai/v1",
         api_key=clean_key
     )
 
-    # Strictly use non-thinking, fast Llama models
-    clean_models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
+    system_instruction = (
+        f"You are a strict, direct translator. "
+        f"Translate the given text from {source} into {target}. "
+        f"Output ONLY the translated words in {target}. "
+        f"NEVER use Arabic alphabet or Arabic language unless {target} is Arabic. "
+        "No quotes, no reasoning, no explanations."
+    )
 
-    for model_name in clean_models:
-        try:
-            response = await groq_client.chat.completions.create(
-                model=model_name,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": text}
-                ],
-                temperature=0.0,
-                max_tokens=150
-            )
-            content = response.choices[0].message.content
-            if content and content.strip():
-                return clean_output(content)
-        except Exception:
-            continue
+    try:
+        response = await groq_client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": f"Input: آپ کیسے ہیں؟\nTarget: {target}"},
+                {"role": "assistant", "content": "How are you?" if target == "English" else "Apa khabar?" if target == "Malay" else "你好吗？"},
+                {"role": "user", "content": f"Input: {text}\nTarget: {target}"}
+            ],
+            temperature=0.0,
+            max_tokens=150
+        )
+        content = response.choices[0].message.content
+        if content and content.strip():
+            # Agar koi reasoning ya prefix aa jaye to saaf karein
+            clean = re.sub(r"^(Translation:|Output:)", "", content.strip(), flags=re.IGNORECASE).strip()
+            return clean.strip('"')
+    except Exception:
+        pass
 
     return text
 
