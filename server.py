@@ -22,11 +22,12 @@ VOICE_MAP = {
     "ja": {"male": "ja-JP-KeitaNeural", "female": "ja-JP-NanamiNeural"}
 }
 
+# Clean language mapping dictionary
 LANG_NAMES = {
     "ur": "Urdu",
-    "zh": "Mandarin Chinese",
     "en": "English",
-    "ms": "Malay",
+    "ms": "Malay (Bahasa Melayu)",
+    "zh": "Mandarin Chinese",
     "ar": "Arabic",
     "es": "Spanish",
     "ru": "Russian",
@@ -34,6 +35,10 @@ LANG_NAMES = {
     "de": "German",
     "ja": "Japanese"
 }
+
+def resolve_lang(code: str) -> str:
+    prefix = (code or "en").split("-")[0].lower()
+    return LANG_NAMES.get(prefix, "English")
 
 class RoomManager:
     def __init__(self):
@@ -67,7 +72,7 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
     if not text.strip():
         return Response(content=b"", media_type="audio/mpeg")
     
-    prefix = lang[:2].lower()
+    prefix = (lang or "en").split("-")[0].lower()
     gender_clean = gender.lower() if gender.lower() in ["male", "female"] else "female"
     
     lang_voices = VOICE_MAP.get(prefix, VOICE_MAP["en"])
@@ -94,16 +99,18 @@ async def pure_translate(text: str, src_lang: str, tgt_lang: str) -> str:
     if not clean_key or clean_key == "dummy_key":
         return text
 
-    source = LANG_NAMES.get(src_lang[:2].lower(), src_lang)
-    target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
+    source = resolve_lang(src_lang)
+    target = resolve_lang(tgt_lang)
 
+    # Bulletproof prompt with strict anti-Arabic leak rule
     system_prompt = (
-        f"You are a strict, literal speech translator from {source} to {target}. "
-        f"Translate the spoken sentence into {target} language only. "
-        "CRITICAL RULES: "
-        f"1. Your entire response MUST be 100% in {target}. Never switch to any other language. "
-        "2. Do NOT answer questions. Do NOT add conversational replies. "
-        "3. Output ONLY the translated text without quotes or explanations."
+        f"You are a professional language translator.\n"
+        f"Your ONLY task is to translate the user input from {source} into {target}.\n"
+        f"RULES:\n"
+        f"1. You MUST output ONLY the translated text in {target}.\n"
+        f"2. DO NOT output Arabic unless the target language is explicitly Arabic.\n"
+        f"3. DO NOT answer questions or chat. ONLY translate the sentence.\n"
+        f"4. Do NOT include pronunciation, notes, or quotes."
     )
 
     groq_client = AsyncOpenAI(
@@ -111,21 +118,33 @@ async def pure_translate(text: str, src_lang: str, tgt_lang: str) -> str:
         api_key=clean_key
     )
 
+    # Discover active models dynamically
+    active_models = []
     try:
-        response = await groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text}
-            ],
-            temperature=0.0,
-            max_tokens=200
-        )
-        content = response.choices[0].message.content
-        if content and content.strip():
-            return content.strip()
+        models_data = await groq_client.models.list()
+        active_models = [m.id for m in models_data.data if "whisper" not in m.id and "guard" not in m.id]
     except Exception:
         pass
+
+    if not active_models:
+        active_models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
+
+    for model_name in active_models:
+        try:
+            response = await groq_client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Translate this into {target}: {text}"}
+                ],
+                temperature=0.0,
+                max_tokens=200
+            )
+            content = response.choices[0].message.content
+            if content and content.strip():
+                return content.strip()
+        except Exception:
+            continue
 
     return text
 
