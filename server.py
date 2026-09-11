@@ -17,7 +17,7 @@ client = AsyncOpenAI(
     api_key=groq_key
 )
 
-# Natural Microsoft Neural Voices
+# Natural Microsoft Neural Voices (Male / Female per Language)
 VOICE_MAP = {
     "ur": {"male": "ur-PK-AsadNeural", "female": "ur-PK-UzmaNeural"},
     "zh": {"male": "zh-CN-YunxiNeural", "female": "zh-CN-XiaoxiaoNeural"},
@@ -65,6 +65,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# Edge-TTS Audio Generation
 @app.get("/tts")
 async def text_to_speech(text: str, lang: str, gender: str = "female"):
     if not text.strip():
@@ -90,6 +91,7 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
+# Multi-Model Resilient Translation Engine
 async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
     source = LANG_NAMES.get(src_lang[:2].lower(), src_lang)
     target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
@@ -100,11 +102,10 @@ async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
         "Do NOT provide explanations, notes, pleasantries, or quotes. Output ONLY the raw translated sentence."
     )
 
-    # Groq active production models
-    models_to_try = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
-    last_error = ""
+    # Universally supported free models on Groq
+    candidate_models = ["mixtral-8x7b-32768", "gemma2-9b-it", "llama-3.1-8b-instant"]
 
-    for model_name in models_to_try:
+    for model_name in candidate_models:
         try:
             response = await client.chat.completions.create(
                 model=model_name,
@@ -115,12 +116,13 @@ async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
                 temperature=0.2,
                 max_tokens=250
             )
-            return response.choices[0].message.content.strip()
-        except Exception as e:
-            last_error = str(e)
+            content = response.choices[0].message.content
+            if content and content.strip():
+                return content.strip()
+        except Exception:
             continue
 
-    return f"[Groq LLM Error: {last_error}]"
+    return "Translation failed. Please check Groq API key in Railway settings."
 
 @app.websocket("/ws/room")
 async def websocket_endpoint(websocket: WebSocket):
