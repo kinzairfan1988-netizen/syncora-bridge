@@ -25,9 +25,9 @@ VOICE_MAP = {
 
 LANG_NAMES = {
     "ur": "Urdu",
-    "zh": "Mandarin Chinese (Simplified)",
+    "zh": "Mandarin Chinese",
     "en": "English",
-    "ms": "Malay (Bahasa Melayu)",
+    "ms": "Malay",
     "ar": "Arabic",
     "es": "Spanish",
     "ru": "Russian",
@@ -83,23 +83,25 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# Strict Single-Language Conversational AI Engine with Detailed Diagnostics
+# Strict Single-Language Conversational AI Engine
 async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
 
     if not clean_key or clean_key == "dummy_key":
-        return "[Error: GROQ_API_KEY Railway variables mein missing hai]"
+        return "[Error: Missing GROQ_API_KEY]"
 
     source = LANG_NAMES.get(src_lang[:2].lower(), src_lang)
     target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
 
+    # Bulletproof prompt: Force output exclusively in target language
     system_prompt = (
         f"You are Syncora, an intelligent conversational AI partner. "
         f"The user spoke to you in {source}. "
-        f"Respond directly, naturally, and politely in {target} language only. "
-        f"CRITICAL: Keep your entire reply strictly in {target}. "
-        "Keep it concise (1 to 2 spoken sentences). Do not include formatting, quotes, or notes."
+        f"ABSOLUTE RULE: You must respond 100% in {target} language only. "
+        f"Do NOT switch to Arabic, Urdu, Malay, or any other language unless the target is explicitly that language. "
+        f"Keep your response natural, polite, and concise (1 to 2 spoken sentences) in {target}. "
+        f"Never include translations, explanations, quotes, or notes."
     )
 
     groq_client = AsyncOpenAI(
@@ -107,19 +109,9 @@ async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
         api_key=clean_key
     )
 
-    # Auto fetch accounts active chat models dynamically
-    active_models = []
-    try:
-        available = await groq_client.models.list()
-        active_models = [m.id for m in available.data if "whisper" not in m.id and "guard" not in m.id]
-    except Exception as e:
-        return f"[Groq Key/Connection Error: {str(e)}]"
+    candidate_models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
 
-    if not active_models:
-        active_models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
-
-    errors_collected = []
-    for model_name in active_models:
+    for model_name in candidate_models:
         try:
             response = await groq_client.chat.completions.create(
                 model=model_name,
@@ -127,17 +119,16 @@ async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": text}
                 ],
-                temperature=0.2,
+                temperature=0.05,  # Zero variance ensures language stays locked
                 max_tokens=150
             )
             content = response.choices[0].message.content
             if content and content.strip():
                 return content.strip()
-        except Exception as err:
-            errors_collected.append(f"{model_name}: {str(err)}")
+        except Exception:
             continue
 
-    return f"[LLM Error: {errors_collected[0] if errors_collected else 'No model succeeded'}]"
+    return "Sorry, I am having trouble responding right now."
 
 @app.websocket("/ws/room")
 async def websocket_endpoint(websocket: WebSocket):
@@ -149,6 +140,8 @@ async def websocket_endpoint(websocket: WebSocket):
             
             sender = data.get("sender", "Ali")
             gender = data.get("gender", "male")
+            
+            # Use dynamic selected values directly from user payload
             src_lang = data.get("source_lang", "ur-PK")
             tgt_lang = data.get("target_lang", "en-US")
             original_text = data.get("text", "").strip()
