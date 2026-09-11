@@ -9,11 +9,20 @@ import edge_tts
 
 app = FastAPI(title="Syncora Sourcing Bridge")
 
-# Microsoft Neural Voices
+# Male aur Female ke liye realistic natural Microsoft Neural Voices
 VOICE_MAP = {
-    "ur": "ur-PK-AsadNeural",
-    "zh": "zh-CN-XiaoxiaoNeural",
-    "en": "en-US-JennyNeural"
+    "ur": {
+        "male": "ur-PK-AsadNeural",
+        "female": "ur-PK-UzmaNeural"
+    },
+    "zh": {
+        "male": "zh-CN-YunxiNeural",
+        "female": "zh-CN-XiaoxiaoNeural"
+    },
+    "en": {
+        "male": "en-US-BrianNeural",
+        "female": "en-US-AvaNeural"
+    }
 }
 
 class ConnectionManager:
@@ -37,16 +46,27 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# Edge-TTS Audio Generation
+# Edge-TTS Audio Generation with Gender & Human Cadence Tuning
 @app.get("/tts")
-async def text_to_speech(text: str, lang: str):
+async def text_to_speech(text: str, lang: str, gender: str = "female"):
     if not text.strip():
         return Response(content=b"", media_type="audio/mpeg")
     
     prefix = lang[:2].lower()
-    voice = VOICE_MAP.get(prefix, "en-US-JennyNeural")
+    gender_clean = gender.lower() if gender.lower() in ["male", "female"] else "female"
     
-    communicate = edge_tts.Communicate(text, voice)
+    # Matching voice lookup
+    lang_voices = VOICE_MAP.get(prefix, VOICE_MAP["en"])
+    selected_voice = lang_voices.get(gender_clean, lang_voices["female"])
+    
+    # rate="-4%" aur pitch="-1Hz" se natural pause aur human warmth milti hai
+    communicate = edge_tts.Communicate(
+        text=text, 
+        voice=selected_voice,
+        rate="-4%",
+        pitch="-1Hz"
+    )
+    
     mp3_bytes = b""
     async for chunk in communicate.stream():
         if chunk["type"] == "audio":
@@ -64,7 +84,7 @@ def perform_translation(text: str, src_lang: str, tgt_lang: str) -> str:
     mm_src = mm_map.get(src_lang[:2].lower(), "en-US")
     mm_tgt = mm_map.get(tgt_lang[:2].lower(), "zh-CN")
 
-    # Primary: MyMemory Translator
+    # Primary: MyMemory Translator (Cloud IPs par fully reliable)
     try:
         res = MyMemoryTranslator(source=mm_src, target=mm_tgt).translate(text)
         if res and not res.strip().startswith("["):
@@ -93,6 +113,7 @@ async def websocket_endpoint(websocket: WebSocket):
             data = json.loads(raw_data)
             
             sender = data.get("sender", "Anonymous")
+            gender = data.get("gender", "male")
             src_lang = data.get("source_lang", "ur-PK")
             tgt_lang = data.get("target_lang", "zh-CN")
             original_text = data.get("text", "").strip()
@@ -104,6 +125,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
             payload = {
                 "sender": sender,
+                "gender": gender,
                 "source_lang": src_lang,
                 "target_lang": tgt_lang,
                 "original": original_text,
@@ -128,8 +150,11 @@ async def get_index():
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
         .container { max-width: 600px; margin: auto; background: #1e293b; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
         h2 { margin-top: 0; color: #38bdf8; text-align: center; }
-        .config-box { display: flex; gap: 10px; margin-bottom: 15px; }
-        select, input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #475569; background: #334155; color: white; box-sizing: border-box; }
+        .config-box { display: flex; gap: 8px; margin-bottom: 15px; }
+        select, input { padding: 10px; border-radius: 8px; border: 1px solid #475569; background: #334155; color: white; box-sizing: border-box; }
+        #username { flex: 2; }
+        #gender { flex: 1.5; }
+        #my-lang { flex: 2.5; }
         .controls { text-align: center; margin: 20px 0; }
         button { background: #22c55e; color: white; border: none; padding: 14px 24px; font-size: 16px; font-weight: bold; border-radius: 30px; cursor: pointer; width: 100%; transition: 0.2s; }
         button.recording { background: #ef4444; }
@@ -146,10 +171,14 @@ async def get_index():
     <h2>⚡ Syncora Sourcing Bridge</h2>
     
     <div class="config-box">
-        <input type="text" id="username" placeholder="Your Name" value="User">
+        <input type="text" id="username" placeholder="Your Name" value="Ali">
+        <select id="gender">
+            <option value="male" selected>👨 Male</option>
+            <option value="female">👩 Female</option>
+        </select>
         <select id="my-lang">
             <option value="ur-PK" selected>🇵🇰 Urdu</option>
-            <option value="zh-CN">🇨🇳 Chinese (Mandarin)</option>
+            <option value="zh-CN">🇨🇳 Chinese</option>
             <option value="en-US">🇬🇧 English</option>
         </select>
     </div>
@@ -169,23 +198,24 @@ async def get_index():
         const msg = JSON.parse(event.data);
         const chatBox = document.getElementById("chat-box");
 
+        const genderIcon = msg.gender === "female" ? "👩" : "👨";
         const bubble = document.createElement("div");
         bubble.className = "bubble";
         bubble.innerHTML = `
-            <div class="sender">${msg.sender} (${msg.source_lang})</div>
+            <div class="sender">${genderIcon} ${msg.sender} (${msg.source_lang})</div>
             <div class="orig">${msg.original}</div>
             <div class="trans">👉 <b>${msg.translated}</b></div>
         `;
         chatBox.appendChild(bubble);
         chatBox.scrollTop = chatBox.scrollHeight;
 
-        // Har message par audio seedha call hoga
-        speakText(msg.translated, msg.target_lang);
+        // Bolne wale ke gender ke mutabiq awaaz bajegi
+        speakText(msg.translated, msg.target_lang, msg.gender);
     };
 
-    function speakText(text, lang) {
+    function speakText(text, lang, gender) {
         if (!text || text.startsWith("[Translation Error")) return;
-        const url = `/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(lang)}`;
+        const url = `/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(lang)}&gender=${encodeURIComponent(gender)}`;
         const audio = new Audio(url);
         audio.play().catch(e => {
             console.log("Audio block error:", e);
@@ -210,8 +240,10 @@ async def get_index():
         recognition.onresult = function(event) {
             const transcript = event.results[0][0].transcript;
             const sender = document.getElementById("username").value;
+            const gender = document.getElementById("gender").value;
             const myLang = document.getElementById("my-lang").value;
             
+            // Auto target mapping: Urdu -> Chinese, Chinese -> Urdu, English -> Urdu
             let targetLang = "ur-PK";
             if (myLang.startsWith("ur")) {
                 targetLang = "zh-CN";
@@ -223,6 +255,7 @@ async def get_index():
 
             socket.send(JSON.stringify({
                 sender: sender,
+                gender: gender,
                 source_lang: myLang,
                 target_lang: targetLang,
                 text: transcript
