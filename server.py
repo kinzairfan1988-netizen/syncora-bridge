@@ -9,7 +9,7 @@ import edge_tts
 
 app = FastAPI(title="Syncora Sourcing Bridge")
 
-# Microsoft Neural Voice map
+# Microsoft Neural Voices
 VOICE_MAP = {
     "ur": "ur-PK-AsadNeural",
     "zh": "zh-CN-XiaoxiaoNeural",
@@ -54,22 +54,30 @@ async def text_to_speech(text: str, lang: str):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# Multi-provider reliable translation function
-def perform_translation(text: str, src: str, tgt: str) -> str:
-    # 1. Primary Attempt: Google Translator
+# Reliable Multi-Provider Translation
+def perform_translation(text: str, src_lang: str, tgt_lang: str) -> str:
+    # 1. MyMemory Codes (Strict exact codes jaisa unki list me hai)
+    mm_map = {
+        "ur": "ur-PK",
+        "zh": "zh-CN",
+        "en": "en-US"
+    }
+    mm_src = mm_map.get(src_lang[:2].lower(), "en-US")
+    mm_tgt = mm_map.get(tgt_lang[:2].lower(), "zh-CN")
+
+    # Primary: MyMemory Translator (Cloud par block nahi hota)
     try:
-        res = GoogleTranslator(source=src, target=tgt).translate(text)
+        res = MyMemoryTranslator(source=mm_src, target=mm_tgt).translate(text)
         if res and not res.strip().startswith("["):
             return res
     except Exception:
         pass
 
-    # 2. Fallback Attempt: MyMemory Translator (Cloud IPs par kabhi block nahi hota)
+    # Secondary Backup: Google Translator
     try:
-        # MyMemory format standard: ur-PK -> ur, zh-CN -> zh-CN
-        mm_src = "zh-CN" if src.startswith("zh") else src[:2]
-        mm_tgt = "zh-CN" if tgt.startswith("zh") else tgt[:2]
-        res = MyMemoryTranslator(source=mm_src, target=mm_tgt).translate(text)
+        g_src = "zh-CN" if src_lang.lower().startswith("zh") else src_lang[:2].lower()
+        g_tgt = "zh-CN" if tgt_lang.lower().startswith("zh") else tgt_lang[:2].lower()
+        res = GoogleTranslator(source=g_src, target=g_tgt).translate(text)
         if res:
             return res
     except Exception as e:
@@ -93,11 +101,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if not original_text:
                 continue
 
-            # Standard language code normalization
-            src_code = "zh-CN" if src_lang.lower().startswith("zh") else src_lang[:2].lower()
-            tgt_code = "zh-CN" if tgt_lang.lower().startswith("zh") else tgt_lang[:2].lower()
-
-            translated_text = perform_translation(original_text, src_code, tgt_code)
+            translated_text = perform_translation(original_text, src_lang, tgt_lang)
 
             payload = {
                 "sender": sender,
@@ -180,6 +184,7 @@ async def get_index():
         const myLang = document.getElementById("my-lang").value;
         const myName = document.getElementById("username").value;
 
+        // Play audio if received for target language or by receiver
         if (msg.target_lang.startsWith(myLang.substring(0, 2)) || msg.sender !== myName) {
             speakText(msg.translated, msg.target_lang);
         }
@@ -190,7 +195,7 @@ async def get_index():
         const url = `/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(lang)}`;
         audioPlayer.src = url;
         audioPlayer.play().catch(e => {
-            console.log("Audio play error:", e);
+            console.log("Audio unlock or play error:", e);
         });
     }
 
@@ -214,6 +219,7 @@ async def get_index():
             const sender = document.getElementById("username").value;
             const myLang = document.getElementById("my-lang").value;
             
+            // Auto target mapping: Urdu -> Chinese, Chinese -> Urdu, English -> Urdu
             let targetLang = "ur-PK";
             if (myLang.startsWith("ur")) {
                 targetLang = "zh-CN";
@@ -242,6 +248,7 @@ async def get_index():
     }
 
     function toggleSpeech() {
+        // Mobile Browser audio channel unlock
         audioPlayer.play().then(() => audioPlayer.pause()).catch(() => {});
 
         if (!recognition) {
