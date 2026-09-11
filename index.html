@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Syncora Workspace | AI Hands-Free Bridge</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Syncora Workspace | AI Bilateral Bridge</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-base: #0a0e17;
-            --surface-card: rgba(18, 24, 38, 0.7);
+            --surface-card: rgba(18, 24, 38, 0.75);
             --surface-elevated: rgba(30, 41, 59, 0.6);
             --border-subtle: rgba(255, 255, 255, 0.08);
             --accent-primary: #38bdf8;
@@ -25,6 +25,7 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
@@ -37,37 +38,40 @@
             overflow-x: hidden;
         }
 
+        /* Responsive Top Bar */
         .navbar {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 16px 28px;
-            background: rgba(10, 14, 23, 0.85);
+            padding: 12px 18px;
+            background: rgba(10, 14, 23, 0.9);
             backdrop-filter: blur(16px);
             border-bottom: 1px solid var(--border-subtle);
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .brand-cluster {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
 
         .brand-logo {
-            width: 32px;
-            height: 32px;
+            width: 28px;
+            height: 28px;
             background: linear-gradient(135deg, #38bdf8, #2563eb);
-            border-radius: 8px;
+            border-radius: 7px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 700;
             color: white;
-            font-size: 16px;
+            font-size: 14px;
         }
 
         .brand-title {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 600;
             letter-spacing: -0.3px;
         }
@@ -75,18 +79,18 @@
         .room-actions {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
         }
 
         .room-badge {
             background: var(--surface-elevated);
             border: 1px solid var(--border-subtle);
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 13px;
+            padding: 5px 10px;
+            border-radius: 16px;
+            font-size: 12px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             color: var(--text-muted);
         }
 
@@ -96,76 +100,81 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-muted);
         }
 
         .dot-indicator {
-            width: 8px;
-            height: 8px;
+            width: 7px;
+            height: 7px;
             border-radius: 50%;
             background: #64748b;
         }
 
         .dot-indicator.live {
             background: var(--success-color);
-            box-shadow: 0 0 10px var(--success-color);
+            box-shadow: 0 0 8px var(--success-color);
         }
 
         .btn-secondary {
             background: var(--surface-elevated);
             border: 1px solid var(--border-subtle);
             color: var(--text-main);
-            padding: 7px 14px;
+            padding: 5px 10px;
             border-radius: 8px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s ease;
         }
 
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: var(--accent-primary);
-        }
-
+        /* Workspace Grid */
         .workspace-container {
             max-width: 1200px;
             width: 100%;
             margin: 0 auto;
-            padding: 24px 20px;
+            padding: 16px 14px 90px 14px; /* Bottom padding for mobile dock */
             flex: 1;
             display: grid;
             grid-template-columns: 1fr 380px;
-            gap: 20px;
+            gap: 16px;
         }
 
         @media (max-width: 900px) {
-            .workspace-container { grid-template-columns: 1fr; }
+            .workspace-container {
+                grid-template-columns: 1fr;
+                padding-bottom: 95px;
+            }
         }
 
         .meeting-stage {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 14px;
         }
 
         .participant-tiles {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 16px;
+            gap: 12px;
+        }
+
+        @media (max-width: 480px) {
+            .participant-tiles {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
         }
 
         .tile-card {
             background: var(--surface-card);
             border: 1px solid var(--border-subtle);
-            border-radius: 16px;
-            padding: 24px;
+            border-radius: 14px;
+            padding: 16px 10px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 220px;
+            min-height: 150px;
             position: relative;
             backdrop-filter: blur(12px);
             transition: all 0.3s ease;
@@ -173,55 +182,55 @@
 
         .tile-card.speaking {
             border-color: var(--success-color);
-            box-shadow: 0 0 24px rgba(34, 197, 94, 0.2);
-            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
         }
 
         .avatar-frame {
-            width: 76px;
-            height: 76px;
+            width: 58px;
+            height: 58px;
             border-radius: 50%;
             background: #1e293b;
             border: 2px solid var(--border-subtle);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 30px;
-            margin-bottom: 12px;
+            font-size: 24px;
+            margin-bottom: 8px;
             transition: transform 0.2s ease;
         }
 
         .tile-card.speaking .avatar-frame {
             border-color: var(--success-color);
-            transform: scale(1.08);
+            transform: scale(1.06);
         }
 
         .participant-name {
-            font-size: 15px;
+            font-size: 13px;
             font-weight: 600;
-            margin-bottom: 4px;
+            text-align: center;
+            margin-bottom: 3px;
         }
 
         .participant-lang-tag {
-            font-size: 12px;
+            font-size: 10px;
             color: var(--accent-primary);
             background: var(--accent-glow);
-            padding: 2px 10px;
-            border-radius: 12px;
+            padding: 2px 8px;
+            border-radius: 10px;
             font-weight: 500;
         }
 
         .audio-wave {
             display: flex;
             align-items: center;
-            gap: 4px;
-            height: 18px;
-            margin-top: 14px;
+            gap: 3px;
+            height: 14px;
+            margin-top: 8px;
         }
 
         .wave-bar {
-            width: 3px;
-            height: 4px;
+            width: 2.5px;
+            height: 3px;
             background: var(--border-subtle);
             border-radius: 2px;
             transition: height 0.15s ease;
@@ -237,93 +246,35 @@
         .tile-card.speaking .wave-bar:nth-child(4) { animation-delay: 0.45s; }
 
         @keyframes wavePulse {
-            0%, 100% { height: 4px; }
-            50% { height: 18px; }
+            0%, 100% { height: 3px; }
+            50% { height: 14px; }
         }
 
-        .sidebar-panel {
-            background: var(--surface-card);
-            border: 1px solid var(--border-subtle);
-            border-radius: 16px;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            backdrop-filter: blur(12px);
-        }
-
-        .panel-header {
-            padding: 14px 18px;
-            border-bottom: 1px solid var(--border-subtle);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .panel-header h3 {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .transcript-feed {
-            flex: 1;
-            padding: 16px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            min-height: 400px;
-            max-height: 520px;
-        }
-
-        .feed-item {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            padding: 12px 14px;
-            border-radius: 12px;
-            background: var(--surface-elevated);
-            font-size: 13px;
-            line-height: 1.5;
-            border-left: 3px solid transparent;
-        }
-
-        .feed-item.me { border-left-color: var(--accent-primary); }
-        .feed-item.partner { border-left-color: var(--success-color); }
-
-        .item-author {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-muted);
-        }
-
-        .item-original { color: #cbd5e1; }
-        .item-translated { color: var(--success-color); font-weight: 600; }
-
+        /* Config Grid */
         .config-strip {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
-            padding: 16px 20px;
+            gap: 8px;
+            padding: 12px;
             background: rgba(10, 14, 23, 0.6);
             border: 1px solid var(--border-subtle);
-            border-radius: 16px;
+            border-radius: 14px;
         }
 
-        @media (max-width: 768px) {
-            .config-strip { grid-template-columns: 1fr 1fr; }
+        @media (max-width: 600px) {
+            .config-strip {
+                grid-template-columns: 1fr 1fr;
+            }
         }
 
         .config-field {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 3px;
         }
 
         .config-field label {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 600;
             color: var(--text-muted);
             text-transform: uppercase;
@@ -333,35 +284,140 @@
             background: var(--surface-elevated);
             border: 1px solid var(--border-subtle);
             color: var(--text-main);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 13px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 12px;
             outline: none;
+            width: 100%;
         }
 
-        .bottom-status-bar {
-            margin-top: auto;
-            padding: 14px 20px;
+        /* Subtitles Panel */
+        .sidebar-panel {
+            background: var(--surface-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            backdrop-filter: blur(12px);
+        }
+
+        .panel-header {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-header h3 {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .transcript-feed {
+            flex: 1;
+            padding: 12px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 250px;
+            max-height: 380px;
+        }
+
+        @media (max-width: 900px) {
+            .transcript-feed {
+                max-height: 40vh;
+                min-height: 180px;
+            }
+        }
+
+        .feed-item {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: var(--surface-elevated);
+            font-size: 12px;
+            line-height: 1.4;
+            border-left: 3px solid transparent;
+        }
+
+        .feed-item.me { border-left-color: var(--accent-primary); }
+        .feed-item.partner { border-left-color: var(--success-color); }
+
+        .item-author {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .item-original { color: #cbd5e1; }
+        .item-translated { color: var(--success-color); font-weight: 600; }
+
+        /* Floating Bottom Dock (Mobile Friendly) */
+        .bottom-call-dock {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 12px 16px;
             display: flex;
             justify-content: center;
             align-items: center;
             gap: 12px;
-            background: rgba(10, 14, 23, 0.7);
+            background: rgba(10, 14, 23, 0.95);
             border-top: 1px solid var(--border-subtle);
-            font-size: 13px;
-            color: var(--text-muted);
+            backdrop-filter: blur(16px);
+            z-index: 100;
         }
 
-        .live-mic-badge {
-            display: inline-flex;
+        .dock-btn {
+            border: none;
+            padding: 10px 24px;
+            border-radius: 50px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
             align-items: center;
             gap: 6px;
-            background: rgba(34, 197, 94, 0.15);
-            color: var(--success-color);
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+        }
+
+        .btn-end {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            display: none;
+        }
+
+        .btn-mic-toggle {
+            background: var(--surface-elevated);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            border-radius: 50px;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-mic-toggle.muted {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: var(--danger-color);
+            color: #fca5a5;
         }
     </style>
 </head>
@@ -370,10 +426,10 @@
     <nav class="navbar">
         <div class="brand-cluster">
             <div class="brand-logo">S</div>
-            <div><div class="brand-title">Syncora Workspace</div></div>
+            <div class="brand-title">Syncora Workspace</div>
             <div class="status-pill">
                 <span class="dot-indicator" id="status-dot"></span>
-                <span id="call-status">Connecting...</span>
+                <span id="call-status">Ready</span>
             </div>
         </div>
 
@@ -382,7 +438,7 @@
                 <span>Room:</span>
                 <b id="room-display">...</b>
             </div>
-            <button class="btn-secondary" id="copy-btn" onclick="copyInviteLink()">📋 Copy Invite</button>
+            <button class="btn-secondary" id="copy-btn" onclick="copyInviteLink()">📋 Copy</button>
         </div>
     </nav>
 
@@ -420,7 +476,7 @@
                     <input type="text" id="username" class="text-input" value="Ali" oninput="updateNames()">
                 </div>
                 <div class="config-field">
-                    <label>Voice Gender</label>
+                    <label>Voice</label>
                     <select id="gender" class="select-input">
                         <option value="male" selected>👨 Male</option>
                         <option value="female">👩 Female</option>
@@ -433,6 +489,7 @@
                         <option value="en-US">🇬🇧 English</option>
                         <option value="ms-MY">🇲🇾 Malay</option>
                         <option value="zh-CN">🇨🇳 Chinese</option>
+                        <option value="ar-SA">🇸🇦 Arabic</option>
                     </select>
                 </div>
                 <div class="config-field">
@@ -442,6 +499,7 @@
                         <option value="ms-MY">🇲🇾 Malay</option>
                         <option value="ur-PK">🇵🇰 Urdu</option>
                         <option value="zh-CN">🇨🇳 Chinese</option>
+                        <option value="ar-SA">🇸🇦 Arabic</option>
                     </select>
                 </div>
             </div>
@@ -449,19 +507,26 @@
 
         <aside class="sidebar-panel">
             <div class="panel-header">
-                <h3>Live Interpretation Feed</h3>
+                <h3>Interpretation Feed</h3>
             </div>
             <div class="transcript-feed" id="captions">
-                <div id="placeholder-msg" style="text-align: center; color: var(--text-muted); font-size: 13px; margin: auto;">
-                    Hands-free mode active. Just speak naturally into your microphone.
+                <div id="placeholder-msg" style="text-align: center; color: var(--text-muted); font-size: 12px; margin: auto;">
+                    Tap "Start Call" below to begin interpretation.
                 </div>
             </div>
         </aside>
     </main>
 
-    <footer class="bottom-status-bar">
-        <div class="live-mic-badge">● Live Mic Active</div>
-        <span>Speak naturally. AI will detect your pauses and translate automatically.</span>
+    <footer class="bottom-call-dock">
+        <button class="dock-btn btn-start" id="start-call-btn" onclick="startCall()">
+            📞 Start Call
+        </button>
+        <button class="btn-mic-toggle" id="mute-toggle-btn" onclick="toggleMute()">
+            🎙️ Mic: ON
+        </button>
+        <button class="dock-btn btn-end" id="end-call-btn" onclick="endCall()">
+            🛑 End Call
+        </button>
     </footer>
 
     <script>
@@ -476,15 +541,17 @@
         let socket = null;
         let recognition = null;
         let currentAudio = null;
+        let isCallActive = false;
         let isPartnerSpeaking = false;
+        let isMuted = false;
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         function copyInviteLink() {
             navigator.clipboard.writeText(window.location.href).then(() => {
                 const btn = document.getElementById("copy-btn");
-                btn.innerText = "✅ Copied";
-                setTimeout(() => { btn.innerText = "📋 Copy Invite"; }, 2000);
+                btn.innerText = "✅ Done";
+                setTimeout(() => { btn.innerText = "📋 Copy"; }, 1500);
             });
         }
 
@@ -500,7 +567,7 @@
             document.getElementById("local-lang-label").innerText = myLangSelect.options[myLangSelect.selectedIndex].text;
             document.getElementById("remote-lang-label").innerText = tgtLangSelect.options[tgtLangSelect.selectedIndex].text;
 
-            if (recognition) {
+            if (recognition && isCallActive) {
                 try {
                     recognition.abort();
                     recognition.lang = myLangSelect.value;
@@ -515,16 +582,16 @@
 
             socket.onopen = () => {
                 document.getElementById("status-dot").classList.add("live");
-                document.getElementById("call-status").innerText = "Bridge Connected";
+                document.getElementById("call-status").innerText = "Connected";
             };
 
             socket.onmessage = (event) => {
+                if (!isCallActive) return;
                 const data = JSON.parse(event.data);
                 const isMe = (data.sender_id === myClientId);
 
                 appendTranscript(data.sender_name, data.original, data.translated, isMe);
 
-                // Sirf samne wale ke speaker par play ho, with correct target language
                 if (!isMe) {
                     playPartnerAudio(data.translated, data.target_lang, data.gender);
                 }
@@ -533,7 +600,7 @@
             socket.onclose = () => {
                 document.getElementById("status-dot").classList.remove("live");
                 document.getElementById("call-status").innerText = "Disconnected";
-                setTimeout(initSocket, 3000);
+                if (isCallActive) setTimeout(initSocket, 2500);
             };
         }
 
@@ -588,7 +655,7 @@
         }
 
         function restartMic() {
-            if (recognition && !isPartnerSpeaking) {
+            if (recognition && isCallActive && !isPartnerSpeaking && !isMuted) {
                 try {
                     recognition.lang = document.getElementById("my-lang").value;
                     recognition.start();
@@ -596,9 +663,9 @@
             }
         }
 
-        function initContinuousSpeech() {
+        function setupSpeechRecognition() {
             if (!SpeechRecognition) {
-                alert("Please use Chrome or Edge for hands-free voice bridge.");
+                alert("Please use Chrome or Edge browser.");
                 return;
             }
 
@@ -606,14 +673,8 @@
             recognition.continuous = true;
             recognition.interimResults = false;
 
-            recognition.onstart = () => {
-                if (!isPartnerSpeaking) {
-                    document.getElementById("local-tile").classList.remove("speaking");
-                }
-            };
-
             recognition.onresult = (event) => {
-                if (isPartnerSpeaking) return;
+                if (!isCallActive || isPartnerSpeaking || isMuted) return;
 
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
                     if (event.results[i].isFinal) {
@@ -642,18 +703,69 @@
             };
 
             recognition.onend = () => {
-                if (!isPartnerSpeaking) {
+                if (isCallActive && !isPartnerSpeaking && !isMuted) {
                     restartMic();
                 }
             };
+        }
+
+        function startCall() {
+            isCallActive = true;
+            isPartnerSpeaking = false;
+            isMuted = false;
+
+            document.getElementById("start-call-btn").style.display = "none";
+            document.getElementById("end-call-btn").style.display = "flex";
+            document.getElementById("mute-toggle-btn").style.display = "flex";
+
+            const unlock = new Audio();
+            unlock.play().catch(() => {});
+
+            initSocket();
+            setupSpeechRecognition();
 
             recognition.lang = document.getElementById("my-lang").value;
             try { recognition.start(); } catch(e) {}
         }
 
+        function endCall() {
+            isCallActive = false;
+            document.getElementById("start-call-btn").style.display = "flex";
+            document.getElementById("end-call-btn").style.display = "none";
+            document.getElementById("mute-toggle-btn").style.display = "none";
+
+            if (recognition) {
+                try { recognition.abort(); } catch(e) {}
+            }
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+            if (socket) {
+                socket.close();
+            }
+
+            document.getElementById("local-tile").classList.remove("speaking");
+            document.getElementById("remote-tile").classList.remove("speaking");
+            document.getElementById("status-dot").classList.remove("live");
+            document.getElementById("call-status").innerText = "Ended";
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            const btn = document.getElementById("mute-toggle-btn");
+            if (isMuted) {
+                btn.classList.add("muted");
+                btn.innerText = "🔇 Muted";
+                if (recognition) try { recognition.abort(); } catch(e) {}
+            } else {
+                btn.classList.remove("muted");
+                btn.innerText = "🎙️ Mic: ON";
+                restartMic();
+            }
+        }
+
         window.onload = () => {
-            initSocket();
-            initContinuousSpeech();
             syncLanguages();
             updateNames();
         };
