@@ -4,25 +4,41 @@ import asyncio
 from typing import List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, Response
-from deep_translator import GoogleTranslator, MyMemoryTranslator
+from openai import AsyncOpenAI
 import edge_tts
 
-app = FastAPI(title="Syncora Sourcing Bridge")
+app = FastAPI(title="Syncora Multilingual Sourcing Bridge")
 
-# Male aur Female ke liye realistic natural Microsoft Neural Voices
+# OpenAI / Groq Compatible Client
+client = AsyncOpenAI(
+    api_key=os.environ.get("OPENAI_API_KEY", "your-api-key-here")
+)
+
+# Natural Microsoft Neural Voices (Male / Female per Language)
 VOICE_MAP = {
-    "ur": {
-        "male": "ur-PK-AsadNeural",
-        "female": "ur-PK-UzmaNeural"
-    },
-    "zh": {
-        "male": "zh-CN-YunxiNeural",
-        "female": "zh-CN-XiaoxiaoNeural"
-    },
-    "en": {
-        "male": "en-US-BrianNeural",
-        "female": "en-US-AvaNeural"
-    }
+    "ur": {"male": "ur-PK-AsadNeural", "female": "ur-PK-UzmaNeural"},
+    "zh": {"male": "zh-CN-YunxiNeural", "female": "zh-CN-XiaoxiaoNeural"},
+    "en": {"male": "en-US-BrianNeural", "female": "en-US-AvaNeural"},
+    "ms": {"male": "ms-MY-OsmanNeural", "female": "ms-MY-YasminNeural"},
+    "ar": {"male": "ar-SA-HamedNeural", "female": "ar-SA-ZariyahNeural"},
+    "es": {"male": "es-ES-AlvaroNeural", "female": "es-ES-ElviraNeural"},
+    "ru": {"male": "ru-RU-DmitryNeural", "female": "ru-RU-SvetlanaNeural"},
+    "tr": {"male": "tr-TR-AhmetNeural", "female": "tr-TR-EmelNeural"},
+    "de": {"male": "de-DE-ConradNeural", "female": "de-DE-KatjaNeural"},
+    "ja": {"male": "ja-JP-KeitaNeural", "female": "ja-JP-NanamiNeural"}
+}
+
+LANG_NAMES = {
+    "ur": "Urdu",
+    "zh": "Mandarin Chinese (Simplified)",
+    "en": "English",
+    "ms": "Malay (Bahasa Melayu)",
+    "ar": "Arabic",
+    "es": "Spanish",
+    "ru": "Russian",
+    "tr": "Turkish",
+    "de": "German",
+    "ja": "Japanese"
 }
 
 class ConnectionManager:
@@ -46,7 +62,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# Edge-TTS Audio Generation with Gender & Human Cadence Tuning
+# Edge-TTS Audio Generation
 @app.get("/tts")
 async def text_to_speech(text: str, lang: str, gender: str = "female"):
     if not text.strip():
@@ -55,11 +71,9 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
     prefix = lang[:2].lower()
     gender_clean = gender.lower() if gender.lower() in ["male", "female"] else "female"
     
-    # Matching voice lookup
     lang_voices = VOICE_MAP.get(prefix, VOICE_MAP["en"])
     selected_voice = lang_voices.get(gender_clean, lang_voices["female"])
     
-    # rate="-4%" aur pitch="-1Hz" se natural pause aur human warmth milti hai
     communicate = edge_tts.Communicate(
         text=text, 
         voice=selected_voice,
@@ -74,35 +88,30 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# Reliable Multi-Provider Translation
-def perform_translation(text: str, src_lang: str, tgt_lang: str) -> str:
-    mm_map = {
-        "ur": "ur-PK",
-        "zh": "zh-CN",
-        "en": "en-US"
-    }
-    mm_src = mm_map.get(src_lang[:2].lower(), "en-US")
-    mm_tgt = mm_map.get(tgt_lang[:2].lower(), "zh-CN")
+# LLM Translation Engine
+async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
+    source = LANG_NAMES.get(src_lang[:2].lower(), src_lang)
+    target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
 
-    # Primary: MyMemory Translator (Cloud IPs par fully reliable)
-    try:
-        res = MyMemoryTranslator(source=mm_src, target=mm_tgt).translate(text)
-        if res and not res.strip().startswith("["):
-            return res
-    except Exception:
-        pass
+    system_prompt = (
+        f"You are a real-time bilateral business and sourcing interpreter between {source} and {target}. "
+        f"Translate the user's spoken input naturally, conversationally, and accurately into {target}. "
+        "Do NOT provide explanations, pleasantries, or phonetic transliterations. Output ONLY the raw translated sentence."
+    )
 
-    # Secondary Backup: Google Translator
     try:
-        g_src = "zh-CN" if src_lang.lower().startswith("zh") else src_lang[:2].lower()
-        g_tgt = "zh-CN" if tgt_lang.lower().startswith("zh") else tgt_lang[:2].lower()
-        res = GoogleTranslator(source=g_src, target=g_tgt).translate(text)
-        if res:
-            return res
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text}
+            ],
+            temperature=0.3,
+            max_tokens=250
+        )
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        return f"[Translation Error: {str(e)}]"
-
-    return text
+        return f"[LLM Error: {str(e)}]"
 
 @app.websocket("/ws/room")
 async def websocket_endpoint(websocket: WebSocket):
@@ -121,7 +130,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if not original_text:
                 continue
 
-            translated_text = perform_translation(original_text, src_lang, tgt_lang)
+            translated_text = await llm_translate(original_text, src_lang, tgt_lang)
 
             payload = {
                 "sender": sender,
@@ -145,17 +154,19 @@ async def get_index():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Syncora Digital | Sourcing Bridge</title>
+    <title>Syncora Sourcing Bridge | Global Edition</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
-        .container { max-width: 600px; margin: auto; background: #1e293b; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+        .container { max-width: 650px; margin: auto; background: #1e293b; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
         h2 { margin-top: 0; color: #38bdf8; text-align: center; }
-        .config-box { display: flex; gap: 8px; margin-bottom: 15px; }
+        .config-box { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
         select, input { padding: 10px; border-radius: 8px; border: 1px solid #475569; background: #334155; color: white; box-sizing: border-box; }
+        .full-w { width: 100%; display: flex; gap: 8px; }
         #username { flex: 2; }
-        #gender { flex: 1.5; }
-        #my-lang { flex: 2.5; }
-        .controls { text-align: center; margin: 20px 0; }
+        #gender { flex: 1.2; }
+        .lang-select { flex: 1; }
+        .lang-label { font-size: 11px; color: #94a3b8; margin-bottom: 3px; display: block; }
+        .controls { text-align: center; margin: 15px 0; }
         button { background: #22c55e; color: white; border: none; padding: 14px 24px; font-size: 16px; font-weight: bold; border-radius: 30px; cursor: pointer; width: 100%; transition: 0.2s; }
         button.recording { background: #ef4444; }
         #chat-box { height: 350px; overflow-y: auto; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #334155; }
@@ -168,19 +179,50 @@ async def get_index():
 <body>
 
 <div class="container">
-    <h2>⚡ Syncora Sourcing Bridge</h2>
+    <h2>⚡ Syncora Global Bridge</h2>
     
     <div class="config-box">
-        <input type="text" id="username" placeholder="Your Name" value="Ali">
-        <select id="gender">
-            <option value="male" selected>👨 Male</option>
-            <option value="female">👩 Female</option>
-        </select>
-        <select id="my-lang">
-            <option value="ur-PK" selected>🇵🇰 Urdu</option>
-            <option value="zh-CN">🇨🇳 Chinese</option>
-            <option value="en-US">🇬🇧 English</option>
-        </select>
+        <div class="full-w">
+            <input type="text" id="username" placeholder="Your Name" value="Ali">
+            <select id="gender">
+                <option value="male" selected>👨 Male</option>
+                <option value="female">👩 Female</option>
+            </select>
+        </div>
+
+        <div class="full-w">
+            <div class="lang-select">
+                <span class="lang-label">I Speak (Source):</span>
+                <select id="my-lang" style="width: 100%;">
+                    <option value="ur-PK" selected>🇵🇰 Urdu</option>
+                    <option value="zh-CN">🇨🇳 Chinese (Mandarin)</option>
+                    <option value="en-US">🇬🇧 English</option>
+                    <option value="ms-MY">🇲🇾 Malay (Malaysia)</option>
+                    <option value="ar-SA">🇸🇦 Arabic</option>
+                    <option value="es-ES">🇪🇸 Spanish</option>
+                    <option value="ru-RU">🇷🇺 Russian</option>
+                    <option value="tr-TR">🇹🇷 Turkish</option>
+                    <option value="de-DE">🇩🇪 German</option>
+                    <option value="ja-JP">🇯🇵 Japanese</option>
+                </select>
+            </div>
+
+            <div class="lang-select">
+                <span class="lang-label">Translate To (Target):</span>
+                <select id="target-lang" style="width: 100%;">
+                    <option value="ms-MY" selected>🇲🇾 Malay (Malaysia)</option>
+                    <option value="zh-CN">🇨🇳 Chinese (Mandarin)</option>
+                    <option value="ur-PK">🇵🇰 Urdu</option>
+                    <option value="en-US">🇬🇧 English</option>
+                    <option value="ar-SA">🇸🇦 Arabic</option>
+                    <option value="es-ES">🇪🇸 Spanish</option>
+                    <option value="ru-RU">🇷🇺 Russian</option>
+                    <option value="tr-TR">🇹🇷 Turkish</option>
+                    <option value="de-DE">🇩🇪 German</option>
+                    <option value="ja-JP">🇯🇵 Japanese</option>
+                </select>
+            </div>
+        </div>
     </div>
 
     <div class="controls">
@@ -202,23 +244,22 @@ async def get_index():
         const bubble = document.createElement("div");
         bubble.className = "bubble";
         bubble.innerHTML = `
-            <div class="sender">${genderIcon} ${msg.sender} (${msg.source_lang})</div>
+            <div class="sender">${genderIcon} ${msg.sender} (${msg.source_lang} ➔ ${msg.target_lang})</div>
             <div class="orig">${msg.original}</div>
             <div class="trans">👉 <b>${msg.translated}</b></div>
         `;
         chatBox.appendChild(bubble);
         chatBox.scrollTop = chatBox.scrollHeight;
 
-        // Bolne wale ke gender ke mutabiq awaaz bajegi
         speakText(msg.translated, msg.target_lang, msg.gender);
     };
 
     function speakText(text, lang, gender) {
-        if (!text || text.startsWith("[Translation Error")) return;
+        if (!text || text.startsWith("[LLM Error")) return;
         const url = `/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(lang)}&gender=${encodeURIComponent(gender)}`;
         const audio = new Audio(url);
         audio.play().catch(e => {
-            console.log("Audio block error:", e);
+            console.log("Audio play error:", e);
         });
     }
 
@@ -242,22 +283,13 @@ async def get_index():
             const sender = document.getElementById("username").value;
             const gender = document.getElementById("gender").value;
             const myLang = document.getElementById("my-lang").value;
-            
-            // Auto target mapping: Urdu -> Chinese, Chinese -> Urdu, English -> Urdu
-            let targetLang = "ur-PK";
-            if (myLang.startsWith("ur")) {
-                targetLang = "zh-CN";
-            } else if (myLang.startsWith("zh")) {
-                targetLang = "ur-PK";
-            } else {
-                targetLang = "ur-PK";
-            }
+            const tgtLang = document.getElementById("target-lang").value;
 
             socket.send(JSON.stringify({
                 sender: sender,
                 gender: gender,
                 source_lang: myLang,
-                target_lang: targetLang,
+                target_lang: tgtLang,
                 text: transcript
             }));
         };
