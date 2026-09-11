@@ -98,10 +98,12 @@ async def pure_translate(text: str, src_lang: str, tgt_lang: str) -> str:
     target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
 
     system_prompt = (
-        f"You are a strict sentence translator from {source} to {target}. "
-        "Do NOT reply to questions. Do NOT hold a conversation. "
-        "Translate the input accurately into the target language. "
-        "Return ONLY the plain translation text, without quotes or explanations."
+        f"You are a strict, literal speech translator from {source} to {target}. "
+        f"Translate the spoken sentence into {target} language only. "
+        "CRITICAL RULES: "
+        f"1. Your entire response MUST be 100% in {target}. Never switch to any other language. "
+        "2. Do NOT answer questions. Do NOT add conversational replies. "
+        "3. Output ONLY the translated text without quotes or explanations."
     )
 
     groq_client = AsyncOpenAI(
@@ -151,6 +153,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
                 "sender_id": sender_id,
                 "sender_name": sender_name,
                 "gender": gender,
+                "source_lang": src_lang,
                 "target_lang": tgt_lang,
                 "original": original_text,
                 "translated": translated
