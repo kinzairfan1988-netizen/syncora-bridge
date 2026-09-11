@@ -83,7 +83,7 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# Conversational AI Agent Engine (Replies back instead of just repeating/translating)
+# Strict Single-Language Conversational AI Engine
 async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
@@ -94,14 +94,14 @@ async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
     source = LANG_NAMES.get(src_lang[:2].lower(), src_lang)
     target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
 
-    # Ab AI aapki baat ka jawab dega, sirf repeat nahi karega
+    # Strictly lock the output language so it never switches
     system_prompt = (
-        f"You are Syncora, an intelligent and polite international business & sourcing assistant. "
-        f"The user is speaking to you in {source}. "
-        f"Understand the user's input, formulate a helpful, direct conversational reply, "
-        f"and output your reply strictly in {target}. "
-        "Keep the reply concise (1 to 2 spoken sentences suitable for a live phone call). "
-        "Do NOT repeat the user's question. Do NOT include markdown, notes, or explanations. Only output the spoken answer."
+        f"You are Syncora, an intelligent real-time conversational voice assistant. "
+        f"CRITICAL RULE: You MUST speak and respond ONLY in {target}. "
+        f"Never use Arabic, Malay, or any other language unless explicitly requested as {target}. "
+        f"The user is speaking in {source}. Understand their message and give a direct, natural spoken response. "
+        f"Your response must be entirely in {target} language only (1 to 2 short sentences). "
+        "Do NOT provide translations, phonetic guides, notes, or explanations."
     )
 
     groq_client = AsyncOpenAI(
@@ -109,20 +109,11 @@ async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
         api_key=clean_key
     )
 
-    candidate_models = []
-    try:
-        model_list = await groq_client.models.list()
-        candidate_models = [m.id for m in model_list.data if "whisper" not in m.id]
-    except Exception:
-        pass
-
-    if not candidate_models:
-        candidate_models = [
-            "llama-3.1-8b-instant",
-            "llama-3.2-11b-vision-preview",
-            "llama-3.2-3b-preview",
-            "qwen-2.5-32b"
-        ]
+    candidate_models = [
+        "llama-3.1-8b-instant",
+        "llama-3.2-11b-vision-preview",
+        "llama-3.2-3b-preview"
+    ]
 
     for target_model in candidate_models:
         try:
@@ -132,8 +123,8 @@ async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": text}
                 ],
-                temperature=0.4,
-                max_tokens=200
+                temperature=0.1,  # Low temperature prevents language drifting
+                max_tokens=150
             )
             content = response.choices[0].message.content
             if content and content.strip():
@@ -141,7 +132,7 @@ async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
         except Exception:
             continue
 
-    return "Maaf kijiye, main abhi jawab generate nahi kar pa raha."
+    return "Sorry, I am unable to generate a response right now."
 
 @app.websocket("/ws/room")
 async def websocket_endpoint(websocket: WebSocket):
@@ -154,13 +145,12 @@ async def websocket_endpoint(websocket: WebSocket):
             sender = data.get("sender", "Ali")
             gender = data.get("gender", "male")
             src_lang = data.get("source_lang", "ur-PK")
-            tgt_lang = data.get("target_lang", "ms-MY")
+            tgt_lang = data.get("target_lang", "en-US")
             original_text = data.get("text", "").strip()
 
             if not original_text:
                 continue
 
-            # Generate AI Reply
             reply_text = await llm_agent_reply(original_text, src_lang, tgt_lang)
 
             payload = {
