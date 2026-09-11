@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, Response, FileResponse
 from openai import AsyncOpenAI
 import edge_tts
 
-app = FastAPI(title="Syncora Live Bridge")
+app = FastAPI(title="Syncora Call Bridge")
 
 VOICE_MAP = {
     "ur": {"male": "ur-PK-AsadNeural", "female": "ur-PK-UzmaNeural"},
@@ -87,8 +87,7 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# Strict Two-Way Human Interpretation (No Bot Reply)
-async def translate_sentence(text: str, src_lang: str, tgt_lang: str) -> str:
+async def pure_translate(text: str, src_lang: str, tgt_lang: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
 
@@ -99,13 +98,10 @@ async def translate_sentence(text: str, src_lang: str, tgt_lang: str) -> str:
     target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
 
     system_prompt = (
-        f"You are a professional bilateral real-time human interpreter between {source} and {target}. "
-        f"The speaker just said a sentence in {source}. "
-        f"Translate it directly, accurately, and naturally into {target} as if you are the speaker. "
-        "CRITICAL RULES: "
-        "1. Do NOT reply or converse. "
-        "2. Do NOT answer the questions. Only TRANSLATE the question or sentence. "
-        f"3. Output strictly the translated sentence in {target}. No quotes, no explanations."
+        f"You are a strict sentence translator from {source} to {target}. "
+        "Do NOT reply to questions. Do NOT hold a conversation. "
+        "Translate the input accurately into the target language. "
+        "Return ONLY the plain translation text, without quotes or explanations."
     )
 
     groq_client = AsyncOpenAI(
@@ -113,24 +109,21 @@ async def translate_sentence(text: str, src_lang: str, tgt_lang: str) -> str:
         api_key=clean_key
     )
 
-    models_to_try = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
-
-    for model_name in models_to_try:
-        try:
-            response = await groq_client.chat.completions.create(
-                model=model_name,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": text}
-                ],
-                temperature=0.1,
-                max_tokens=200
-            )
-            content = response.choices[0].message.content
-            if content and content.strip():
-                return content.strip()
-        except Exception:
-            continue
+    try:
+        response = await groq_client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text}
+            ],
+            temperature=0.0,
+            max_tokens=200
+        )
+        content = response.choices[0].message.content
+        if content and content.strip():
+            return content.strip()
+    except Exception:
+        pass
 
     return text
 
@@ -152,16 +145,15 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
             if not original_text:
                 continue
 
-            translated_text = await translate_sentence(original_text, src_lang, tgt_lang)
+            translated = await pure_translate(original_text, src_lang, tgt_lang)
 
             payload = {
                 "sender_id": sender_id,
                 "sender_name": sender_name,
                 "gender": gender,
-                "source_lang": src_lang,
                 "target_lang": tgt_lang,
                 "original": original_text,
-                "translated": translated_text
+                "translated": translated
             }
             await manager.broadcast(room_id, payload)
 
