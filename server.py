@@ -9,9 +9,10 @@ import edge_tts
 
 app = FastAPI(title="Syncora Multilingual Sourcing Bridge")
 
-# OpenAI / Groq Compatible Client
+# Groq Cloud Ultra-Fast Free LLM Client
 client = AsyncOpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY", "your-api-key-here")
+    base_url="https://api.groq.com/openai/v1",
+    api_key=os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY")
 )
 
 # Natural Microsoft Neural Voices (Male / Female per Language)
@@ -88,7 +89,7 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# LLM Translation Engine
+# Ultra-Fast Llama-3 Translation Engine via Groq
 async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
     source = LANG_NAMES.get(src_lang[:2].lower(), src_lang)
     target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
@@ -96,22 +97,22 @@ async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
     system_prompt = (
         f"You are a real-time bilateral business and sourcing interpreter between {source} and {target}. "
         f"Translate the user's spoken input naturally, conversationally, and accurately into {target}. "
-        "Do NOT provide explanations, pleasantries, or phonetic transliterations. Output ONLY the raw translated sentence."
+        "Do NOT provide explanations, notes, pleasantries, or quotes. Output ONLY the raw translated sentence."
     )
 
     try:
         response = await client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": text}
             ],
-            temperature=0.3,
+            temperature=0.2,
             max_tokens=250
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        return f"[LLM Error: {str(e)}]"
+        return f"[Groq LLM Error: {str(e)}]"
 
 @app.websocket("/ws/room")
 async def websocket_endpoint(websocket: WebSocket):
@@ -124,7 +125,7 @@ async def websocket_endpoint(websocket: WebSocket):
             sender = data.get("sender", "Anonymous")
             gender = data.get("gender", "male")
             src_lang = data.get("source_lang", "ur-PK")
-            tgt_lang = data.get("target_lang", "zh-CN")
+            tgt_lang = data.get("target_lang", "ms-MY")
             original_text = data.get("text", "").strip()
 
             if not original_text:
@@ -255,7 +256,7 @@ async def get_index():
     };
 
     function speakText(text, lang, gender) {
-        if (!text || text.startsWith("[LLM Error")) return;
+        if (!text || text.startsWith("[Groq LLM Error")) return;
         const url = `/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(lang)}&gender=${encodeURIComponent(gender)}`;
         const audio = new Audio(url);
         audio.play().catch(e => {
