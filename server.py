@@ -58,12 +58,13 @@ async def text_to_speech(text: str, lang: str = "en", gender: str = "female"):
     if not text.strip():
         return Response(content=b"", media_type="audio/mpeg")
     
-    # Strip any dialect codes (e.g. en-US -> en, ur-PK -> ur)
     prefix = (lang or "en").split("-")[0].lower()
     gender_clean = gender.lower() if gender.lower() in ["male", "female"] else "female"
     
     lang_voices = VOICE_MAP.get(prefix, VOICE_MAP["en"])
     selected_voice = lang_voices.get(gender_clean, lang_voices["female"])
+    
+    print(f"[TTS DEBUG] Voice: {selected_voice} | Lang: {prefix} | Text: {text[:40]}")
     
     communicate = edge_tts.Communicate(
         text=text, 
@@ -88,7 +89,8 @@ def extract_clean_translation(raw: str) -> str:
                 clean = re.sub(r'^(Translation:|Output:|"|\')', "", l, flags=re.IGNORECASE).strip().strip('"')
                 if clean:
                     return clean
-    return text.strip().strip('"')
+    clean = re.sub(r'^(Translation:|Output:|"|\')', "", text.strip(), flags=re.IGNORECASE).strip().strip('"')
+    return clean
 
 async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
@@ -102,6 +104,8 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
 
     target_lang = LANG_MAP.get(tgt_prefix, "English")
     source_lang = LANG_MAP.get(src_prefix, "Urdu")
+
+    print(f"[TRANS DEBUG] Input: '{text}' | Source: {source_lang} ({src_code}) -> Target: {target_lang} ({tgt_code})")
 
     groq_client = AsyncOpenAI(
         base_url="https://api.groq.com/openai/v1",
@@ -117,17 +121,25 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
                 messages=[
                     {
                         "role": "system",
-                        "content": f"You are a translator. Translate from {source_lang} into {target_lang}. Return ONLY the direct translation in {target_lang}. Never explain, never analyze, never output thinking process."
+                        "content": (
+                            f"You are a strict bilingual translator from {source_lang} to {target_lang}. "
+                            f"Your output MUST be exclusively in {target_lang}. "
+                            f"NEVER use Arabic characters or words unless target is Arabic. "
+                            "Output ONLY the translated sentence. No explanations, no quotes."
+                        )
                     },
                     {"role": "user", "content": text}
                 ],
                 temperature=0.0,
-                max_tokens=100
+                max_tokens=120
             )
             content = response.choices[0].message.content
             if content and content.strip():
-                return extract_clean_translation(content)
-        except Exception:
+                clean = extract_clean_translation(content)
+                print(f"[TRANS RESULT] Success: '{clean}'")
+                return clean
+        except Exception as e:
+            print(f"[TRANS ERROR] Model {model_name} failed: {e}")
             continue
 
     return text
