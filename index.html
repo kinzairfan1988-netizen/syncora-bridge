@@ -30,7 +30,7 @@
         }
         .header {
             text-align: center;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
         .header h2 {
             margin: 0 0 6px 0;
@@ -44,16 +44,11 @@
             background: #0b111c;
             padding: 10px 14px;
             border-radius: 12px;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
             border: 1px dashed #334155;
         }
-        .room-info {
-            font-size: 13px;
-            color: #94a3b8;
-        }
-        .room-info b {
-            color: #38bdf8;
-        }
+        .room-info { font-size: 13px; color: #94a3b8; }
+        .room-info b { color: #38bdf8; }
         .copy-btn {
             background: #334155;
             color: #f8fafc;
@@ -73,6 +68,7 @@
             border-radius: 20px;
             font-size: 12px;
             color: #94a3b8;
+            margin: auto;
         }
         .dot {
             width: 8px;
@@ -88,7 +84,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
             background: #0b111c;
             padding: 12px;
             border-radius: 16px;
@@ -114,44 +110,10 @@
             outline: none;
             width: 100%;
         }
-        .call-visualizer {
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            padding: 14px 0;
-            margin: 6px 0;
-        }
-        .avatar-wrap {
-            text-align: center;
-        }
-        .avatar {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background: #1e293b;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 30px;
-            margin: auto;
-            border: 3px solid #334155;
-            transition: 0.3s;
-        }
-        .avatar.speaking {
-            border-color: #22c55e;
-            transform: scale(1.06);
-            box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
-        }
-        .avatar-label {
-            margin-top: 6px;
-            font-size: 12px;
-            font-weight: bold;
-            color: #cbd5e1;
-        }
         .live-captions {
             background: #0b111c;
             border-radius: 14px;
-            height: 170px;
+            height: 180px;
             overflow-y: auto;
             padding: 12px;
             margin-bottom: 16px;
@@ -167,21 +129,13 @@
             border-radius: 10px;
             background: #131d2e;
         }
-        .transcript-item.me {
-            border-left: 3px solid #38bdf8;
-        }
-        .transcript-item.partner {
-            border-left: 3px solid #22c55e;
-        }
-        .transcript-item .user {
-            font-size: 11px;
-            font-weight: bold;
-            margin-bottom: 2px;
-        }
+        .transcript-item.me { border-left: 3px solid #38bdf8; }
+        .transcript-item.partner { border-left: 3px solid #22c55e; }
+        .transcript-item .user { font-size: 11px; font-weight: bold; margin-bottom: 2px; }
         .transcript-item.me .user { color: #38bdf8; }
         .transcript-item.partner .user { color: #22c55e; }
         .transcript-item .orig { color: #94a3b8; }
-        .transcript-item .trans { font-weight: 500; margin-top: 2px; color: #f8fafc; }
+        .transcript-item .trans { color: #f8fafc; font-weight: 500; margin-top: 2px; }
         .call-actions {
             display: flex;
             gap: 12px;
@@ -212,10 +166,10 @@
 
 <div class="call-card">
     <div class="header">
-        <h2>⚡ Syncora Bilateral Call</h2>
+        <h2>⚡ Syncora Call Bridge</h2>
         <div class="status-badge">
             <span class="dot" id="status-dot"></span>
-            <span id="call-status">Call Disconnected</span>
+            <span id="call-status">Disconnected</span>
         </div>
     </div>
 
@@ -244,45 +198,23 @@
                 <option value="zh-CN">🇨🇳 Chinese</option>
                 <option value="ms-MY">🇲🇾 Malay</option>
                 <option value="ar-SA">🇸🇦 Arabic</option>
-                <option value="es-ES">🇪🇸 Spanish</option>
-                <option value="ru-RU">🇷🇺 Russian</option>
-                <option value="tr-TR">🇹🇷 Turkish</option>
-                <option value="de-DE">🇩🇪 German</option>
-                <option value="ja-JP">🇯🇵 Japanese</option>
             </select>
         </div>
         <div class="field-group">
-            <label>Partner Speaks</label>
+            <label>Partner Hears</label>
             <select id="target-lang">
                 <option value="en-US" selected>🇬🇧 English</option>
                 <option value="ms-MY">🇲🇾 Malay</option>
                 <option value="ur-PK">🇵🇰 Urdu</option>
                 <option value="zh-CN">🇨🇳 Chinese</option>
                 <option value="ar-SA">🇸🇦 Arabic</option>
-                <option value="es-ES">🇪🇸 Spanish</option>
-                <option value="ru-RU">🇷🇺 Russian</option>
-                <option value="tr-TR">🇹🇷 Turkish</option>
-                <option value="de-DE">🇩🇪 German</option>
-                <option value="ja-JP">🇯🇵 Japanese</option>
             </select>
-        </div>
-    </div>
-
-    <div class="call-visualizer">
-        <div class="avatar-wrap">
-            <div class="avatar" id="local-avatar">🎙️</div>
-            <div class="avatar-label" id="local-label">You</div>
-        </div>
-        <div style="color: #64748b; font-size: 20px;">➔</div>
-        <div class="avatar-wrap">
-            <div class="avatar" id="remote-avatar">🔊</div>
-            <div class="avatar-label" id="remote-label">Partner</div>
         </div>
     </div>
 
     <div class="live-captions" id="captions">
         <div id="placeholder-msg" style="text-align: center; color: #475569; font-size: 12px; margin: auto;">
-            Link copy karke partner ko bhejein, phir "Start Call" karein.
+            Link copy kar ke partner ko bhejein aur "Start Call" karein.
         </div>
     </div>
 
@@ -297,23 +229,20 @@
 </div>
 
 <script>
-    // Room Setup
     const urlParams = new URLSearchParams(window.location.search);
     let roomId = urlParams.get('room');
     if (!roomId) {
         roomId = 'call-' + Math.random().toString(36).substring(2, 7);
-        const newUrl = window.location.pathname + '?room=' + roomId;
-        window.history.replaceState(null, '', newUrl);
+        window.history.replaceState(null, '', window.location.pathname + '?room=' + roomId);
     }
     document.getElementById("room-display").innerText = roomId;
 
-    // Unique user ID per tab
     const myClientId = 'user_' + Math.random().toString(36).substring(2, 9);
 
     let socket = null;
     let recognition = null;
     let isCallActive = false;
-    let isPlayingIncomingAudio = false;
+    let isPlayingAudio = false;
     let currentAudio = null;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -326,18 +255,17 @@
             setTimeout(() => {
                 btn.innerText = "📋 Copy Invite Link";
                 btn.style.background = "#334155";
-            }, 2500);
+            }, 2000);
         });
     }
 
     function initSocket() {
         const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-        const wsUrl = `${wsProtocol}${window.location.host}/ws/${roomId}`;
-        socket = new WebSocket(wsUrl);
+        socket = new WebSocket(`${wsProtocol}${window.location.host}/ws/${roomId}`);
 
         socket.onopen = () => {
             document.getElementById("status-dot").classList.add("active");
-            document.getElementById("call-status").innerText = "In Call (" + roomId + ")";
+            document.getElementById("call-status").innerText = "Call Connected";
         };
 
         socket.onmessage = (event) => {
@@ -347,7 +275,7 @@
 
             appendCaption(data.sender_name, data.original, data.translated, isMe);
 
-            // Audio sirf samne wale ke device par baje, bolne wale ko apni aawaz ka tarjuma wapis na sunayi de!
+            // Audio sirf samne wale ke device par bajegi, bolne wale ke speaker par bilkul nahi!
             if (!isMe) {
                 playLiveSpeech(data.translated, data.target_lang, data.gender);
             }
@@ -355,7 +283,7 @@
 
         socket.onclose = () => {
             document.getElementById("status-dot").classList.remove("active");
-            document.getElementById("call-status").innerText = "Call Disconnected";
+            document.getElementById("call-status").innerText = "Disconnected";
         };
     }
 
@@ -378,46 +306,38 @@
     function playLiveSpeech(text, lang, gender) {
         if (!isCallActive || !text) return;
 
-        stopCurrentAudio();
-        isPlayingIncomingAudio = true;
+        // Speaker se aawaz aate hi mic foran stop (taake echo/loop na banay)
+        isPlayingAudio = true;
+        if (recognition) {
+            try { recognition.abort(); } catch(e) {}
+        }
 
-        const remoteAvatar = document.getElementById("remote-avatar");
-        remoteAvatar.classList.add("speaking");
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio = null;
+        }
 
         const url = `/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(lang)}&gender=${encodeURIComponent(gender)}`;
         currentAudio = new Audio(url);
 
-        currentAudio.onended = () => {
-            remoteAvatar.classList.remove("speaking");
+        const resumeMic = () => {
             currentAudio = null;
-            setTimeout(() => { isPlayingIncomingAudio = false; }, 300);
+            setTimeout(() => {
+                isPlayingAudio = false;
+                if (isCallActive && recognition) {
+                    try { recognition.start(); } catch(e) {}
+                }
+            }, 400);
         };
 
-        currentAudio.onerror = () => {
-            remoteAvatar.classList.remove("speaking");
-            currentAudio = null;
-            isPlayingIncomingAudio = false;
-        };
-
-        currentAudio.play().catch(() => {
-            remoteAvatar.classList.remove("speaking");
-            currentAudio = null;
-            isPlayingIncomingAudio = false;
-        });
-    }
-
-    function stopCurrentAudio() {
-        if (currentAudio) {
-            currentAudio.pause();
-            currentAudio.currentTime = 0;
-            currentAudio = null;
-        }
-        document.getElementById("remote-avatar").classList.remove("speaking");
+        currentAudio.onended = resumeMic;
+        currentAudio.onerror = resumeMic;
+        currentAudio.play().catch(resumeMic);
     }
 
     function setupSpeechRecognition() {
         if (!SpeechRecognition) {
-            alert("Please open this page in Chrome or Edge.");
+            alert("Please open this link in Chrome or Edge.");
             return;
         }
 
@@ -426,16 +346,12 @@
         recognition.interimResults = false;
 
         recognition.onresult = (event) => {
-            if (!isCallActive || isPlayingIncomingAudio) return;
+            if (!isCallActive || isPlayingAudio) return;
 
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
                     const transcript = event.results[i][0].transcript.trim();
                     if (!transcript) continue;
-
-                    const localAvatar = document.getElementById("local-avatar");
-                    localAvatar.classList.add("speaking");
-                    setTimeout(() => localAvatar.classList.remove("speaking"), 1000);
 
                     const myLang = document.getElementById("my-lang").value;
                     const partnerLang = document.getElementById("target-lang").value;
@@ -455,7 +371,8 @@
         };
 
         recognition.onend = () => {
-            if (isCallActive) {
+            // Sirf tab dobara start ho jab call active ho aur speaker na baj raha ho
+            if (isCallActive && !isPlayingAudio) {
                 try {
                     recognition.lang = document.getElementById("my-lang").value;
                     recognition.start();
@@ -466,7 +383,7 @@
 
     function startCall() {
         isCallActive = true;
-        isPlayingIncomingAudio = false;
+        isPlayingAudio = false;
         document.getElementById("start-call-btn").style.display = "none";
         document.getElementById("end-call-btn").style.display = "flex";
 
@@ -474,29 +391,25 @@
         setupSpeechRecognition();
 
         recognition.lang = document.getElementById("my-lang").value;
-        try {
-            recognition.start();
-        } catch(e) {}
+        try { recognition.start(); } catch(e) {}
     }
 
     function endCall() {
         isCallActive = false;
-        isPlayingIncomingAudio = false;
+        isPlayingAudio = false;
         document.getElementById("start-call-btn").style.display = "flex";
         document.getElementById("end-call-btn").style.display = "none";
 
         if (recognition) {
             try { recognition.abort(); } catch(e) {}
         }
-
-        stopCurrentAudio();
-
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio = null;
+        }
         if (socket) {
             socket.close();
         }
-
-        document.getElementById("local-avatar").classList.remove("speaking");
-        document.getElementById("remote-avatar").classList.remove("speaking");
     }
 </script>
 
