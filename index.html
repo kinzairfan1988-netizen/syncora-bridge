@@ -3,174 +3,417 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Syncora Sourcing Bridge | Global Edition</title>
+    <title>Syncora Live Voice Call</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
-        .container { max-width: 650px; margin: auto; background: #1e293b; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
-        h2 { margin-top: 0; color: #38bdf8; text-align: center; }
-        .config-box { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
-        select, input { padding: 10px; border-radius: 8px; border: 1px solid #475569; background: #334155; color: white; box-sizing: border-box; }
-        .full-w { width: 100%; display: flex; gap: 8px; }
-        #username { flex: 2; }
-        #gender { flex: 1.2; }
-        .lang-select { flex: 1; }
-        .lang-label { font-size: 11px; color: #94a3b8; margin-bottom: 3px; display: block; }
-        .controls { text-align: center; margin: 15px 0; }
-        button { background: #22c55e; color: white; border: none; padding: 14px 24px; font-size: 16px; font-weight: bold; border-radius: 30px; cursor: pointer; width: 100%; transition: 0.2s; }
-        button.recording { background: #ef4444; }
-        #chat-box { height: 350px; overflow-y: auto; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #334155; }
-        .bubble { margin-bottom: 12px; padding: 10px; border-radius: 8px; background: #1e293b; }
-        .bubble .sender { font-weight: bold; font-size: 12px; color: #38bdf8; margin-bottom: 4px; }
-        .bubble .orig { font-size: 14px; color: #94a3b8; }
-        .bubble .trans { font-size: 16px; font-weight: 500; color: #f8fafc; margin-top: 2px; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #090d16;
+            color: #f8fafc;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .call-card {
+            width: 100%;
+            max-width: 480px;
+            background: #131d2e;
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #1e293b;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header h2 {
+            margin: 0 0 6px 0;
+            color: #38bdf8;
+            font-size: 20px;
+            letter-spacing: 0.5px;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #0f172a;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #64748b;
+        }
+        .dot.active {
+            background: #22c55e;
+            box-shadow: 0 0 10px #22c55e;
+        }
+        .config-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: #0b111c;
+            padding: 12px;
+            border-radius: 16px;
+        }
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .field-group label {
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        select, input {
+            background: #1e293b;
+            color: #f8fafc;
+            border: 1px solid #334155;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            outline: none;
+            width: 100%;
+        }
+        .call-visualizer {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 20px 0;
+            margin: 10px 0;
+        }
+        .avatar-wrap {
+            text-align: center;
+        }
+        .avatar {
+            width: 74px;
+            height: 74px;
+            border-radius: 50%;
+            background: #1e293b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 34px;
+            margin: auto;
+            border: 3px solid #334155;
+            transition: 0.3s;
+        }
+        .avatar.speaking {
+            border-color: #22c55e;
+            transform: scale(1.06);
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+        }
+        .avatar-label {
+            margin-top: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            color: #cbd5e1;
+        }
+        .live-captions {
+            background: #0b111c;
+            border-radius: 14px;
+            height: 180px;
+            overflow-y: auto;
+            padding: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #1e293b;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .transcript-item {
+            font-size: 13px;
+            line-height: 1.4;
+            padding: 8px 10px;
+            border-radius: 10px;
+            background: #131d2e;
+        }
+        .transcript-item .user {
+            color: #38bdf8;
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        .transcript-item .orig {
+            color: #94a3b8;
+        }
+        .transcript-item .trans {
+            color: #22c55e;
+            font-weight: 500;
+            margin-top: 2px;
+        }
+        .call-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .call-btn {
+            border: none;
+            border-radius: 50px;
+            padding: 14px 28px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: 0.2s;
+            color: white;
+            flex: 1;
+            justify-content: center;
+        }
+        .start-btn {
+            background: #22c55e;
+        }
+        .start-btn:hover {
+            background: #16a34a;
+        }
+        .end-btn {
+            background: #ef4444;
+            display: none;
+        }
+        .end-btn:hover {
+            background: #dc2626;
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>⚡ Syncora Global Bridge</h2>
-    
-    <div class="config-box">
-        <div class="full-w">
-            <input type="text" id="username" placeholder="Your Name" value="Ali">
+<div class="call-card">
+    <div class="header">
+        <h2>⚡ Syncora Live Call</h2>
+        <div class="status-badge">
+            <span class="dot" id="status-dot"></span>
+            <span id="call-status">Call Disconnected</span>
+        </div>
+    </div>
+
+    <div class="config-grid">
+        <div class="field-group">
+            <label>Name</label>
+            <input type="text" id="username" value="Ali">
+        </div>
+        <div class="field-group">
+            <label>Gender Voice</label>
             <select id="gender">
                 <option value="male" selected>👨 Male</option>
                 <option value="female">👩 Female</option>
             </select>
         </div>
-
-        <div class="full-w">
-            <div class="lang-select">
-                <span class="lang-label">I Speak (Source):</span>
-                <select id="my-lang" style="width: 100%;">
-                    <option value="ur-PK" selected>🇵🇰 Urdu</option>
-                    <option value="zh-CN">🇨🇳 Chinese (Mandarin)</option>
-                    <option value="en-US">🇬🇧 English</option>
-                    <option value="ms-MY">🇲🇾 Malay (Malaysia)</option>
-                    <option value="ar-SA">🇸🇦 Arabic</option>
-                    <option value="es-ES">🇪🇸 Spanish</option>
-                    <option value="ru-RU">🇷🇺 Russian</option>
-                    <option value="tr-TR">🇹🇷 Turkish</option>
-                    <option value="de-DE">🇩🇪 German</option>
-                    <option value="ja-JP">🇯🇵 Japanese</option>
-                </select>
-            </div>
-
-            <div class="lang-select">
-                <span class="lang-label">Translate To (Target):</span>
-                <select id="target-lang" style="width: 100%;">
-                    <option value="ms-MY" selected>🇲🇾 Malay (Malaysia)</option>
-                    <option value="zh-CN">🇨🇳 Chinese (Mandarin)</option>
-                    <option value="ur-PK">🇵🇰 Urdu</option>
-                    <option value="en-US">🇬🇧 English</option>
-                    <option value="ar-SA">🇸🇦 Arabic</option>
-                    <option value="es-ES">🇪🇸 Spanish</option>
-                    <option value="ru-RU">🇷🇺 Russian</option>
-                    <option value="tr-TR">🇹🇷 Turkish</option>
-                    <option value="de-DE">🇩🇪 German</option>
-                    <option value="ja-JP">🇯🇵 Japanese</option>
-                </select>
-            </div>
+        <div class="field-group">
+            <label>My Language</label>
+            <select id="my-lang">
+                <option value="ur-PK" selected>🇵🇰 Urdu</option>
+                <option value="en-US">🇬🇧 English</option>
+                <option value="zh-CN">🇨🇳 Chinese</option>
+                <option value="ms-MY">🇲🇾 Malay</option>
+                <option value="ar-SA">🇸🇦 Arabic</option>
+                <option value="es-ES">🇪🇸 Spanish</option>
+                <option value="ru-RU">🇷🇺 Russian</option>
+                <option value="tr-TR">🇹🇷 Turkish</option>
+                <option value="de-DE">🇩🇪 German</option>
+                <option value="ja-JP">🇯🇵 Japanese</option>
+            </select>
+        </div>
+        <div class="field-group">
+            <label>Translate To</label>
+            <select id="target-lang">
+                <option value="ms-MY" selected>🇲🇾 Malay</option>
+                <option value="ur-PK">🇵🇰 Urdu</option>
+                <option value="en-US">🇬🇧 English</option>
+                <option value="zh-CN">🇨🇳 Chinese</option>
+                <option value="ar-SA">🇸🇦 Arabic</option>
+                <option value="es-ES">🇪🇸 Spanish</option>
+                <option value="ru-RU">🇷🇺 Russian</option>
+                <option value="tr-TR">🇹🇷 Turkish</option>
+                <option value="de-DE">🇩🇪 German</option>
+                <option value="ja-JP">🇯🇵 Japanese</option>
+            </select>
         </div>
     </div>
 
-    <div class="controls">
-        <button id="mic-btn" onclick="toggleSpeech()">🎤 Push to Speak</button>
+    <div class="call-visualizer">
+        <div class="avatar-wrap">
+            <div class="avatar" id="local-avatar">🎙️</div>
+            <div class="avatar-label">You (Speaking)</div>
+        </div>
+        <div style="color: #64748b; font-size: 20px;">➔</div>
+        <div class="avatar-wrap">
+            <div class="avatar" id="remote-avatar">🔊</div>
+            <div class="avatar-label">Partner (Receiver)</div>
+        </div>
     </div>
 
-    <div id="chat-box"></div>
+    <div class="live-captions" id="captions">
+        <div style="text-align: center; color: #475569; font-size: 12px; margin: auto;">
+            Call connect karein aur hands-free baat cheet shuru karein.
+        </div>
+    </div>
+
+    <div class="call-actions">
+        <button class="call-btn start-btn" id="start-call-btn" onclick="startCall()">
+            📞 Start Voice Call
+        </button>
+        <button class="call-btn end-btn" id="end-call-btn" onclick="endCall()">
+            🛑 End Call
+        </button>
+    </div>
 </div>
 
 <script>
     const wsUrl = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/ws/room";
-    let socket = new WebSocket(wsUrl);
+    let socket = null;
+    let recognition = null;
+    let isCallActive = false;
+    let isPlayingAudio = false;
 
-    socket.onmessage = function(event) {
-        const msg = JSON.parse(event.data);
-        const chatBox = document.getElementById("chat-box");
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-        const genderIcon = msg.gender === "female" ? "👩" : "👨";
-        const bubble = document.createElement("div");
-        bubble.className = "bubble";
-        bubble.innerHTML = `
-            <div class="sender">${genderIcon} ${msg.sender} (${msg.source_lang} ➔ ${msg.target_lang})</div>
-            <div class="orig">${msg.original}</div>
-            <div class="trans">👉 <b>${msg.translated}</b></div>
+    function initSocket() {
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = () => {
+            document.getElementById("status-dot").classList.add("active");
+            document.getElementById("call-status").innerText = "Call Connected (Hands-Free)";
+        };
+
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            appendCaption(data.sender, data.original, data.translated);
+            playLiveSpeech(data.translated, data.target_lang, data.gender);
+        };
+
+        socket.onclose = () => {
+            document.getElementById("status-dot").classList.remove("active");
+            document.getElementById("call-status").innerText = "Call Disconnected";
+        };
+    }
+
+    function appendCaption(sender, orig, trans) {
+        const captions = document.getElementById("captions");
+        const item = document.createElement("div");
+        item.className = "transcript-item";
+        item.innerHTML = `
+            <div class="user">${sender}</div>
+            <div class="orig">${orig}</div>
+            <div class="trans">👉 ${trans}</div>
         `;
-        chatBox.appendChild(bubble);
-        chatBox.scrollTop = chatBox.scrollHeight;
+        captions.appendChild(item);
+        captions.scrollTop = captions.scrollHeight;
+    }
 
-        speakText(msg.translated, msg.target_lang, msg.gender);
-    };
+    function playLiveSpeech(text, lang, gender) {
+        if (!text || text.startsWith("[Groq Error")) return;
+        
+        isPlayingAudio = true;
+        const remoteAvatar = document.getElementById("remote-avatar");
+        remoteAvatar.classList.add("speaking");
 
-    function speakText(text, lang, gender) {
-        if (!text || text.startsWith("[Groq LLM Error")) return;
         const url = `/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(lang)}&gender=${encodeURIComponent(gender)}`;
         const audio = new Audio(url);
-        audio.play().catch(e => {
-            console.log("Audio play error:", e);
+
+        audio.onended = () => {
+            isPlayingAudio = false;
+            remoteAvatar.classList.remove("speaking");
+        };
+
+        audio.onerror = () => {
+            isPlayingAudio = false;
+            remoteAvatar.classList.remove("speaking");
+        };
+
+        audio.play().catch(() => {
+            isPlayingAudio = false;
+            remoteAvatar.classList.remove("speaking");
         });
     }
 
-    let recognition;
-    let isListening = false;
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (SpeechRecognition) {
-        recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-
-        recognition.onstart = function() {
-            isListening = true;
-            document.getElementById("mic-btn").className = "recording";
-            document.getElementById("mic-btn").innerText = "🛑 Listening... Tap to Send";
-        };
-
-        recognition.onresult = function(event) {
-            const transcript = event.results[0][0].transcript;
-            const sender = document.getElementById("username").value;
-            const gender = document.getElementById("gender").value;
-            const myLang = document.getElementById("my-lang").value;
-            const tgtLang = document.getElementById("target-lang").value;
-
-            socket.send(JSON.stringify({
-                sender: sender,
-                gender: gender,
-                source_lang: myLang,
-                target_lang: tgtLang,
-                text: transcript
-            }));
-        };
-
-        recognition.onerror = function(e) {
-            console.error(e);
-            stopListening();
-        };
-
-        recognition.onend = function() {
-            stopListening();
-        };
-    }
-
-    function toggleSpeech() {
-        if (!recognition) {
-            alert("Speech recognition is only supported in Chrome, Edge, or Safari.");
+    function setupSpeechRecognition() {
+        if (!SpeechRecognition) {
+            alert("Please use Chrome or Edge browser for continuous voice calls.");
             return;
         }
-        if (isListening) {
-            recognition.stop();
-            stopListening();
-        } else {
-            recognition.lang = document.getElementById("my-lang").value;
-            recognition.start();
-        }
+
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = false;
+
+        recognition.onresult = (event) => {
+            if (isPlayingAudio) return; // Ignore echo during playback
+
+            const lastIndex = event.results.length - 1;
+            const transcript = event.results[lastIndex][0].transcript.trim();
+
+            if (!transcript) return;
+
+            const localAvatar = document.getElementById("local-avatar");
+            localAvatar.classList.add("speaking");
+            setTimeout(() => localAvatar.classList.remove("speaking"), 1000);
+
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    sender: document.getElementById("username").value || "Ali",
+                    gender: document.getElementById("gender").value,
+                    source_lang: document.getElementById("my-lang").value,
+                    target_lang: document.getElementById("target-lang").value,
+                    text: transcript
+                }));
+            }
+        };
+
+        recognition.onerror = (e) => {
+            console.log("Speech Recognition Status:", e.error);
+        };
+
+        recognition.onend = () => {
+            // Auto restart to keep call alive
+            if (isCallActive) {
+                try {
+                    recognition.lang = document.getElementById("my-lang").value;
+                    recognition.start();
+                } catch(e) {}
+            }
+        };
     }
 
-    function stopListening() {
-        isListening = false;
-        document.getElementById("mic-btn").className = "";
-        document.getElementById("mic-btn").innerText = "🎤 Push to Speak";
+    function startCall() {
+        isCallActive = true;
+        document.getElementById("start-call-btn").style.display = "none";
+        document.getElementById("end-call-btn").style.display = "flex";
+
+        initSocket();
+        setupSpeechRecognition();
+
+        recognition.lang = document.getElementById("my-lang").value;
+        try {
+            recognition.start();
+        } catch(e) {}
+    }
+
+    function endCall() {
+        isCallActive = false;
+        document.getElementById("start-call-btn").style.display = "flex";
+        document.getElementById("end-call-btn").style.display = "none";
+
+        if (recognition) {
+            try { recognition.stop(); } catch(e) {}
+        }
+        if (socket) {
+            socket.close();
+        }
     }
 </script>
 
