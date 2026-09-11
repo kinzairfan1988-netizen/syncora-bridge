@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Syncora Live Voice Call</title>
+    <title>Syncora Live Room Call</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -30,13 +30,44 @@
         }
         .header {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
         .header h2 {
             margin: 0 0 6px 0;
             color: #38bdf8;
             font-size: 20px;
             letter-spacing: 0.5px;
+        }
+        .room-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #0b111c;
+            padding: 10px 14px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            border: 1px dashed #334155;
+        }
+        .room-info {
+            font-size: 13px;
+            color: #94a3b8;
+        }
+        .room-info b {
+            color: #38bdf8;
+        }
+        .copy-btn {
+            background: #334155;
+            color: #f8fafc;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        .copy-btn:hover {
+            background: #475569;
         }
         .status-badge {
             display: inline-flex;
@@ -47,6 +78,7 @@
             border-radius: 20px;
             font-size: 12px;
             color: #94a3b8;
+            margin: auto;
         }
         .dot {
             width: 8px;
@@ -62,7 +94,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             background: #0b111c;
             padding: 12px;
             border-radius: 16px;
@@ -92,21 +124,21 @@
             display: flex;
             justify-content: space-around;
             align-items: center;
-            padding: 20px 0;
-            margin: 10px 0;
+            padding: 14px 0;
+            margin: 6px 0;
         }
         .avatar-wrap {
             text-align: center;
         }
         .avatar {
-            width: 74px;
-            height: 74px;
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
             background: #1e293b;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 34px;
+            font-size: 30px;
             margin: auto;
             border: 3px solid #334155;
             transition: 0.3s;
@@ -117,18 +149,18 @@
             box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
         }
         .avatar-label {
-            margin-top: 8px;
-            font-size: 13px;
+            margin-top: 6px;
+            font-size: 12px;
             font-weight: bold;
             color: #cbd5e1;
         }
         .live-captions {
             background: #0b111c;
             border-radius: 14px;
-            height: 180px;
+            height: 170px;
             overflow-y: auto;
             padding: 12px;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             border: 1px solid #1e293b;
             display: flex;
             flex-direction: column;
@@ -140,6 +172,12 @@
             padding: 8px 10px;
             border-radius: 10px;
             background: #131d2e;
+        }
+        .transcript-item.me {
+            border-left: 3px solid #38bdf8;
+        }
+        .transcript-item.partner {
+            border-left: 3px solid #22c55e;
         }
         .transcript-item .user {
             color: #38bdf8;
@@ -194,27 +232,33 @@
 
 <div class="call-card">
     <div class="header">
-        <h2>⚡ Syncora Live Call</h2>
+        <h2>⚡ Syncora Private Call Room</h2>
         <div class="status-badge">
             <span class="dot" id="status-dot"></span>
             <span id="call-status">Call Disconnected</span>
         </div>
     </div>
 
+    <!-- Room Share Bar -->
+    <div class="room-bar">
+        <div class="room-info">Room: <b id="room-display">...</b></div>
+        <button class="copy-btn" id="copy-btn" onclick="copyInviteLink()">📋 Copy Invite Link</button>
+    </div>
+
     <div class="config-grid">
         <div class="field-group">
-            <label>Name</label>
+            <label>Your Name</label>
             <input type="text" id="username" value="Ali">
         </div>
         <div class="field-group">
-            <label>Gender Voice</label>
+            <label>Voice Gender</label>
             <select id="gender">
                 <option value="male" selected>👨 Male</option>
                 <option value="female">👩 Female</option>
             </select>
         </div>
         <div class="field-group">
-            <label>My Language</label>
+            <label>I Speak</label>
             <select id="my-lang">
                 <option value="ur-PK" selected>🇵🇰 Urdu</option>
                 <option value="en-US">🇬🇧 English</option>
@@ -248,24 +292,24 @@
     <div class="call-visualizer">
         <div class="avatar-wrap">
             <div class="avatar" id="local-avatar">🎙️</div>
-            <div class="avatar-label">You</div>
+            <div class="avatar-label" id="local-name-label">You</div>
         </div>
         <div style="color: #64748b; font-size: 20px;">➔</div>
         <div class="avatar-wrap">
             <div class="avatar" id="remote-avatar">🔊</div>
-            <div class="avatar-label">AI Partner</div>
+            <div class="avatar-label">Partner</div>
         </div>
     </div>
 
     <div class="live-captions" id="captions">
         <div id="placeholder-msg" style="text-align: center; color: #475569; font-size: 12px; margin: auto;">
-            Call connect karein aur bolna shuru karein.
+            Invite link copy karein aur client ko bhejein, phir Call start karein.
         </div>
     </div>
 
     <div class="call-actions">
         <button class="call-btn start-btn" id="start-call-btn" onclick="startCall()">
-            📞 Start Voice Call
+            📞 Join / Start Call
         </button>
         <button class="call-btn end-btn" id="end-call-btn" onclick="endCall()">
             🛑 End Call
@@ -274,28 +318,61 @@
 </div>
 
 <script>
-    const wsUrl = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/ws/room";
+    // 1. Generate or Read Room ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    let roomId = urlParams.get('room');
+    if (!roomId) {
+        roomId = 'call-' + Math.random().toString(36).substring(2, 7);
+        const newUrl = window.location.pathname + '?room=' + roomId;
+        window.history.replaceState(null, '', newUrl);
+    }
+    document.getElementById("room-display").innerText = roomId;
+
+    // Unique ID for this browser tab to distinguish speaker vs listener
+    const myClientId = 'user_' + Math.random().toString(36).substring(2, 9);
+
     let socket = null;
     let recognition = null;
     let isCallActive = false;
-    let isAIResponding = false;
+    let isAudioPlaying = false;
     let currentAudio = null;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
+    function copyInviteLink() {
+        const fullLink = window.location.href;
+        navigator.clipboard.writeText(fullLink).then(() => {
+            const btn = document.getElementById("copy-btn");
+            btn.innerText = "✅ Link Copied!";
+            btn.style.background = "#22c55e";
+            setTimeout(() => {
+                btn.innerText = "📋 Copy Invite Link";
+                btn.style.background = "#334155";
+            }, 2500);
+        });
+    }
+
     function initSocket() {
+        const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+        const wsUrl = `${wsProtocol}${window.location.host}/ws/${roomId}`;
         socket = new WebSocket(wsUrl);
 
         socket.onopen = () => {
             document.getElementById("status-dot").classList.add("active");
-            document.getElementById("call-status").innerText = "Call Connected (Hands-Free)";
+            document.getElementById("call-status").innerText = "In Call (" + roomId + ")";
         };
 
         socket.onmessage = (event) => {
             if (!isCallActive) return;
             const data = JSON.parse(event.data);
-            appendCaption(data.sender, data.original, data.translated);
-            playLiveSpeech(data.translated, data.target_lang, data.gender);
+            const isMe = data.sender_id === myClientId;
+
+            appendCaption(data.sender_name, data.original, data.translated, isMe);
+
+            // Audio sirf samne wale ke device par baje, apne speaker par echo na ho
+            if (!isMe) {
+                playLiveSpeech(data.translated, data.target_lang, data.gender);
+            }
         };
 
         socket.onclose = () => {
@@ -304,15 +381,15 @@
         };
     }
 
-    function appendCaption(sender, orig, trans) {
+    function appendCaption(sender, orig, trans, isMe) {
         const placeholder = document.getElementById("placeholder-msg");
         if (placeholder) placeholder.remove();
 
         const captions = document.getElementById("captions");
         const item = document.createElement("div");
-        item.className = "transcript-item";
+        item.className = "transcript-item " + (isMe ? "me" : "partner");
         item.innerHTML = `
-            <div class="user">${sender}</div>
+            <div class="user">${sender} ${isMe ? "(You)" : ""}</div>
             <div class="orig">${orig}</div>
             <div class="trans">👉 ${trans}</div>
         `;
@@ -321,13 +398,10 @@
     }
 
     function playLiveSpeech(text, lang, gender) {
-        if (!isCallActive || !text || text.startsWith("[") || text.startsWith("Maaf")) {
-            isAIResponding = false;
-            return;
-        }
+        if (!isCallActive || !text || text.startsWith("[")) return;
 
         stopCurrentAudio();
-        isAIResponding = true; // Mic ko pause rakhein jab tak AI bol raha ho
+        isAudioPlaying = true;
 
         const remoteAvatar = document.getElementById("remote-avatar");
         remoteAvatar.classList.add("speaking");
@@ -338,19 +412,19 @@
         currentAudio.onended = () => {
             remoteAvatar.classList.remove("speaking");
             currentAudio = null;
-            setTimeout(() => { isAIResponding = false; }, 400); // Thora pause taake echo na bane
+            setTimeout(() => { isAudioPlaying = false; }, 350);
         };
 
         currentAudio.onerror = () => {
             remoteAvatar.classList.remove("speaking");
             currentAudio = null;
-            isAIResponding = false;
+            isAudioPlaying = false;
         };
 
         currentAudio.play().catch(() => {
             remoteAvatar.classList.remove("speaking");
             currentAudio = null;
-            isAIResponding = false;
+            isAudioPlaying = false;
         });
     }
 
@@ -365,7 +439,7 @@
 
     function setupSpeechRecognition() {
         if (!SpeechRecognition) {
-            alert("Please use Chrome or Edge browser.");
+            alert("Please open this link in Google Chrome, Edge, or Safari.");
             return;
         }
 
@@ -374,7 +448,7 @@
         recognition.interimResults = false;
 
         recognition.onresult = (event) => {
-            if (!isCallActive || isAIResponding) return; // Ignore echo while AI speaks
+            if (!isCallActive || isAudioPlaying) return;
 
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
@@ -385,13 +459,13 @@
                     localAvatar.classList.add("speaking");
                     setTimeout(() => localAvatar.classList.remove("speaking"), 1000);
 
-                    // Har bar user ki selected language fresh get ki jaye
                     const currentSrc = document.getElementById("my-lang").value;
                     const currentTgt = document.getElementById("target-lang").value;
 
                     if (socket && socket.readyState === WebSocket.OPEN) {
                         socket.send(JSON.stringify({
-                            sender: document.getElementById("username").value || "Ali",
+                            sender_id: myClientId,
+                            sender_name: document.getElementById("username").value || "Ali",
                             gender: document.getElementById("gender").value,
                             source_lang: currentSrc,
                             target_lang: currentTgt,
@@ -400,10 +474,6 @@
                     }
                 }
             }
-        };
-
-        recognition.onerror = (e) => {
-            console.log("Recognition note:", e.error);
         };
 
         recognition.onend = () => {
@@ -418,7 +488,7 @@
 
     function startCall() {
         isCallActive = true;
-        isAIResponding = false;
+        isAudioPlaying = false;
         document.getElementById("start-call-btn").style.display = "none";
         document.getElementById("end-call-btn").style.display = "flex";
 
@@ -433,7 +503,7 @@
 
     function endCall() {
         isCallActive = false;
-        isAIResponding = false;
+        isAudioPlaying = false;
         document.getElementById("start-call-btn").style.display = "flex";
         document.getElementById("end-call-btn").style.display = "none";
 
