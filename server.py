@@ -54,10 +54,11 @@ class RoomManager:
 manager = RoomManager()
 
 @app.get("/tts")
-async def text_to_speech(text: str, lang: str, gender: str = "female"):
+async def text_to_speech(text: str, lang: str = "en", gender: str = "female"):
     if not text.strip():
         return Response(content=b"", media_type="audio/mpeg")
     
+    # Strip any dialect codes (e.g. en-US -> en, ur-PK -> ur)
     prefix = (lang or "en").split("-")[0].lower()
     gender_clean = gender.lower() if gender.lower() in ["male", "female"] else "female"
     
@@ -67,8 +68,8 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
     communicate = edge_tts.Communicate(
         text=text, 
         voice=selected_voice,
-        rate="-2%",
-        pitch="-1Hz"
+        rate="+0%",
+        pitch="+0Hz"
     )
     
     mp3_bytes = b""
@@ -79,10 +80,7 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
 def extract_clean_translation(raw: str) -> str:
-    # Strip thinking tags if present
     text = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL)
-    
-    # If model outputted markdown analysis, extract only clean sentence
     if "thinking process" in text.lower() or "analyze user input" in text.lower():
         lines = [l.strip() for l in text.splitlines() if l.strip()]
         for l in reversed(lines):
@@ -110,7 +108,6 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
         api_key=clean_key
     )
 
-    # Strictly use clean non-thinking models
     candidate_models = ["llama-3.3-70b-versatile", "llama3-8b-8192"]
 
     for model_name in candidate_models:
