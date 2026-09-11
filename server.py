@@ -96,27 +96,44 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
         api_key=clean_key
     )
 
+    # Fetch active non-whisper/non-thinking models dynamically
+    candidate_models = []
     try:
-        response = await groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[
-                {
-                    "role": "system", 
-                    "content": f"You are a translator. Translate the text from {source_lang} directly to {target_lang}. Return ONLY the translation in {target_lang}. Do NOT use Arabic unless the target language is Arabic."
-                },
-                {"role": "user", "content": text}
-            ],
-            temperature=0.0,
-            max_tokens=150
-        )
-        content = response.choices[0].message.content
-        if content and content.strip():
-            clean = re.sub(r"^(Translation:|Output:)", "", content.strip(), flags=re.IGNORECASE).strip()
-            return clean.strip('"')
-    except Exception as e:
-        return f"[Error: {str(e)}]"
+        available = await groq_client.models.list()
+        candidate_models = [
+            m.id for m in available.data 
+            if "whisper" not in m.id and "guard" not in m.id and "r1" not in m.id
+        ]
+    except Exception:
+        pass
 
-    return text
+    if not candidate_models:
+        candidate_models = ["llama-3.3-70b-versatile", "llama-3.2-3b-preview"]
+
+    last_error = ""
+    for model_name in candidate_models:
+        try:
+            response = await groq_client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {
+                        "role": "system", 
+                        "content": f"You are a direct translator. Translate the given text from {source_lang} into {target_lang}. Output ONLY the translated words in {target_lang}. Never use Arabic unless target is Arabic. Do not add quotes or notes."
+                    },
+                    {"role": "user", "content": text}
+                ],
+                temperature=0.0,
+                max_tokens=150
+            )
+            content = response.choices[0].message.content
+            if content and content.strip():
+                clean = re.sub(r"^(Translation:|Output:)", "", content.strip(), flags=re.IGNORECASE).strip()
+                return clean.strip('"')
+        except Exception as e:
+            last_error = str(e)
+            continue
+
+    return f"[Error: {last_error}]"
 
 @app.websocket("/ws/{room_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str):
