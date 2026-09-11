@@ -222,7 +222,7 @@
 
     <div class="live-captions" id="captions">
         <div id="placeholder-msg" style="text-align: center; color: #475569; font-size: 12px; margin: auto;">
-            Hold button to speak Urdu, release to send English translation.
+            Hold button to speak Urdu, release to send English speech.
         </div>
     </div>
 
@@ -274,7 +274,7 @@
 
             appendCaption(data.sender_name, data.original, data.translated, isMe);
 
-            // Audio sirf doosre bande ke speaker par baje
+            // Audio sirf doosre device par bajegi, aur target_lang ke sath strictly bind hogi
             if (!isMe) {
                 playIncomingAudio(data.translated, data.target_lang, data.gender);
             }
@@ -310,7 +310,9 @@
             currentAudio = null;
         }
 
-        const url = `/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(lang)}&gender=${encodeURIComponent(gender)}`;
+        // Use target language specifically for TTS
+        const cleanLang = (lang || "en").split("-")[0].toLowerCase();
+        const url = `/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(cleanLang)}&gender=${encodeURIComponent(gender)}`;
         currentAudio = new Audio(url);
         currentAudio.play().catch(e => console.log("Audio play error:", e));
     }
@@ -349,10 +351,9 @@
         if (currentAudio) currentAudio.pause();
 
         pttBtn.classList.add("recording");
-        pttHint.innerText = "Listening Urdu... Release to send";
+        pttHint.innerText = "Listening... Release to send";
         pttHint.style.color = "#22c55e";
 
-        // Hard enforce Urdu for voice recognition
         recognition.lang = document.getElementById("my-lang").value;
         try { recognition.start(); } catch(e) {}
     }
@@ -360,7 +361,7 @@
     function stopRecording() {
         if (!recognition) return;
         pttBtn.classList.remove("recording");
-        pttHint.innerText = "Translating to English...";
+        pttHint.innerText = "Translating & Sending...";
         pttHint.style.color = "#38bdf8";
 
         try { recognition.stop(); } catch(e) {}
