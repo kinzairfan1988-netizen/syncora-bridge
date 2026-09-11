@@ -83,13 +83,13 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# Direct Groq Translation
+# Dynamic Model Auto-Detect & Translation Engine
 async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
 
     if not clean_key or clean_key == "dummy_key":
-        return "[Error: GROQ_API_KEY nahi mili. Railway variables check karein]"
+        return "[Error: GROQ_API_KEY missing in Railway variables]"
 
     source = LANG_NAMES.get(src_lang[:2].lower(), src_lang)
     target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
@@ -97,7 +97,7 @@ async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
     system_prompt = (
         f"You are a real-time interpreter between {source} and {target}. "
         f"Translate the following input accurately into {target}. "
-        "Output ONLY the translated text without explanations, quotes, or notes."
+        "Output ONLY the raw translated text without explanations, quotes, or notes."
     )
 
     groq_client = AsyncOpenAI(
@@ -105,19 +105,44 @@ async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
         api_key=clean_key
     )
 
+    # Auto-detect available models from the active Groq account
+    active_models = []
     try:
-        response = await groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text}
-            ],
-            temperature=0.2,
-            max_tokens=200
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        return f"[Groq Live Error: {str(e)}]"
+        model_list = await groq_client.models.list()
+        active_models = [m.id for m in model_list.data if "whisper" not in m.id]
+    except Exception:
+        active_models = []
+
+    # Fallback to standard model names if listing models fails
+    if not active_models:
+        active_models = [
+            "llama-3.2-11b-vision-preview",
+            "llama-3.2-3b-preview",
+            "llama-3.2-1b-preview",
+            "qwen-2.5-32b",
+            "deepseek-r1-distill-llama-70b"
+        ]
+
+    last_error = ""
+    for target_model in active_models:
+        try:
+            response = await groq_client.chat.completions.create(
+                model=target_model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": text}
+                ],
+                temperature=0.2,
+                max_tokens=200
+            )
+            content = response.choices[0].message.content
+            if content and content.strip():
+                return content.strip()
+        except Exception as e:
+            last_error = f"{target_model}: {str(e)}"
+            continue
+
+    return f"[Groq Error across available models: {last_error}]"
 
 @app.websocket("/ws/room")
 async def websocket_endpoint(websocket: WebSocket):
