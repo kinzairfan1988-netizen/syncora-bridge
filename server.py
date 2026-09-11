@@ -83,25 +83,24 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# Strict Single-Language Conversational AI Engine
+# Strict Single-Language Conversational AI Engine with Live Model Discovery & Diagnostics
 async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
 
     if not clean_key or clean_key == "dummy_key":
-        return "[Error: Missing GROQ_API_KEY]"
+        return "[Error: GROQ_API_KEY Railway variables mein configure nahi hai]"
 
     source = LANG_NAMES.get(src_lang[:2].lower(), src_lang)
     target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
 
-    # Bulletproof prompt: Force output exclusively in target language
     system_prompt = (
-        f"You are Syncora, an intelligent conversational AI partner. "
+        f"You are Syncora, an intelligent conversational voice assistant. "
         f"The user spoke to you in {source}. "
-        f"ABSOLUTE RULE: You must respond 100% in {target} language only. "
-        f"Do NOT switch to Arabic, Urdu, Malay, or any other language unless the target is explicitly that language. "
-        f"Keep your response natural, polite, and concise (1 to 2 spoken sentences) in {target}. "
-        f"Never include translations, explanations, quotes, or notes."
+        f"CRITICAL RULE: Respond 100% in {target} language only. "
+        f"Do NOT use any other language. "
+        f"Keep your response concise, polite, and conversational (1 to 2 spoken sentences) in {target}. "
+        f"Do NOT include explanations, quotes, notes, or translations."
     )
 
     groq_client = AsyncOpenAI(
@@ -109,9 +108,19 @@ async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
         api_key=clean_key
     )
 
-    candidate_models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
+    # Fetch active models dynamically from Groq account
+    active_models = []
+    try:
+        models_data = await groq_client.models.list()
+        active_models = [m.id for m in models_data.data if "whisper" not in m.id and "guard" not in m.id]
+    except Exception as e:
+        return f"[Groq Connection Error: {str(e)}]"
 
-    for model_name in candidate_models:
+    if not active_models:
+        active_models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
+
+    last_error = ""
+    for model_name in active_models:
         try:
             response = await groq_client.chat.completions.create(
                 model=model_name,
@@ -119,16 +128,17 @@ async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": text}
                 ],
-                temperature=0.05,  # Zero variance ensures language stays locked
+                temperature=0.1,
                 max_tokens=150
             )
             content = response.choices[0].message.content
             if content and content.strip():
                 return content.strip()
-        except Exception:
+        except Exception as err:
+            last_error = f"{model_name}: {str(err)}"
             continue
 
-    return "Sorry, I am having trouble responding right now."
+    return f"[Groq LLM Error: {last_error}]"
 
 @app.websocket("/ws/room")
 async def websocket_endpoint(websocket: WebSocket):
@@ -140,8 +150,6 @@ async def websocket_endpoint(websocket: WebSocket):
             
             sender = data.get("sender", "Ali")
             gender = data.get("gender", "male")
-            
-            # Use dynamic selected values directly from user payload
             src_lang = data.get("source_lang", "ur-PK")
             tgt_lang = data.get("target_lang", "en-US")
             original_text = data.get("text", "").strip()
