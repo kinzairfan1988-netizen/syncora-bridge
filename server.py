@@ -100,7 +100,8 @@ async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
         "Do NOT provide explanations, notes, pleasantries, or quotes. Output ONLY the raw translated sentence."
     )
 
-    models_to_try = ["llama-3.1-8b-instant", "llama3-8b-8192"]
+    # Groq active production models
+    models_to_try = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
     last_error = ""
 
     for model_name in models_to_try:
