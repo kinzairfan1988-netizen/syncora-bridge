@@ -78,6 +78,20 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
+def extract_clean_translation(raw: str) -> str:
+    # Strip thinking tags if present
+    text = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL)
+    
+    # If model outputted markdown analysis, extract only clean sentence
+    if "thinking process" in text.lower() or "analyze user input" in text.lower():
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
+        for l in reversed(lines):
+            if not any(l.lower().startswith(x) for x in ["-", "*", "1", "2", "3", "4", "here", "step", "input", "task", "rule", "literal"]):
+                clean = re.sub(r'^(Translation:|Output:|"|\')', "", l, flags=re.IGNORECASE).strip().strip('"')
+                if clean:
+                    return clean
+    return text.strip().strip('"')
+
 async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
@@ -96,44 +110,30 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
         api_key=clean_key
     )
 
-    # Fetch active non-whisper/non-thinking models dynamically
-    candidate_models = []
-    try:
-        available = await groq_client.models.list()
-        candidate_models = [
-            m.id for m in available.data 
-            if "whisper" not in m.id and "guard" not in m.id and "r1" not in m.id
-        ]
-    except Exception:
-        pass
+    # Strictly use clean non-thinking models
+    candidate_models = ["llama-3.3-70b-versatile", "llama3-8b-8192"]
 
-    if not candidate_models:
-        candidate_models = ["llama-3.3-70b-versatile", "llama-3.2-3b-preview"]
-
-    last_error = ""
     for model_name in candidate_models:
         try:
             response = await groq_client.chat.completions.create(
                 model=model_name,
                 messages=[
                     {
-                        "role": "system", 
-                        "content": f"You are a direct translator. Translate the given text from {source_lang} into {target_lang}. Output ONLY the translated words in {target_lang}. Never use Arabic unless target is Arabic. Do not add quotes or notes."
+                        "role": "system",
+                        "content": f"You are a translator. Translate from {source_lang} into {target_lang}. Return ONLY the direct translation in {target_lang}. Never explain, never analyze, never output thinking process."
                     },
                     {"role": "user", "content": text}
                 ],
                 temperature=0.0,
-                max_tokens=150
+                max_tokens=100
             )
             content = response.choices[0].message.content
             if content and content.strip():
-                clean = re.sub(r"^(Translation:|Output:)", "", content.strip(), flags=re.IGNORECASE).strip()
-                return clean.strip('"')
-        except Exception as e:
-            last_error = str(e)
+                return extract_clean_translation(content)
+        except Exception:
             continue
 
-    return f"[Error: {last_error}]"
+    return text
 
 @app.websocket("/ws/{room_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str):
