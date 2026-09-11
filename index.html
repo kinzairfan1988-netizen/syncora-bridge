@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Syncora Bilateral Bridge</title>
+    <title>Syncora Bilateral Call</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -222,7 +222,7 @@
 
     <div class="live-captions" id="captions">
         <div id="placeholder-msg" style="text-align: center; color: #475569; font-size: 12px; margin: auto;">
-            Hold button to speak Urdu, release to send translation.
+            Hold button to speak Urdu, release to send English translation.
         </div>
     </div>
 
@@ -274,7 +274,7 @@
 
             appendCaption(data.sender_name, data.original, data.translated, isMe);
 
-            // Audio sirf samne wale ke speaker par play ho
+            // Audio sirf doosre bande ke speaker par baje
             if (!isMe) {
                 playIncomingAudio(data.translated, data.target_lang, data.gender);
             }
@@ -304,7 +304,7 @@
     }
 
     function playIncomingAudio(text, lang, gender) {
-        if (!text) return;
+        if (!text || text.startsWith("[")) return;
         if (currentAudio) {
             currentAudio.pause();
             currentAudio = null;
@@ -312,7 +312,7 @@
 
         const url = `/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(lang)}&gender=${encodeURIComponent(gender)}`;
         currentAudio = new Audio(url);
-        currentAudio.play().catch(e => console.log("Audio block:", e));
+        currentAudio.play().catch(e => console.log("Audio play error:", e));
     }
 
     function initSpeech() {
@@ -325,7 +325,6 @@
             const transcript = event.results[0][0].transcript.trim();
             if (!transcript) return;
 
-            // Live pull selected values from DOM on every press
             const myLangVal = document.getElementById("my-lang").value;
             const targetLangVal = document.getElementById("target-lang").value;
 
@@ -350,9 +349,10 @@
         if (currentAudio) currentAudio.pause();
 
         pttBtn.classList.add("recording");
-        pttHint.innerText = "Listening... Release to translate";
+        pttHint.innerText = "Listening Urdu... Release to send";
         pttHint.style.color = "#22c55e";
 
+        // Hard enforce Urdu for voice recognition
         recognition.lang = document.getElementById("my-lang").value;
         try { recognition.start(); } catch(e) {}
     }
@@ -360,7 +360,7 @@
     function stopRecording() {
         if (!recognition) return;
         pttBtn.classList.remove("recording");
-        pttHint.innerText = "Translating...";
+        pttHint.innerText = "Translating to English...";
         pttHint.style.color = "#38bdf8";
 
         try { recognition.stop(); } catch(e) {}
