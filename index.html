@@ -231,9 +231,9 @@
         <div class="field-group">
             <label>Translate To</label>
             <select id="target-lang">
-                <option value="ms-MY" selected>🇲🇾 Malay</option>
+                <option value="en-US" selected>🇬🇧 English</option>
+                <option value="ms-MY">🇲🇾 Malay</option>
                 <option value="ur-PK">🇵🇰 Urdu</option>
-                <option value="en-US">🇬🇧 English</option>
                 <option value="zh-CN">🇨🇳 Chinese</option>
                 <option value="ar-SA">🇸🇦 Arabic</option>
                 <option value="es-ES">🇪🇸 Spanish</option>
@@ -253,7 +253,7 @@
         <div style="color: #64748b; font-size: 20px;">➔</div>
         <div class="avatar-wrap">
             <div class="avatar" id="remote-avatar">🔊</div>
-            <div class="avatar-label">Partner</div>
+            <div class="avatar-label">AI Partner</div>
         </div>
     </div>
 
@@ -278,7 +278,8 @@
     let socket = null;
     let recognition = null;
     let isCallActive = false;
-    let currentAudio = null; // Active audio player reference
+    let isAIResponding = false;
+    let currentAudio = null;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -291,8 +292,7 @@
         };
 
         socket.onmessage = (event) => {
-            if (!isCallActive) return; // Agar call end ho chuki hai to ignore karein
-            
+            if (!isCallActive) return;
             const data = JSON.parse(event.data);
             appendCaption(data.sender, data.original, data.translated);
             playLiveSpeech(data.translated, data.target_lang, data.gender);
@@ -321,10 +321,13 @@
     }
 
     function playLiveSpeech(text, lang, gender) {
-        if (!isCallActive || !text || text.startsWith("[Groq Error")) return;
+        if (!isCallActive || !text || text.startsWith("[") || text.startsWith("Maaf")) {
+            isAIResponding = false;
+            return;
+        }
 
-        // Pehle se bajti hui purani audio ko foran band karein
         stopCurrentAudio();
+        isAIResponding = true; // Mic ko pause rakhein jab tak AI bol raha ho
 
         const remoteAvatar = document.getElementById("remote-avatar");
         remoteAvatar.classList.add("speaking");
@@ -335,16 +338,19 @@
         currentAudio.onended = () => {
             remoteAvatar.classList.remove("speaking");
             currentAudio = null;
+            setTimeout(() => { isAIResponding = false; }, 400); // Thora pause taake echo na bane
         };
 
         currentAudio.onerror = () => {
             remoteAvatar.classList.remove("speaking");
             currentAudio = null;
+            isAIResponding = false;
         };
 
         currentAudio.play().catch(() => {
             remoteAvatar.classList.remove("speaking");
             currentAudio = null;
+            isAIResponding = false;
         });
     }
 
@@ -368,25 +374,27 @@
         recognition.interimResults = false;
 
         recognition.onresult = (event) => {
-            if (!isCallActive) return;
+            if (!isCallActive || isAIResponding) return; // Ignore echo while AI speaks
 
-            // Sirf bilkul latest resultIndex uthana hai taake purana text repeat na ho
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
                     const transcript = event.results[i][0].transcript.trim();
                     if (!transcript) continue;
 
-                    // UI speaking effect
                     const localAvatar = document.getElementById("local-avatar");
                     localAvatar.classList.add("speaking");
                     setTimeout(() => localAvatar.classList.remove("speaking"), 1000);
+
+                    // Har bar user ki selected language fresh get ki jaye
+                    const currentSrc = document.getElementById("my-lang").value;
+                    const currentTgt = document.getElementById("target-lang").value;
 
                     if (socket && socket.readyState === WebSocket.OPEN) {
                         socket.send(JSON.stringify({
                             sender: document.getElementById("username").value || "Ali",
                             gender: document.getElementById("gender").value,
-                            source_lang: document.getElementById("my-lang").value,
-                            target_lang: document.getElementById("target-lang").value,
+                            source_lang: currentSrc,
+                            target_lang: currentTgt,
                             text: transcript
                         }));
                     }
@@ -395,11 +403,10 @@
         };
 
         recognition.onerror = (e) => {
-            console.log("Recognition warning:", e.error);
+            console.log("Recognition note:", e.error);
         };
 
         recognition.onend = () => {
-            // Sirf tab restart ho jab call abhi bhi active ho
             if (isCallActive) {
                 try {
                     recognition.lang = document.getElementById("my-lang").value;
@@ -411,6 +418,7 @@
 
     function startCall() {
         isCallActive = true;
+        isAIResponding = false;
         document.getElementById("start-call-btn").style.display = "none";
         document.getElementById("end-call-btn").style.display = "flex";
 
@@ -425,20 +433,16 @@
 
     function endCall() {
         isCallActive = false;
+        isAIResponding = false;
         document.getElementById("start-call-btn").style.display = "flex";
         document.getElementById("end-call-btn").style.display = "none";
 
-        // Foran mic aur recognition band karein
         if (recognition) {
-            try { 
-                recognition.abort(); 
-            } catch(e) {}
+            try { recognition.abort(); } catch(e) {}
         }
 
-        // Foran speaker ki awaz band karein
         stopCurrentAudio();
 
-        // WebSocket close karein
         if (socket) {
             socket.close();
         }
