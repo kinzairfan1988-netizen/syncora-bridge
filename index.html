@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Syncora Live Room Call</title>
+    <title>Syncora Bilateral Call</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -36,7 +36,6 @@
             margin: 0 0 6px 0;
             color: #38bdf8;
             font-size: 20px;
-            letter-spacing: 0.5px;
         }
         .room-bar {
             display: flex;
@@ -64,10 +63,6 @@
             font-size: 12px;
             cursor: pointer;
             font-weight: bold;
-            transition: 0.2s;
-        }
-        .copy-btn:hover {
-            background: #475569;
         }
         .status-badge {
             display: inline-flex;
@@ -78,7 +73,6 @@
             border-radius: 20px;
             font-size: 12px;
             color: #94a3b8;
-            margin: auto;
         }
         .dot {
             width: 8px;
@@ -180,19 +174,14 @@
             border-left: 3px solid #22c55e;
         }
         .transcript-item .user {
-            color: #38bdf8;
             font-size: 11px;
             font-weight: bold;
             margin-bottom: 2px;
         }
-        .transcript-item .orig {
-            color: #94a3b8;
-        }
-        .transcript-item .trans {
-            color: #22c55e;
-            font-weight: 500;
-            margin-top: 2px;
-        }
+        .transcript-item.me .user { color: #38bdf8; }
+        .transcript-item.partner .user { color: #22c55e; }
+        .transcript-item .orig { color: #94a3b8; }
+        .transcript-item .trans { font-weight: 500; margin-top: 2px; color: #f8fafc; }
         .call-actions {
             display: flex;
             gap: 12px;
@@ -213,33 +202,23 @@
             flex: 1;
             justify-content: center;
         }
-        .start-btn {
-            background: #22c55e;
-        }
-        .start-btn:hover {
-            background: #16a34a;
-        }
-        .end-btn {
-            background: #ef4444;
-            display: none;
-        }
-        .end-btn:hover {
-            background: #dc2626;
-        }
+        .start-btn { background: #22c55e; }
+        .start-btn:hover { background: #16a34a; }
+        .end-btn { background: #ef4444; display: none; }
+        .end-btn:hover { background: #dc2626; }
     </style>
 </head>
 <body>
 
 <div class="call-card">
     <div class="header">
-        <h2>⚡ Syncora Private Call Room</h2>
+        <h2>⚡ Syncora Bilateral Call</h2>
         <div class="status-badge">
             <span class="dot" id="status-dot"></span>
             <span id="call-status">Call Disconnected</span>
         </div>
     </div>
 
-    <!-- Room Share Bar -->
     <div class="room-bar">
         <div class="room-info">Room: <b id="room-display">...</b></div>
         <button class="copy-btn" id="copy-btn" onclick="copyInviteLink()">📋 Copy Invite Link</button>
@@ -273,7 +252,7 @@
             </select>
         </div>
         <div class="field-group">
-            <label>Translate To</label>
+            <label>Partner Speaks</label>
             <select id="target-lang">
                 <option value="en-US" selected>🇬🇧 English</option>
                 <option value="ms-MY">🇲🇾 Malay</option>
@@ -292,24 +271,24 @@
     <div class="call-visualizer">
         <div class="avatar-wrap">
             <div class="avatar" id="local-avatar">🎙️</div>
-            <div class="avatar-label" id="local-name-label">You</div>
+            <div class="avatar-label" id="local-label">You</div>
         </div>
         <div style="color: #64748b; font-size: 20px;">➔</div>
         <div class="avatar-wrap">
             <div class="avatar" id="remote-avatar">🔊</div>
-            <div class="avatar-label">Partner</div>
+            <div class="avatar-label" id="remote-label">Partner</div>
         </div>
     </div>
 
     <div class="live-captions" id="captions">
         <div id="placeholder-msg" style="text-align: center; color: #475569; font-size: 12px; margin: auto;">
-            Invite link copy karein aur client ko bhejein, phir Call start karein.
+            Link copy karke partner ko bhejein, phir "Start Call" karein.
         </div>
     </div>
 
     <div class="call-actions">
         <button class="call-btn start-btn" id="start-call-btn" onclick="startCall()">
-            📞 Join / Start Call
+            📞 Start / Join Call
         </button>
         <button class="call-btn end-btn" id="end-call-btn" onclick="endCall()">
             🛑 End Call
@@ -318,7 +297,7 @@
 </div>
 
 <script>
-    // 1. Generate or Read Room ID from URL
+    // Room Setup
     const urlParams = new URLSearchParams(window.location.search);
     let roomId = urlParams.get('room');
     if (!roomId) {
@@ -328,20 +307,19 @@
     }
     document.getElementById("room-display").innerText = roomId;
 
-    // Unique ID for this browser tab to distinguish speaker vs listener
+    // Unique user ID per tab
     const myClientId = 'user_' + Math.random().toString(36).substring(2, 9);
 
     let socket = null;
     let recognition = null;
     let isCallActive = false;
-    let isAudioPlaying = false;
+    let isPlayingIncomingAudio = false;
     let currentAudio = null;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     function copyInviteLink() {
-        const fullLink = window.location.href;
-        navigator.clipboard.writeText(fullLink).then(() => {
+        navigator.clipboard.writeText(window.location.href).then(() => {
             const btn = document.getElementById("copy-btn");
             btn.innerText = "✅ Link Copied!";
             btn.style.background = "#22c55e";
@@ -365,11 +343,11 @@
         socket.onmessage = (event) => {
             if (!isCallActive) return;
             const data = JSON.parse(event.data);
-            const isMe = data.sender_id === myClientId;
+            const isMe = (data.sender_id === myClientId);
 
             appendCaption(data.sender_name, data.original, data.translated, isMe);
 
-            // Audio sirf samne wale ke device par baje, apne speaker par echo na ho
+            // Audio sirf samne wale ke device par baje, bolne wale ko apni aawaz ka tarjuma wapis na sunayi de!
             if (!isMe) {
                 playLiveSpeech(data.translated, data.target_lang, data.gender);
             }
@@ -389,7 +367,7 @@
         const item = document.createElement("div");
         item.className = "transcript-item " + (isMe ? "me" : "partner");
         item.innerHTML = `
-            <div class="user">${sender} ${isMe ? "(You)" : ""}</div>
+            <div class="user">${sender} ${isMe ? "(You)" : "(Partner)"}</div>
             <div class="orig">${orig}</div>
             <div class="trans">👉 ${trans}</div>
         `;
@@ -398,10 +376,10 @@
     }
 
     function playLiveSpeech(text, lang, gender) {
-        if (!isCallActive || !text || text.startsWith("[")) return;
+        if (!isCallActive || !text) return;
 
         stopCurrentAudio();
-        isAudioPlaying = true;
+        isPlayingIncomingAudio = true;
 
         const remoteAvatar = document.getElementById("remote-avatar");
         remoteAvatar.classList.add("speaking");
@@ -412,19 +390,19 @@
         currentAudio.onended = () => {
             remoteAvatar.classList.remove("speaking");
             currentAudio = null;
-            setTimeout(() => { isAudioPlaying = false; }, 350);
+            setTimeout(() => { isPlayingIncomingAudio = false; }, 300);
         };
 
         currentAudio.onerror = () => {
             remoteAvatar.classList.remove("speaking");
             currentAudio = null;
-            isAudioPlaying = false;
+            isPlayingIncomingAudio = false;
         };
 
         currentAudio.play().catch(() => {
             remoteAvatar.classList.remove("speaking");
             currentAudio = null;
-            isAudioPlaying = false;
+            isPlayingIncomingAudio = false;
         });
     }
 
@@ -439,7 +417,7 @@
 
     function setupSpeechRecognition() {
         if (!SpeechRecognition) {
-            alert("Please open this link in Google Chrome, Edge, or Safari.");
+            alert("Please open this page in Chrome or Edge.");
             return;
         }
 
@@ -448,7 +426,7 @@
         recognition.interimResults = false;
 
         recognition.onresult = (event) => {
-            if (!isCallActive || isAudioPlaying) return;
+            if (!isCallActive || isPlayingIncomingAudio) return;
 
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
@@ -459,16 +437,16 @@
                     localAvatar.classList.add("speaking");
                     setTimeout(() => localAvatar.classList.remove("speaking"), 1000);
 
-                    const currentSrc = document.getElementById("my-lang").value;
-                    const currentTgt = document.getElementById("target-lang").value;
+                    const myLang = document.getElementById("my-lang").value;
+                    const partnerLang = document.getElementById("target-lang").value;
 
                     if (socket && socket.readyState === WebSocket.OPEN) {
                         socket.send(JSON.stringify({
                             sender_id: myClientId,
-                            sender_name: document.getElementById("username").value || "Ali",
+                            sender_name: document.getElementById("username").value || "Caller",
                             gender: document.getElementById("gender").value,
-                            source_lang: currentSrc,
-                            target_lang: currentTgt,
+                            source_lang: myLang,
+                            target_lang: partnerLang,
                             text: transcript
                         }));
                     }
@@ -488,7 +466,7 @@
 
     function startCall() {
         isCallActive = true;
-        isAudioPlaying = false;
+        isPlayingIncomingAudio = false;
         document.getElementById("start-call-btn").style.display = "none";
         document.getElementById("end-call-btn").style.display = "flex";
 
@@ -503,7 +481,7 @@
 
     function endCall() {
         isCallActive = false;
-        isAudioPlaying = false;
+        isPlayingIncomingAudio = false;
         document.getElementById("start-call-btn").style.display = "flex";
         document.getElementById("end-call-btn").style.display = "none";
 
