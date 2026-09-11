@@ -110,10 +110,46 @@
             outline: none;
             width: 100%;
         }
+        .call-visualizer {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 16px 0;
+            margin: 6px 0 12px 0;
+            background: #0b111c;
+            border-radius: 16px;
+        }
+        .avatar-wrap {
+            text-align: center;
+        }
+        .avatar {
+            width: 68px;
+            height: 68px;
+            border-radius: 50%;
+            background: #1e293b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin: auto;
+            border: 3px solid #334155;
+            transition: all 0.2s ease-in-out;
+        }
+        .avatar.speaking {
+            border-color: #22c55e;
+            transform: scale(1.08);
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+        }
+        .avatar-label {
+            margin-top: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #cbd5e1;
+        }
         .live-captions {
             background: #0b111c;
             border-radius: 14px;
-            height: 180px;
+            height: 160px;
             overflow-y: auto;
             padding: 12px;
             margin-bottom: 16px;
@@ -192,7 +228,7 @@
         </div>
         <div class="field-group">
             <label>I Speak</label>
-            <select id="my-lang">
+            <select id="my-lang" onchange="updateRecognitionLanguage()">
                 <option value="ur-PK" selected>🇵🇰 Urdu</option>
                 <option value="en-US">🇬🇧 English</option>
                 <option value="zh-CN">🇨🇳 Chinese</option>
@@ -209,6 +245,19 @@
                 <option value="zh-CN">🇨🇳 Chinese</option>
                 <option value="ar-SA">🇸🇦 Arabic</option>
             </select>
+        </div>
+    </div>
+
+    <!-- Visual Avatars Restored -->
+    <div class="call-visualizer">
+        <div class="avatar-wrap">
+            <div class="avatar" id="local-avatar">🎙️</div>
+            <div class="avatar-label">You (Speaking)</div>
+        </div>
+        <div style="color: #64748b; font-size: 20px;">➔</div>
+        <div class="avatar-wrap">
+            <div class="avatar" id="remote-avatar">🔊</div>
+            <div class="avatar-label">Partner (Listening)</div>
         </div>
     </div>
 
@@ -275,7 +324,7 @@
 
             appendCaption(data.sender_name, data.original, data.translated, isMe);
 
-            // Audio sirf samne wale ke device par bajegi, bolne wale ke speaker par bilkul nahi!
+            // Sirf samne wale ke phone par aawaz bajegi
             if (!isMe) {
                 playLiveSpeech(data.translated, data.target_lang, data.gender);
             }
@@ -306,8 +355,10 @@
     function playLiveSpeech(text, lang, gender) {
         if (!isCallActive || !text) return;
 
-        // Speaker se aawaz aate hi mic foran stop (taake echo/loop na banay)
         isPlayingAudio = true;
+        const remoteAvatar = document.getElementById("remote-avatar");
+        remoteAvatar.classList.add("speaking");
+
         if (recognition) {
             try { recognition.abort(); } catch(e) {}
         }
@@ -322,12 +373,16 @@
 
         const resumeMic = () => {
             currentAudio = null;
+            remoteAvatar.classList.remove("speaking");
             setTimeout(() => {
                 isPlayingAudio = false;
                 if (isCallActive && recognition) {
-                    try { recognition.start(); } catch(e) {}
+                    try {
+                        recognition.lang = document.getElementById("my-lang").value;
+                        recognition.start();
+                    } catch(e) {}
                 }
-            }, 400);
+            }, 300);
         };
 
         currentAudio.onended = resumeMic;
@@ -335,9 +390,19 @@
         currentAudio.play().catch(resumeMic);
     }
 
+    function updateRecognitionLanguage() {
+        if (recognition && isCallActive) {
+            try {
+                recognition.abort();
+                recognition.lang = document.getElementById("my-lang").value;
+                recognition.start();
+            } catch(e) {}
+        }
+    }
+
     function setupSpeechRecognition() {
         if (!SpeechRecognition) {
-            alert("Please open this link in Chrome or Edge.");
+            alert("Please use Chrome or Edge.");
             return;
         }
 
@@ -352,6 +417,10 @@
                 if (event.results[i].isFinal) {
                     const transcript = event.results[i][0].transcript.trim();
                     if (!transcript) continue;
+
+                    const localAvatar = document.getElementById("local-avatar");
+                    localAvatar.classList.add("speaking");
+                    setTimeout(() => localAvatar.classList.remove("speaking"), 900);
 
                     const myLang = document.getElementById("my-lang").value;
                     const partnerLang = document.getElementById("target-lang").value;
@@ -371,9 +440,9 @@
         };
 
         recognition.onend = () => {
-            // Sirf tab dobara start ho jab call active ho aur speaker na baj raha ho
             if (isCallActive && !isPlayingAudio) {
                 try {
+                    // Force strictly selected language
                     recognition.lang = document.getElementById("my-lang").value;
                     recognition.start();
                 } catch(e) {}
@@ -410,6 +479,9 @@
         if (socket) {
             socket.close();
         }
+
+        document.getElementById("local-avatar").classList.remove("speaking");
+        document.getElementById("remote-avatar").classList.remove("speaking");
     }
 </script>
 
