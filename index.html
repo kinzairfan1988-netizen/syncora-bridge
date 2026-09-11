@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Syncora Bilateral Call</title>
+    <title>Syncora Bilateral Bridge</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -110,49 +110,14 @@
             outline: none;
             width: 100%;
         }
-        .call-visualizer {
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            padding: 16px 0;
-            margin: 6px 0 12px 0;
-            background: #0b111c;
-            border-radius: 16px;
-        }
-        .avatar-wrap {
-            text-align: center;
-        }
-        .avatar {
-            width: 68px;
-            height: 68px;
-            border-radius: 50%;
-            background: #1e293b;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-            margin: auto;
-            border: 3px solid #334155;
-            transition: all 0.2s ease-in-out;
-        }
-        .avatar.speaking {
-            border-color: #22c55e;
-            transform: scale(1.08);
-            box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
-        }
-        .avatar-label {
-            margin-top: 6px;
-            font-size: 12px;
-            font-weight: bold;
-            color: #cbd5e1;
-        }
+        
         .live-captions {
             background: #0b111c;
             border-radius: 14px;
-            height: 160px;
+            height: 200px;
             overflow-y: auto;
             padding: 12px;
-            margin-bottom: 16px;
+            margin-bottom: 20px;
             border: 1px solid #1e293b;
             display: flex;
             flex-direction: column;
@@ -172,55 +137,67 @@
         .transcript-item.partner .user { color: #22c55e; }
         .transcript-item .orig { color: #94a3b8; }
         .transcript-item .trans { color: #f8fafc; font-weight: 500; margin-top: 2px; }
-        .call-actions {
+        
+        /* Walkie-Talkie Button */
+        .ptt-container {
             display: flex;
-            gap: 12px;
             justify-content: center;
-        }
-        .call-btn {
-            border: none;
-            border-radius: 50px;
-            padding: 14px 28px;
-            font-size: 15px;
-            font-weight: bold;
-            cursor: pointer;
-            display: flex;
             align-items: center;
-            gap: 8px;
-            transition: 0.2s;
-            color: white;
-            flex: 1;
-            justify-content: center;
         }
-        .start-btn { background: #22c55e; }
-        .start-btn:hover { background: #16a34a; }
-        .end-btn { background: #ef4444; display: none; }
-        .end-btn:hover { background: #dc2626; }
+        .ptt-btn {
+            background: #334155;
+            color: white;
+            border: 4px solid #1e293b;
+            border-radius: 50%;
+            width: 90px;
+            height: 90px;
+            font-size: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.1s ease-in-out;
+            user-select: none;
+            -webkit-user-select: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        }
+        .ptt-btn.recording {
+            background: #22c55e;
+            border-color: #16a34a;
+            transform: scale(0.95);
+            box-shadow: 0 0 30px rgba(34, 197, 94, 0.6);
+        }
+        .ptt-hint {
+            text-align: center;
+            color: #64748b;
+            font-size: 12px;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
 
 <div class="call-card">
     <div class="header">
-        <h2>⚡ Syncora Call Bridge</h2>
+        <h2>⚡ Syncora Room</h2>
         <div class="status-badge">
             <span class="dot" id="status-dot"></span>
-            <span id="call-status">Disconnected</span>
+            <span id="call-status">Connecting...</span>
         </div>
     </div>
 
     <div class="room-bar">
         <div class="room-info">Room: <b id="room-display">...</b></div>
-        <button class="copy-btn" id="copy-btn" onclick="copyInviteLink()">📋 Copy Invite Link</button>
+        <button class="copy-btn" id="copy-btn" onclick="copyInviteLink()">📋 Copy Link</button>
     </div>
 
     <div class="config-grid">
         <div class="field-group">
-            <label>Your Name</label>
+            <label>Name</label>
             <input type="text" id="username" value="Ali">
         </div>
         <div class="field-group">
-            <label>Voice Gender</label>
+            <label>Gender</label>
             <select id="gender">
                 <option value="male" selected>👨 Male</option>
                 <option value="female">👩 Female</option>
@@ -228,7 +205,7 @@
         </div>
         <div class="field-group">
             <label>I Speak</label>
-            <select id="my-lang" onchange="updateRecognitionLanguage()">
+            <select id="my-lang">
                 <option value="ur-PK" selected>🇵🇰 Urdu</option>
                 <option value="en-US">🇬🇧 English</option>
                 <option value="zh-CN">🇨🇳 Chinese</option>
@@ -248,50 +225,31 @@
         </div>
     </div>
 
-    <!-- Visual Avatars Restored -->
-    <div class="call-visualizer">
-        <div class="avatar-wrap">
-            <div class="avatar" id="local-avatar">🎙️</div>
-            <div class="avatar-label">You (Speaking)</div>
-        </div>
-        <div style="color: #64748b; font-size: 20px;">➔</div>
-        <div class="avatar-wrap">
-            <div class="avatar" id="remote-avatar">🔊</div>
-            <div class="avatar-label">Partner (Listening)</div>
-        </div>
-    </div>
-
     <div class="live-captions" id="captions">
         <div id="placeholder-msg" style="text-align: center; color: #475569; font-size: 12px; margin: auto;">
-            Link copy kar ke partner ko bhejein aur "Start Call" karein.
+            Hold the Microphone button to speak.
         </div>
     </div>
 
-    <div class="call-actions">
-        <button class="call-btn start-btn" id="start-call-btn" onclick="startCall()">
-            📞 Start / Join Call
-        </button>
-        <button class="call-btn end-btn" id="end-call-btn" onclick="endCall()">
-            🛑 End Call
-        </button>
+    <div class="ptt-container">
+        <div class="ptt-btn" id="ptt-btn">🎙️</div>
     </div>
+    <div class="ptt-hint" id="ptt-hint">Press and hold to speak</div>
 </div>
 
 <script>
     const urlParams = new URLSearchParams(window.location.search);
     let roomId = urlParams.get('room');
     if (!roomId) {
-        roomId = 'call-' + Math.random().toString(36).substring(2, 7);
+        roomId = 'room-' + Math.random().toString(36).substring(2, 7);
         window.history.replaceState(null, '', window.location.pathname + '?room=' + roomId);
     }
     document.getElementById("room-display").innerText = roomId;
 
     const myClientId = 'user_' + Math.random().toString(36).substring(2, 9);
-
+    
     let socket = null;
     let recognition = null;
-    let isCallActive = false;
-    let isPlayingAudio = false;
     let currentAudio = null;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -302,7 +260,7 @@
             btn.innerText = "✅ Link Copied!";
             btn.style.background = "#22c55e";
             setTimeout(() => {
-                btn.innerText = "📋 Copy Invite Link";
+                btn.innerText = "📋 Copy Link";
                 btn.style.background = "#334155";
             }, 2000);
         });
@@ -314,25 +272,28 @@
 
         socket.onopen = () => {
             document.getElementById("status-dot").classList.add("active");
-            document.getElementById("call-status").innerText = "Call Connected";
+            document.getElementById("call-status").innerText = "Connected";
+            
+            // Empty dummy audio to unlock browser autoplay policy (crucial fix)
+            const unlockAudio = new Audio();
+            unlockAudio.play().catch(e => console.log("Unlock waiting for user interaction"));
         };
 
         socket.onmessage = (event) => {
-            if (!isCallActive) return;
             const data = JSON.parse(event.data);
             const isMe = (data.sender_id === myClientId);
 
             appendCaption(data.sender_name, data.original, data.translated, isMe);
 
-            // Sirf samne wale ke phone par aawaz bajegi
             if (!isMe) {
-                playLiveSpeech(data.translated, data.target_lang, data.gender);
+                playIncomingAudio(data.translated, data.target_lang, data.gender);
             }
         };
 
         socket.onclose = () => {
             document.getElementById("status-dot").classList.remove("active");
             document.getElementById("call-status").innerText = "Disconnected";
+            setTimeout(initSocket, 3000); // auto reconnect
         };
     }
 
@@ -352,17 +313,9 @@
         captions.scrollTop = captions.scrollHeight;
     }
 
-    function playLiveSpeech(text, lang, gender) {
-        if (!isCallActive || !text) return;
-
-        isPlayingAudio = true;
-        const remoteAvatar = document.getElementById("remote-avatar");
-        remoteAvatar.classList.add("speaking");
-
-        if (recognition) {
-            try { recognition.abort(); } catch(e) {}
-        }
-
+    function playIncomingAudio(text, lang, gender) {
+        if (!text) return;
+        
         if (currentAudio) {
             currentAudio.pause();
             currentAudio = null;
@@ -370,119 +323,89 @@
 
         const url = `/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(lang)}&gender=${encodeURIComponent(gender)}`;
         currentAudio = new Audio(url);
-
-        const resumeMic = () => {
-            currentAudio = null;
-            remoteAvatar.classList.remove("speaking");
-            setTimeout(() => {
-                isPlayingAudio = false;
-                if (isCallActive && recognition) {
-                    try {
-                        recognition.lang = document.getElementById("my-lang").value;
-                        recognition.start();
-                    } catch(e) {}
-                }
-            }, 300);
-        };
-
-        currentAudio.onended = resumeMic;
-        currentAudio.onerror = resumeMic;
-        currentAudio.play().catch(resumeMic);
+        
+        currentAudio.play().catch((e) => {
+            console.log("Browser blocked autoplay. User must click anywhere first.", e);
+            document.getElementById("ptt-hint").innerText = "Browser blocked audio. Tap anywhere to allow.";
+            document.getElementById("ptt-hint").style.color = "#ef4444";
+        });
     }
 
-    function updateRecognitionLanguage() {
-        if (recognition && isCallActive) {
-            try {
-                recognition.abort();
-                recognition.lang = document.getElementById("my-lang").value;
-                recognition.start();
-            } catch(e) {}
-        }
-    }
-
-    function setupSpeechRecognition() {
+    // Push To Talk Logic
+    function initSpeech() {
         if (!SpeechRecognition) {
-            alert("Please use Chrome or Edge.");
+            alert("Chrome or Edge required.");
             return;
         }
-
         recognition = new SpeechRecognition();
-        recognition.continuous = true;
+        recognition.continuous = false; // Only record while holding
         recognition.interimResults = false;
 
         recognition.onresult = (event) => {
-            if (!isCallActive || isPlayingAudio) return;
+            const transcript = event.results[0][0].transcript.trim();
+            if (!transcript) return;
 
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    const transcript = event.results[i][0].transcript.trim();
-                    if (!transcript) continue;
-
-                    const localAvatar = document.getElementById("local-avatar");
-                    localAvatar.classList.add("speaking");
-                    setTimeout(() => localAvatar.classList.remove("speaking"), 900);
-
-                    const myLang = document.getElementById("my-lang").value;
-                    const partnerLang = document.getElementById("target-lang").value;
-
-                    if (socket && socket.readyState === WebSocket.OPEN) {
-                        socket.send(JSON.stringify({
-                            sender_id: myClientId,
-                            sender_name: document.getElementById("username").value || "Caller",
-                            gender: document.getElementById("gender").value,
-                            source_lang: myLang,
-                            target_lang: partnerLang,
-                            text: transcript
-                        }));
-                    }
-                }
-            }
-        };
-
-        recognition.onend = () => {
-            if (isCallActive && !isPlayingAudio) {
-                try {
-                    // Force strictly selected language
-                    recognition.lang = document.getElementById("my-lang").value;
-                    recognition.start();
-                } catch(e) {}
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    sender_id: myClientId,
+                    sender_name: document.getElementById("username").value || "Caller",
+                    gender: document.getElementById("gender").value,
+                    source_lang: document.getElementById("my-lang").value,
+                    target_lang: document.getElementById("target-lang").value,
+                    text: transcript
+                }));
             }
         };
     }
 
-    function startCall() {
-        isCallActive = true;
-        isPlayingAudio = false;
-        document.getElementById("start-call-btn").style.display = "none";
-        document.getElementById("end-call-btn").style.display = "flex";
+    const pttBtn = document.getElementById("ptt-btn");
+    const pttHint = document.getElementById("ptt-hint");
 
-        initSocket();
-        setupSpeechRecognition();
+    function startRecording() {
+        if (!recognition) return;
+        
+        // Stop any playing audio so it doesn't feed into mic
+        if (currentAudio) {
+            currentAudio.pause();
+        }
 
+        pttBtn.classList.add("recording");
+        pttHint.innerText = "Listening... Release to send";
+        pttHint.style.color = "#22c55e";
+        
         recognition.lang = document.getElementById("my-lang").value;
         try { recognition.start(); } catch(e) {}
     }
 
-    function endCall() {
-        isCallActive = false;
-        isPlayingAudio = false;
-        document.getElementById("start-call-btn").style.display = "flex";
-        document.getElementById("end-call-btn").style.display = "none";
-
-        if (recognition) {
-            try { recognition.abort(); } catch(e) {}
-        }
-        if (currentAudio) {
-            currentAudio.pause();
-            currentAudio = null;
-        }
-        if (socket) {
-            socket.close();
-        }
-
-        document.getElementById("local-avatar").classList.remove("speaking");
-        document.getElementById("remote-avatar").classList.remove("speaking");
+    function stopRecording() {
+        if (!recognition) return;
+        pttBtn.classList.remove("recording");
+        pttHint.innerText = "Processing...";
+        pttHint.style.color = "#38bdf8";
+        
+        try { recognition.stop(); } catch(e) {}
+        
+        setTimeout(() => {
+            pttHint.innerText = "Press and hold to speak";
+            pttHint.style.color = "#64748b";
+        }, 1500);
     }
+
+    // Mouse and Touch Events for Button
+    pttBtn.addEventListener("mousedown", startRecording);
+    pttBtn.addEventListener("mouseup", stopRecording);
+    pttBtn.addEventListener("mouseleave", stopRecording);
+    
+    pttBtn.addEventListener("touchstart", (e) => { e.preventDefault(); startRecording(); });
+    pttBtn.addEventListener("touchend", (e) => { e.preventDefault(); stopRecording(); });
+    pttBtn.addEventListener("touchcancel", (e) => { e.preventDefault(); stopRecording(); });
+
+    // Initialize
+    window.onload = () => {
+        initSocket();
+        initSpeech();
+    };
+
 </script>
 
 </body>
