@@ -12,33 +12,19 @@ app = FastAPI(title="Syncora Call Bridge")
 
 VOICE_MAP = {
     "ur": {"male": "ur-PK-AsadNeural", "female": "ur-PK-UzmaNeural"},
-    "zh": {"male": "zh-CN-YunxiNeural", "female": "zh-CN-XiaoxiaoNeural"},
     "en": {"male": "en-US-BrianNeural", "female": "en-US-AvaNeural"},
     "ms": {"male": "ms-MY-OsmanNeural", "female": "ms-MY-YasminNeural"},
-    "ar": {"male": "ar-SA-HamedNeural", "female": "ar-SA-ZariyahNeural"},
-    "es": {"male": "es-ES-AlvaroNeural", "female": "es-ES-ElviraNeural"},
-    "ru": {"male": "ru-RU-DmitryNeural", "female": "ru-RU-SvetlanaNeural"},
-    "tr": {"male": "tr-TR-AhmetNeural", "female": "tr-TR-EmelNeural"},
-    "de": {"male": "de-DE-ConradNeural", "female": "de-DE-KatjaNeural"},
-    "ja": {"male": "ja-JP-KeitaNeural", "female": "ja-JP-NanamiNeural"}
+    "zh": {"male": "zh-CN-YunxiNeural", "female": "zh-CN-XiaoxiaoNeural"},
+    "ar": {"male": "ar-SA-HamedNeural", "female": "ar-SA-ZariyahNeural"}
 }
 
-LANG_NAMES = {
+LANG_MAP = {
     "ur": "Urdu",
     "en": "English",
     "ms": "Malay",
     "zh": "Chinese",
-    "ar": "Arabic",
-    "es": "Spanish",
-    "ru": "Russian",
-    "tr": "Turkish",
-    "de": "German",
-    "ja": "Japanese"
+    "ar": "Arabic"
 }
-
-def resolve_lang(code: str) -> str:
-    prefix = (code or "en").split("-")[0].lower()
-    return LANG_NAMES.get(prefix, "English")
 
 class RoomManager:
     def __init__(self):
@@ -92,49 +78,43 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-async def pure_translate(text: str, src_lang: str, tgt_lang: str) -> str:
+async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
 
     if not clean_key or clean_key == "dummy_key":
         return text
 
-    source = resolve_lang(src_lang)
-    target = resolve_lang(tgt_lang)
+    src_prefix = src_code.split("-")[0].lower()
+    tgt_prefix = tgt_code.split("-")[0].lower()
 
-    # Hard-locked few-shot prompt: Never allows Arabic drift
+    target_lang = LANG_MAP.get(tgt_prefix, "English")
+    source_lang = LANG_MAP.get(src_prefix, "Urdu")
+
     groq_client = AsyncOpenAI(
         base_url="https://api.groq.com/openai/v1",
         api_key=clean_key
-    )
-
-    system_instruction = (
-        f"You are a strict, direct translator. "
-        f"Translate the given text from {source} into {target}. "
-        f"Output ONLY the translated words in {target}. "
-        f"NEVER use Arabic alphabet or Arabic language unless {target} is Arabic. "
-        "No quotes, no reasoning, no explanations."
     )
 
     try:
         response = await groq_client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": f"Input: آپ کیسے ہیں؟\nTarget: {target}"},
-                {"role": "assistant", "content": "How are you?" if target == "English" else "Apa khabar?" if target == "Malay" else "你好吗？"},
-                {"role": "user", "content": f"Input: {text}\nTarget: {target}"}
+                {
+                    "role": "system", 
+                    "content": f"You are a translator. Translate the text from {source_lang} directly to {target_lang}. Return ONLY the translation in {target_lang}. Do NOT use Arabic unless the target language is Arabic."
+                },
+                {"role": "user", "content": text}
             ],
             temperature=0.0,
             max_tokens=150
         )
         content = response.choices[0].message.content
         if content and content.strip():
-            # Agar koi reasoning ya prefix aa jaye to saaf karein
             clean = re.sub(r"^(Translation:|Output:)", "", content.strip(), flags=re.IGNORECASE).strip()
             return clean.strip('"')
-    except Exception:
-        pass
+    except Exception as e:
+        return f"[Error: {str(e)}]"
 
     return text
 
