@@ -4,20 +4,18 @@ import asyncio
 from typing import List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, Response
-from deep_translator import GoogleTranslator
+from deep_translator import GoogleTranslator, MyMemoryTranslator
 import edge_tts
 
-# 1. FastAPI App Initialization
 app = FastAPI(title="Syncora Sourcing Bridge")
 
-# 2. Microsoft Neural Voices
+# Microsoft Neural Voice map
 VOICE_MAP = {
-    "ur": "ur-PK-AsadNeural",       # Clear Pakistan Urdu
-    "zh": "zh-CN-XiaoxiaoNeural",   # Standard Mandarin Chinese
-    "en": "en-US-JennyNeural"       # Clear US English
+    "ur": "ur-PK-AsadNeural",
+    "zh": "zh-CN-XiaoxiaoNeural",
+    "en": "en-US-JennyNeural"
 }
 
-# 3. Connection Manager for WebSockets
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
@@ -39,7 +37,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# 4. Server-Side Text to Speech
+# Edge-TTS Audio Generation
 @app.get("/tts")
 async def text_to_speech(text: str, lang: str):
     if not text.strip():
@@ -56,18 +54,29 @@ async def text_to_speech(text: str, lang: str):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# Helper function for GoogleTranslator language formatting
-def normalize_lang(code: str) -> str:
-    c = code.lower()
-    if c.startswith("zh"):
-        return "zh-CN"
-    elif c.startswith("ur"):
-        return "ur"
-    elif c.startswith("en"):
-        return "en"
-    return "en"
+# Multi-provider reliable translation function
+def perform_translation(text: str, src: str, tgt: str) -> str:
+    # 1. Primary Attempt: Google Translator
+    try:
+        res = GoogleTranslator(source=src, target=tgt).translate(text)
+        if res and not res.strip().startswith("["):
+            return res
+    except Exception:
+        pass
 
-# 5. Real-Time WebSocket Communication & Translation
+    # 2. Fallback Attempt: MyMemory Translator (Cloud IPs par kabhi block nahi hota)
+    try:
+        # MyMemory format standard: ur-PK -> ur, zh-CN -> zh-CN
+        mm_src = "zh-CN" if src.startswith("zh") else src[:2]
+        mm_tgt = "zh-CN" if tgt.startswith("zh") else tgt[:2]
+        res = MyMemoryTranslator(source=mm_src, target=mm_tgt).translate(text)
+        if res:
+            return res
+    except Exception as e:
+        return f"[Translation Error: {str(e)}]"
+
+    return text
+
 @app.websocket("/ws/room")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
@@ -84,14 +93,11 @@ async def websocket_endpoint(websocket: WebSocket):
             if not original_text:
                 continue
 
-            # Standardized language mapping for deep-translator
-            src_code = normalize_lang(src_lang)
-            tgt_code = normalize_lang(tgt_lang)
+            # Standard language code normalization
+            src_code = "zh-CN" if src_lang.lower().startswith("zh") else src_lang[:2].lower()
+            tgt_code = "zh-CN" if tgt_lang.lower().startswith("zh") else tgt_lang[:2].lower()
 
-            try:
-                translated_text = GoogleTranslator(source=src_code, target=tgt_code).translate(original_text)
-            except Exception as e:
-                translated_text = f"[Translation Error: {str(e)}]"
+            translated_text = perform_translation(original_text, src_code, tgt_code)
 
             payload = {
                 "sender": sender,
@@ -107,7 +113,6 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception:
         manager.disconnect(websocket)
 
-# 6. Frontend UI
 @app.get("/", response_class=HTMLResponse)
 async def get_index():
     return """<!DOCTYPE html>
@@ -175,7 +180,6 @@ async def get_index():
         const myLang = document.getElementById("my-lang").value;
         const myName = document.getElementById("username").value;
 
-        // Agar message doosre participant ka hai aur meri language se relate karta hai
         if (msg.target_lang.startsWith(myLang.substring(0, 2)) || msg.sender !== myName) {
             speakText(msg.translated, msg.target_lang);
         }
@@ -186,7 +190,7 @@ async def get_index():
         const url = `/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(lang)}`;
         audioPlayer.src = url;
         audioPlayer.play().catch(e => {
-            console.log("Autoplay policy lock or audio error:", e);
+            console.log("Audio play error:", e);
         });
     }
 
@@ -210,7 +214,6 @@ async def get_index():
             const sender = document.getElementById("username").value;
             const myLang = document.getElementById("my-lang").value;
             
-            // Auto target mapping: Urdu -> Chinese, Chinese -> Urdu, English -> Urdu
             let targetLang = "ur-PK";
             if (myLang.startsWith("ur")) {
                 targetLang = "zh-CN";
@@ -239,7 +242,6 @@ async def get_index():
     }
 
     function toggleSpeech() {
-        // Mobile Browser audio unlock trick
         audioPlayer.play().then(() => audioPlayer.pause()).catch(() => {});
 
         if (!recognition) {
