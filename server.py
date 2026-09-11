@@ -8,11 +8,12 @@ from openai import AsyncOpenAI
 import edge_tts
 
 app = FastAPI(title="Syncora Multilingual Sourcing Bridge")
+# Safe Groq Client Initialization (Kabhi crash nahi hoga)
+groq_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or "dummy_key_to_prevent_crash"
 
-# Groq Cloud Ultra-Fast Free LLM Client
 client = AsyncOpenAI(
     base_url="https://api.groq.com/openai/v1",
-    api_key=os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    api_key=groq_key
 )
 
 # Natural Microsoft Neural Voices (Male / Female per Language)
