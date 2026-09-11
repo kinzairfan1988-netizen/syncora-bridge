@@ -72,7 +72,7 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
     communicate = edge_tts.Communicate(
         text=text, 
         voice=selected_voice,
-        rate="-3%",
+        rate="-2%",
         pitch="-1Hz"
     )
     
@@ -83,8 +83,8 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# Resilient Translation using Active Models
-async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
+# Conversational AI Agent Engine (Replies back instead of just repeating/translating)
+async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
 
@@ -94,10 +94,14 @@ async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
     source = LANG_NAMES.get(src_lang[:2].lower(), src_lang)
     target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
 
+    # Ab AI aapki baat ka jawab dega, sirf repeat nahi karega
     system_prompt = (
-        f"You are a real-time call interpreter between {source} and {target}. "
-        f"Translate the spoken text naturally and fluently into {target}. "
-        "Output ONLY the translated sentence without quotes, thoughts, or formatting."
+        f"You are Syncora, an intelligent and polite international business & sourcing assistant. "
+        f"The user is speaking to you in {source}. "
+        f"Understand the user's input, formulate a helpful, direct conversational reply, "
+        f"and output your reply strictly in {target}. "
+        "Keep the reply concise (1 to 2 spoken sentences suitable for a live phone call). "
+        "Do NOT repeat the user's question. Do NOT include markdown, notes, or explanations. Only output the spoken answer."
     )
 
     groq_client = AsyncOpenAI(
@@ -105,7 +109,6 @@ async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
         api_key=clean_key
     )
 
-    # Dynamic fallback to ensure unbroken call stream
     candidate_models = []
     try:
         model_list = await groq_client.models.list()
@@ -129,7 +132,7 @@ async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": text}
                 ],
-                temperature=0.2,
+                temperature=0.4,
                 max_tokens=200
             )
             content = response.choices[0].message.content
@@ -138,7 +141,7 @@ async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
         except Exception:
             continue
 
-    return "Translation temporarily unavailable."
+    return "Maaf kijiye, main abhi jawab generate nahi kar pa raha."
 
 @app.websocket("/ws/room")
 async def websocket_endpoint(websocket: WebSocket):
@@ -148,7 +151,7 @@ async def websocket_endpoint(websocket: WebSocket):
             raw_data = await websocket.receive_text()
             data = json.loads(raw_data)
             
-            sender = data.get("sender", "Caller")
+            sender = data.get("sender", "Ali")
             gender = data.get("gender", "male")
             src_lang = data.get("source_lang", "ur-PK")
             tgt_lang = data.get("target_lang", "ms-MY")
@@ -157,7 +160,8 @@ async def websocket_endpoint(websocket: WebSocket):
             if not original_text:
                 continue
 
-            translated_text = await llm_translate(original_text, src_lang, tgt_lang)
+            # Generate AI Reply
+            reply_text = await llm_agent_reply(original_text, src_lang, tgt_lang)
 
             payload = {
                 "sender": sender,
@@ -165,7 +169,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 "source_lang": src_lang,
                 "target_lang": tgt_lang,
                 "original": original_text,
-                "translated": translated_text
+                "translated": reply_text
             }
             await manager.broadcast(payload)
 
