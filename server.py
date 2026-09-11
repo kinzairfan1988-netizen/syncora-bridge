@@ -9,15 +9,7 @@ import edge_tts
 
 app = FastAPI(title="Syncora Multilingual Sourcing Bridge")
 
-# Groq Client Initialization
-groq_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or "dummy_key"
-
-client = AsyncOpenAI(
-    base_url="https://api.groq.com/openai/v1",
-    api_key=groq_key
-)
-
-# Natural Microsoft Neural Voices (Male / Female per Language)
+# Natural Microsoft Neural Voices
 VOICE_MAP = {
     "ur": {"male": "ur-PK-AsadNeural", "female": "ur-PK-UzmaNeural"},
     "zh": {"male": "zh-CN-YunxiNeural", "female": "zh-CN-XiaoxiaoNeural"},
@@ -91,38 +83,41 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# Multi-Model Resilient Translation Engine
+# Direct Groq Translation
 async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
+    raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
+    clean_key = raw_key.strip().strip("'").strip('"')
+
+    if not clean_key or clean_key == "dummy_key":
+        return "[Error: GROQ_API_KEY nahi mili. Railway variables check karein]"
+
     source = LANG_NAMES.get(src_lang[:2].lower(), src_lang)
     target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
 
     system_prompt = (
-        f"You are a real-time bilateral business and sourcing interpreter between {source} and {target}. "
-        f"Translate the user's spoken input naturally, conversationally, and accurately into {target}. "
-        "Do NOT provide explanations, notes, pleasantries, or quotes. Output ONLY the raw translated sentence."
+        f"You are a real-time interpreter between {source} and {target}. "
+        f"Translate the following input accurately into {target}. "
+        "Output ONLY the translated text without explanations, quotes, or notes."
     )
 
-    # Universally supported free models on Groq
-    candidate_models = ["mixtral-8x7b-32768", "gemma2-9b-it", "llama-3.1-8b-instant"]
+    groq_client = AsyncOpenAI(
+        base_url="https://api.groq.com/openai/v1",
+        api_key=clean_key
+    )
 
-    for model_name in candidate_models:
-        try:
-            response = await client.chat.completions.create(
-                model=model_name,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": text}
-                ],
-                temperature=0.2,
-                max_tokens=250
-            )
-            content = response.choices[0].message.content
-            if content and content.strip():
-                return content.strip()
-        except Exception:
-            continue
-
-    return "Translation failed. Please check Groq API key in Railway settings."
+    try:
+        response = await groq_client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text}
+            ],
+            temperature=0.2,
+            max_tokens=200
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"[Groq Live Error: {str(e)}]"
 
 @app.websocket("/ws/room")
 async def websocket_endpoint(websocket: WebSocket):
@@ -132,7 +127,7 @@ async def websocket_endpoint(websocket: WebSocket):
             raw_data = await websocket.receive_text()
             data = json.loads(raw_data)
             
-            sender = data.get("sender", "Anonymous")
+            sender = data.get("sender", "Ali")
             gender = data.get("gender", "male")
             src_lang = data.get("source_lang", "ur-PK")
             tgt_lang = data.get("target_lang", "ms-MY")
