@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Syncora Workspace | AI Bilateral Bridge</title>
+    <title>Syncora Workspace | AI Hands-Free Bridge</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -13,7 +13,6 @@
             --surface-card: rgba(18, 24, 38, 0.7);
             --surface-elevated: rgba(30, 41, 59, 0.6);
             --border-subtle: rgba(255, 255, 255, 0.08);
-            --border-active: rgba(56, 189, 248, 0.4);
             --accent-primary: #38bdf8;
             --accent-glow: rgba(56, 189, 248, 0.15);
             --success-color: #22c55e;
@@ -38,13 +37,12 @@
             overflow-x: hidden;
         }
 
-        /* Top Navigation Bar */
         .navbar {
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 16px 28px;
-            background: rgba(10, 14, 23, 0.8);
+            background: rgba(10, 14, 23, 0.85);
             backdrop-filter: blur(16px);
             border-bottom: 1px solid var(--border-subtle);
         }
@@ -92,9 +90,7 @@
             color: var(--text-muted);
         }
 
-        .room-badge b {
-            color: var(--accent-primary);
-        }
+        .room-badge b { color: var(--accent-primary); }
 
         .status-pill {
             display: inline-flex;
@@ -133,7 +129,6 @@
             border-color: var(--accent-primary);
         }
 
-        /* Workspace Grid */
         .workspace-container {
             max-width: 1200px;
             width: 100%;
@@ -146,12 +141,9 @@
         }
 
         @media (max-width: 900px) {
-            .workspace-container {
-                grid-template-columns: 1fr;
-            }
+            .workspace-container { grid-template-columns: 1fr; }
         }
 
-        /* Left Main Panel: Participants & Visual Feed */
         .meeting-stage {
             display: flex;
             flex-direction: column;
@@ -168,64 +160,63 @@
             background: var(--surface-card);
             border: 1px solid var(--border-subtle);
             border-radius: 16px;
-            padding: 20px;
+            padding: 24px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 200px;
+            min-height: 220px;
             position: relative;
             backdrop-filter: blur(12px);
-            transition: border-color 0.3s ease;
+            transition: all 0.3s ease;
         }
 
         .tile-card.speaking {
             border-color: var(--success-color);
-            box-shadow: 0 0 24px rgba(34, 197, 94, 0.15);
+            box-shadow: 0 0 24px rgba(34, 197, 94, 0.2);
+            transform: translateY(-2px);
         }
 
         .avatar-frame {
-            width: 72px;
-            height: 72px;
+            width: 76px;
+            height: 76px;
             border-radius: 50%;
             background: #1e293b;
             border: 2px solid var(--border-subtle);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 28px;
+            font-size: 30px;
             margin-bottom: 12px;
             transition: transform 0.2s ease;
         }
 
         .tile-card.speaking .avatar-frame {
             border-color: var(--success-color);
-            transform: scale(1.05);
+            transform: scale(1.08);
         }
 
         .participant-name {
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 600;
-            color: var(--text-main);
             margin-bottom: 4px;
         }
 
         .participant-lang-tag {
-            font-size: 11px;
+            font-size: 12px;
             color: var(--accent-primary);
             background: var(--accent-glow);
-            padding: 2px 8px;
+            padding: 2px 10px;
             border-radius: 12px;
             font-weight: 500;
         }
 
-        /* Audio Wave Simulation */
         .audio-wave {
             display: flex;
             align-items: center;
-            gap: 3px;
-            height: 16px;
-            margin-top: 10px;
+            gap: 4px;
+            height: 18px;
+            margin-top: 14px;
         }
 
         .wave-bar {
@@ -238,7 +229,7 @@
 
         .tile-card.speaking .wave-bar {
             background: var(--success-color);
-            animation: wavePulse 0.8s infinite ease-in-out;
+            animation: wavePulse 0.7s infinite ease-in-out;
         }
 
         .tile-card.speaking .wave-bar:nth-child(2) { animation-delay: 0.15s; }
@@ -247,10 +238,9 @@
 
         @keyframes wavePulse {
             0%, 100% { height: 4px; }
-            50% { height: 16px; }
+            50% { height: 18px; }
         }
 
-        /* Right Panel: Clean Subtitles & Transcript Feed */
         .sidebar-panel {
             background: var(--surface-card);
             border: 1px solid var(--border-subtle);
@@ -284,15 +274,15 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
-            min-height: 380px;
-            max-height: 480px;
+            min-height: 400px;
+            max-height: 520px;
         }
 
         .feed-item {
             display: flex;
             flex-direction: column;
             gap: 4px;
-            padding: 10px 14px;
+            padding: 12px 14px;
             border-radius: 12px;
             background: var(--surface-elevated);
             font-size: 13px;
@@ -300,45 +290,30 @@
             border-left: 3px solid transparent;
         }
 
-        .feed-item.me {
-            border-left-color: var(--accent-primary);
-        }
-
-        .feed-item.partner {
-            border-left-color: var(--success-color);
-        }
+        .feed-item.me { border-left-color: var(--accent-primary); }
+        .feed-item.partner { border-left-color: var(--success-color); }
 
         .item-author {
-            display: flex;
-            justify-content: space-between;
             font-size: 11px;
             font-weight: 600;
             color: var(--text-muted);
         }
 
-        .item-original {
-            color: #cbd5e1;
-        }
+        .item-original { color: #cbd5e1; }
+        .item-translated { color: var(--success-color); font-weight: 600; }
 
-        .item-translated {
-            color: var(--success-color);
-            font-weight: 500;
-        }
-
-        /* Settings Bar */
         .config-strip {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-            padding: 14px 18px;
+            gap: 12px;
+            padding: 16px 20px;
             background: rgba(10, 14, 23, 0.6);
-            border-top: 1px solid var(--border-subtle);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
         }
 
         @media (max-width: 768px) {
-            .config-strip {
-                grid-template-columns: 1fr 1fr;
-            }
+            .config-strip { grid-template-columns: 1fr 1fr; }
         }
 
         .config-field {
@@ -358,73 +333,44 @@
             background: var(--surface-elevated);
             border: 1px solid var(--border-subtle);
             color: var(--text-main);
-            padding: 6px 10px;
+            padding: 8px 12px;
             border-radius: 8px;
-            font-size: 12px;
+            font-size: 13px;
             outline: none;
-            transition: border-color 0.2s ease;
         }
 
-        .select-input:focus, .text-input:focus {
-            border-color: var(--accent-primary);
-        }
-
-        /* Bottom Floating Dock / Controls */
-        .bottom-dock {
+        .bottom-status-bar {
             margin-top: auto;
-            padding: 16px;
+            padding: 14px 20px;
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
+            background: rgba(10, 14, 23, 0.7);
+            border-top: 1px solid var(--border-subtle);
+            font-size: 13px;
+            color: var(--text-muted);
         }
 
-        .ptt-action-btn {
-            background: linear-gradient(135deg, #1e293b, #0f172a);
-            border: 2px solid var(--border-subtle);
-            color: var(--text-main);
-            border-radius: 50px;
-            padding: 12px 28px;
-            font-size: 14px;
-            font-weight: 600;
-            display: flex;
+        .live-mic-badge {
+            display: inline-flex;
             align-items: center;
-            gap: 10px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            user-select: none;
-            -webkit-user-select: none;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-        }
-
-        .ptt-action-btn.active {
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-color: #4ade80;
-            box-shadow: 0 0 24px rgba(34, 197, 94, 0.4);
-            transform: scale(0.98);
-        }
-
-        .icon-circle {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            gap: 6px;
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--success-color);
+            padding: 4px 12px;
+            border-radius: 20px;
             font-size: 12px;
+            font-weight: 600;
         }
     </style>
 </head>
 <body>
 
-    <!-- Header Navigation -->
     <nav class="navbar">
         <div class="brand-cluster">
             <div class="brand-logo">S</div>
-            <div>
-                <div class="brand-title">Syncora Workspace</div>
-            </div>
+            <div><div class="brand-title">Syncora Workspace</div></div>
             <div class="status-pill">
                 <span class="dot-indicator" id="status-dot"></span>
                 <span id="call-status">Connecting...</span>
@@ -440,13 +386,9 @@
         </div>
     </nav>
 
-    <!-- Main Workspace Container -->
     <main class="workspace-container">
-        
-        <!-- Left: Call Stage / Participants -->
         <section class="meeting-stage">
             <div class="participant-tiles">
-                <!-- Local User Tile -->
                 <div class="tile-card" id="local-tile">
                     <div class="avatar-frame">🎙️</div>
                     <div class="participant-name" id="local-name-label">Ali (You)</div>
@@ -459,7 +401,6 @@
                     </div>
                 </div>
 
-                <!-- Remote User Tile -->
                 <div class="tile-card" id="remote-tile">
                     <div class="avatar-frame">🔊</div>
                     <div class="participant-name">Client / Partner</div>
@@ -473,7 +414,6 @@
                 </div>
             </div>
 
-            <!-- Configurations Bar -->
             <div class="config-strip">
                 <div class="config-field">
                     <label>Your Name</label>
@@ -493,7 +433,6 @@
                         <option value="en-US">🇬🇧 English</option>
                         <option value="ms-MY">🇲🇾 Malay</option>
                         <option value="zh-CN">🇨🇳 Chinese</option>
-                        <option value="ar-SA">🇸🇦 Arabic</option>
                     </select>
                 </div>
                 <div class="config-field">
@@ -503,32 +442,26 @@
                         <option value="ms-MY">🇲🇾 Malay</option>
                         <option value="ur-PK">🇵🇰 Urdu</option>
                         <option value="zh-CN">🇨🇳 Chinese</option>
-                        <option value="ar-SA">🇸🇦 Arabic</option>
                     </select>
                 </div>
             </div>
         </section>
 
-        <!-- Right: Transcript Subtitles Feed -->
         <aside class="sidebar-panel">
             <div class="panel-header">
                 <h3>Live Interpretation Feed</h3>
             </div>
             <div class="transcript-feed" id="captions">
                 <div id="placeholder-msg" style="text-align: center; color: var(--text-muted); font-size: 13px; margin: auto;">
-                    Hold the Push-to-Talk button below to start real-time interpretation.
+                    Hands-free mode active. Just speak naturally into your microphone.
                 </div>
             </div>
         </aside>
-
     </main>
 
-    <!-- Bottom Dock Floating Controls -->
-    <footer class="bottom-dock">
-        <button class="ptt-action-btn" id="ptt-btn">
-            <div class="icon-circle">🎙️</div>
-            <span id="ptt-label">Hold to Speak</span>
-        </button>
+    <footer class="bottom-status-bar">
+        <div class="live-mic-badge">● Live Mic Active</div>
+        <span>Speak naturally. AI will detect your pauses and translate automatically.</span>
     </footer>
 
     <script>
@@ -543,13 +476,14 @@
         let socket = null;
         let recognition = null;
         let currentAudio = null;
+        let isPartnerSpeaking = false;
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         function copyInviteLink() {
             navigator.clipboard.writeText(window.location.href).then(() => {
                 const btn = document.getElementById("copy-btn");
-                btn.innerText = "✅ Link Copied";
+                btn.innerText = "✅ Copied";
                 setTimeout(() => { btn.innerText = "📋 Copy Invite"; }, 2000);
             });
         }
@@ -565,6 +499,14 @@
             
             document.getElementById("local-lang-label").innerText = myLangSelect.options[myLangSelect.selectedIndex].text;
             document.getElementById("remote-lang-label").innerText = tgtLangSelect.options[tgtLangSelect.selectedIndex].text;
+
+            if (recognition) {
+                try {
+                    recognition.abort();
+                    recognition.lang = myLangSelect.value;
+                    recognition.start();
+                } catch(e) {}
+            }
         }
 
         function initSocket() {
@@ -582,6 +524,7 @@
 
                 appendTranscript(data.sender_name, data.original, data.translated, isMe);
 
+                // Sirf samne wale ke speaker par play ho, with correct target language
                 if (!isMe) {
                     playPartnerAudio(data.translated, data.target_lang, data.gender);
                 }
@@ -602,9 +545,7 @@
             const item = document.createElement("div");
             item.className = "feed-item " + (isMe ? "me" : "partner");
             item.innerHTML = `
-                <div class="item-author">
-                    <span>${sender} ${isMe ? "(You)" : ""}</span>
-                </div>
+                <div class="item-author">${sender} ${isMe ? "(You)" : ""}</div>
                 <div class="item-original">${orig}</div>
                 <div class="item-translated">➔ ${trans}</div>
             `;
@@ -614,6 +555,12 @@
 
         function playPartnerAudio(text, lang, gender) {
             if (!text || text.startsWith("[")) return;
+
+            isPartnerSpeaking = true;
+            if (recognition) {
+                try { recognition.abort(); } catch(e) {}
+            }
+
             if (currentAudio) {
                 currentAudio.pause();
                 currentAudio = null;
@@ -622,82 +569,91 @@
             const remoteTile = document.getElementById("remote-tile");
             remoteTile.classList.add("speaking");
 
-            const cleanLang = (lang || "en").split("-")[0].lower();
+            const cleanLang = (lang || "en").split("-")[0].toLowerCase();
             const url = `/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(cleanLang)}&gender=${encodeURIComponent(gender)}`;
             currentAudio = new Audio(url);
 
-            const clearSpeaking = () => {
+            const unlockMic = () => {
                 remoteTile.classList.remove("speaking");
                 currentAudio = null;
+                setTimeout(() => {
+                    isPartnerSpeaking = false;
+                    restartMic();
+                }, 400);
             };
 
-            currentAudio.onended = clearSpeaking;
-            currentAudio.onerror = clearSpeaking;
-            currentAudio.play().catch(clearSpeaking);
+            currentAudio.onended = unlockMic;
+            currentAudio.onerror = unlockMic;
+            currentAudio.play().catch(unlockMic);
         }
 
-        function initSpeech() {
-            if (!SpeechRecognition) return;
+        function restartMic() {
+            if (recognition && !isPartnerSpeaking) {
+                try {
+                    recognition.lang = document.getElementById("my-lang").value;
+                    recognition.start();
+                } catch(e) {}
+            }
+        }
+
+        function initContinuousSpeech() {
+            if (!SpeechRecognition) {
+                alert("Please use Chrome or Edge for hands-free voice bridge.");
+                return;
+            }
+
             recognition = new SpeechRecognition();
-            recognition.continuous = false;
+            recognition.continuous = true;
             recognition.interimResults = false;
 
-            recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript.trim();
-                if (!transcript) return;
-
-                const myLangVal = document.getElementById("my-lang").value;
-                const targetLangVal = document.getElementById("target-lang").value;
-
-                if (socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({
-                        sender_id: myClientId,
-                        sender_name: document.getElementById("username").value || "Ali",
-                        gender: document.getElementById("gender").value,
-                        source_lang: myLangVal,
-                        target_lang: targetLangVal,
-                        text: transcript
-                    }));
+            recognition.onstart = () => {
+                if (!isPartnerSpeaking) {
+                    document.getElementById("local-tile").classList.remove("speaking");
                 }
             };
-        }
 
-        const pttBtn = document.getElementById("ptt-btn");
-        const pttLabel = document.getElementById("ptt-label");
-        const localTile = document.getElementById("local-tile");
+            recognition.onresult = (event) => {
+                if (isPartnerSpeaking) return;
 
-        function startRecording() {
-            if (!recognition) return;
-            if (currentAudio) currentAudio.pause();
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        const transcript = event.results[i][0].transcript.trim();
+                        if (!transcript) continue;
 
-            pttBtn.classList.add("active");
-            localTile.classList.add("speaking");
-            pttLabel.innerText = "Listening...";
+                        const localTile = document.getElementById("local-tile");
+                        localTile.classList.add("speaking");
+                        setTimeout(() => localTile.classList.remove("speaking"), 1000);
+
+                        const myLangVal = document.getElementById("my-lang").value;
+                        const targetLangVal = document.getElementById("target-lang").value;
+
+                        if (socket && socket.readyState === WebSocket.OPEN) {
+                            socket.send(JSON.stringify({
+                                sender_id: myClientId,
+                                sender_name: document.getElementById("username").value || "Ali",
+                                gender: document.getElementById("gender").value,
+                                source_lang: myLangVal,
+                                target_lang: targetLangVal,
+                                text: transcript
+                            }));
+                        }
+                    }
+                }
+            };
+
+            recognition.onend = () => {
+                if (!isPartnerSpeaking) {
+                    restartMic();
+                }
+            };
 
             recognition.lang = document.getElementById("my-lang").value;
             try { recognition.start(); } catch(e) {}
         }
 
-        function stopRecording() {
-            if (!recognition) return;
-            pttBtn.classList.remove("active");
-            localTile.classList.remove("speaking");
-            pttLabel.innerText = "Translating...";
-
-            try { recognition.stop(); } catch(e) {}
-            setTimeout(() => { pttLabel.innerText = "Hold to Speak"; }, 1500);
-        }
-
-        pttBtn.addEventListener("mousedown", startRecording);
-        pttBtn.addEventListener("mouseup", stopRecording);
-        pttBtn.addEventListener("mouseleave", stopRecording);
-
-        pttBtn.addEventListener("touchstart", (e) => { e.preventDefault(); startRecording(); });
-        pttBtn.addEventListener("touchend", (e) => { e.preventDefault(); stopRecording(); });
-
         window.onload = () => {
             initSocket();
-            initSpeech();
+            initContinuousSpeech();
             syncLanguages();
             updateNames();
         };
