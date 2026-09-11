@@ -56,7 +56,6 @@ async def text_to_speech(text: str, lang: str):
 
 # Reliable Multi-Provider Translation
 def perform_translation(text: str, src_lang: str, tgt_lang: str) -> str:
-    # 1. MyMemory Codes (Strict exact codes jaisa unki list me hai)
     mm_map = {
         "ur": "ur-PK",
         "zh": "zh-CN",
@@ -65,7 +64,7 @@ def perform_translation(text: str, src_lang: str, tgt_lang: str) -> str:
     mm_src = mm_map.get(src_lang[:2].lower(), "en-US")
     mm_tgt = mm_map.get(tgt_lang[:2].lower(), "zh-CN")
 
-    # Primary: MyMemory Translator (Cloud par block nahi hota)
+    # Primary: MyMemory Translator
     try:
         res = MyMemoryTranslator(source=mm_src, target=mm_tgt).translate(text)
         if res and not res.strip().startswith("["):
@@ -147,7 +146,7 @@ async def get_index():
     <h2>⚡ Syncora Sourcing Bridge</h2>
     
     <div class="config-box">
-        <input type="text" id="username" placeholder="Your Name" value="Ali">
+        <input type="text" id="username" placeholder="Your Name" value="User">
         <select id="my-lang">
             <option value="ur-PK" selected>🇵🇰 Urdu</option>
             <option value="zh-CN">🇨🇳 Chinese (Mandarin)</option>
@@ -165,7 +164,6 @@ async def get_index():
 <script>
     const wsUrl = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/ws/room";
     let socket = new WebSocket(wsUrl);
-    const audioPlayer = new Audio();
 
     socket.onmessage = function(event) {
         const msg = JSON.parse(event.data);
@@ -181,21 +179,16 @@ async def get_index():
         chatBox.appendChild(bubble);
         chatBox.scrollTop = chatBox.scrollHeight;
 
-        const myLang = document.getElementById("my-lang").value;
-        const myName = document.getElementById("username").value;
-
-        // Play audio if received for target language or by receiver
-        if (msg.target_lang.startsWith(myLang.substring(0, 2)) || msg.sender !== myName) {
-            speakText(msg.translated, msg.target_lang);
-        }
+        // Har message par audio seedha call hoga
+        speakText(msg.translated, msg.target_lang);
     };
 
     function speakText(text, lang) {
         if (!text || text.startsWith("[Translation Error")) return;
         const url = `/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(lang)}`;
-        audioPlayer.src = url;
-        audioPlayer.play().catch(e => {
-            console.log("Audio unlock or play error:", e);
+        const audio = new Audio(url);
+        audio.play().catch(e => {
+            console.log("Audio block error:", e);
         });
     }
 
@@ -219,7 +212,6 @@ async def get_index():
             const sender = document.getElementById("username").value;
             const myLang = document.getElementById("my-lang").value;
             
-            // Auto target mapping: Urdu -> Chinese, Chinese -> Urdu, English -> Urdu
             let targetLang = "ur-PK";
             if (myLang.startsWith("ur")) {
                 targetLang = "zh-CN";
@@ -248,9 +240,6 @@ async def get_index():
     }
 
     function toggleSpeech() {
-        // Mobile Browser audio channel unlock
-        audioPlayer.play().then(() => audioPlayer.pause()).catch(() => {});
-
         if (!recognition) {
             alert("Speech recognition is only supported in Chrome, Edge, or Safari.");
             return;
