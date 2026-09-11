@@ -83,25 +83,23 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# Strict Single-Language Conversational AI Engine
+# Strict Single-Language Conversational AI Engine with Detailed Diagnostics
 async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
 
     if not clean_key or clean_key == "dummy_key":
-        return "[Error: Missing GROQ_API_KEY]"
+        return "[Error: GROQ_API_KEY Railway variables mein missing hai]"
 
     source = LANG_NAMES.get(src_lang[:2].lower(), src_lang)
     target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
 
-    # Strictly lock the output language so it never switches
     system_prompt = (
-        f"You are Syncora, an intelligent real-time conversational voice assistant. "
-        f"CRITICAL RULE: You MUST speak and respond ONLY in {target}. "
-        f"Never use Arabic, Malay, or any other language unless explicitly requested as {target}. "
-        f"The user is speaking in {source}. Understand their message and give a direct, natural spoken response. "
-        f"Your response must be entirely in {target} language only (1 to 2 short sentences). "
-        "Do NOT provide translations, phonetic guides, notes, or explanations."
+        f"You are Syncora, an intelligent conversational AI partner. "
+        f"The user spoke to you in {source}. "
+        f"Respond directly, naturally, and politely in {target} language only. "
+        f"CRITICAL: Keep your entire reply strictly in {target}. "
+        "Keep it concise (1 to 2 spoken sentences). Do not include formatting, quotes, or notes."
     )
 
     groq_client = AsyncOpenAI(
@@ -109,30 +107,37 @@ async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
         api_key=clean_key
     )
 
-    candidate_models = [
-        "llama-3.1-8b-instant",
-        "llama-3.2-11b-vision-preview",
-        "llama-3.2-3b-preview"
-    ]
+    # Auto fetch accounts active chat models dynamically
+    active_models = []
+    try:
+        available = await groq_client.models.list()
+        active_models = [m.id for m in available.data if "whisper" not in m.id and "guard" not in m.id]
+    except Exception as e:
+        return f"[Groq Key/Connection Error: {str(e)}]"
 
-    for target_model in candidate_models:
+    if not active_models:
+        active_models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
+
+    errors_collected = []
+    for model_name in active_models:
         try:
             response = await groq_client.chat.completions.create(
-                model=target_model,
+                model=model_name,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": text}
                 ],
-                temperature=0.1,  # Low temperature prevents language drifting
+                temperature=0.2,
                 max_tokens=150
             )
             content = response.choices[0].message.content
             if content and content.strip():
                 return content.strip()
-        except Exception:
+        except Exception as err:
+            errors_collected.append(f"{model_name}: {str(err)}")
             continue
 
-    return "Sorry, I am unable to generate a response right now."
+    return f"[LLM Error: {errors_collected[0] if errors_collected else 'No model succeeded'}]"
 
 @app.websocket("/ws/room")
 async def websocket_endpoint(websocket: WebSocket):
