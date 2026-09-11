@@ -1,13 +1,13 @@
 import os
 import json
 import asyncio
-from typing import List
+from typing import Dict, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, Response, FileResponse
 from openai import AsyncOpenAI
 import edge_tts
 
-app = FastAPI(title="Syncora Multilingual Voice Bridge")
+app = FastAPI(title="Syncora Private Room Voice Bridge")
 
 # Microsoft Neural Voices Map
 VOICE_MAP = {
@@ -36,26 +36,34 @@ LANG_NAMES = {
     "ja": "Japanese"
 }
 
-class ConnectionManager:
+# Room-Based Connection Manager
+class RoomManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        # room_id -> list of WebSockets
+        self.rooms: Dict[str, List[WebSocket]] = {}
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, room_id: str, websocket: WebSocket):
         await websocket.accept()
-        self.active_connections.append(websocket)
+        if room_id not in self.rooms:
+            self.rooms[room_id] = []
+        self.rooms[room_id].append(websocket)
 
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+    def disconnect(self, room_id: str, websocket: WebSocket):
+        if room_id in self.rooms:
+            if websocket in self.rooms[room_id]:
+                self.rooms[room_id].remove(websocket)
+            if not self.rooms[room_id]:
+                del self.rooms[room_id]
 
-    async def broadcast(self, message: dict):
-        for connection in self.active_connections:
-            try:
-                await connection.send_text(json.dumps(message))
-            except Exception:
-                pass
+    async def broadcast_to_room(self, room_id: str, message: dict):
+        if room_id in self.rooms:
+            for connection in self.rooms[room_id]:
+                try:
+                    await connection.send_text(json.dumps(message))
+                except Exception:
+                    pass
 
-manager = ConnectionManager()
+manager = RoomManager()
 
 # High-Performance Neural Voice Endpoint
 @app.get("/tts")
@@ -83,24 +91,22 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# Strict Single-Language Conversational AI Engine with Live Model Discovery & Diagnostics
-async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
+# Bilateral Call Translation Engine
+async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
 
     if not clean_key or clean_key == "dummy_key":
-        return "[Error: GROQ_API_KEY Railway variables mein configure nahi hai]"
+        return "[Error: GROQ_API_KEY Missing]"
 
     source = LANG_NAMES.get(src_lang[:2].lower(), src_lang)
     target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
 
     system_prompt = (
-        f"You are Syncora, an intelligent conversational voice assistant. "
-        f"The user spoke to you in {source}. "
-        f"CRITICAL RULE: Respond 100% in {target} language only. "
-        f"Do NOT use any other language. "
-        f"Keep your response concise, polite, and conversational (1 to 2 spoken sentences) in {target}. "
-        f"Do NOT include explanations, quotes, notes, or translations."
+        f"You are a live bilingual call interpreter between {source} and {target}. "
+        f"Translate the spoken sentence directly and naturally into {target}. "
+        f"CRITICAL: Output ONLY the raw translated sentence in {target}. "
+        "Do NOT add notes, explanations, or quotes."
     )
 
     groq_client = AsyncOpenAI(
@@ -108,18 +114,16 @@ async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
         api_key=clean_key
     )
 
-    # Fetch active models dynamically from Groq account
     active_models = []
     try:
         models_data = await groq_client.models.list()
         active_models = [m.id for m in models_data.data if "whisper" not in m.id and "guard" not in m.id]
-    except Exception as e:
-        return f"[Groq Connection Error: {str(e)}]"
+    except Exception:
+        pass
 
     if not active_models:
         active_models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
 
-    last_error = ""
     for model_name in active_models:
         try:
             response = await groq_client.chat.completions.create(
@@ -134,21 +138,22 @@ async def llm_agent_reply(text: str, src_lang: str, tgt_lang: str) -> str:
             content = response.choices[0].message.content
             if content and content.strip():
                 return content.strip()
-        except Exception as err:
-            last_error = f"{model_name}: {str(err)}"
+        except Exception:
             continue
 
-    return f"[Groq LLM Error: {last_error}]"
+    return text
 
-@app.websocket("/ws/room")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
+# WebSocket Room Endpoint
+@app.websocket("/ws/{room_id}")
+async def websocket_endpoint(websocket: WebSocket, room_id: str):
+    await manager.connect(room_id, websocket)
     try:
         while True:
             raw_data = await websocket.receive_text()
             data = json.loads(raw_data)
             
-            sender = data.get("sender", "Ali")
+            sender_id = data.get("sender_id", "")
+            sender_name = data.get("sender_name", "Caller")
             gender = data.get("gender", "male")
             src_lang = data.get("source_lang", "ur-PK")
             tgt_lang = data.get("target_lang", "en-US")
@@ -157,22 +162,23 @@ async def websocket_endpoint(websocket: WebSocket):
             if not original_text:
                 continue
 
-            reply_text = await llm_agent_reply(original_text, src_lang, tgt_lang)
+            translated_text = await llm_translate(original_text, src_lang, tgt_lang)
 
             payload = {
-                "sender": sender,
+                "sender_id": sender_id,
+                "sender_name": sender_name,
                 "gender": gender,
                 "source_lang": src_lang,
                 "target_lang": tgt_lang,
                 "original": original_text,
-                "translated": reply_text
+                "translated": translated_text
             }
-            await manager.broadcast(payload)
+            await manager.broadcast_to_room(room_id, payload)
 
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        manager.disconnect(room_id, websocket)
     except Exception:
-        manager.disconnect(websocket)
+        manager.disconnect(room_id, websocket)
 
 @app.get("/")
 async def get_index():
