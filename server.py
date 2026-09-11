@@ -7,9 +7,8 @@ from fastapi.responses import HTMLResponse, Response, FileResponse
 from openai import AsyncOpenAI
 import edge_tts
 
-app = FastAPI(title="Syncora Private Room Voice Bridge")
+app = FastAPI(title="Syncora Live Bridge")
 
-# Microsoft Neural Voices Map
 VOICE_MAP = {
     "ur": {"male": "ur-PK-AsadNeural", "female": "ur-PK-UzmaNeural"},
     "zh": {"male": "zh-CN-YunxiNeural", "female": "zh-CN-XiaoxiaoNeural"},
@@ -36,10 +35,8 @@ LANG_NAMES = {
     "ja": "Japanese"
 }
 
-# Room-Based Connection Manager
 class RoomManager:
     def __init__(self):
-        # room_id -> list of WebSockets
         self.rooms: Dict[str, List[WebSocket]] = {}
 
     async def connect(self, room_id: str, websocket: WebSocket):
@@ -55,7 +52,7 @@ class RoomManager:
             if not self.rooms[room_id]:
                 del self.rooms[room_id]
 
-    async def broadcast_to_room(self, room_id: str, message: dict):
+    async def broadcast(self, room_id: str, message: dict):
         if room_id in self.rooms:
             for connection in self.rooms[room_id]:
                 try:
@@ -65,7 +62,6 @@ class RoomManager:
 
 manager = RoomManager()
 
-# High-Performance Neural Voice Endpoint
 @app.get("/tts")
 async def text_to_speech(text: str, lang: str, gender: str = "female"):
     if not text.strip():
@@ -91,22 +87,25 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# Bilateral Call Translation Engine
-async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
+# Strict Two-Way Human Interpretation (No Bot Reply)
+async def translate_sentence(text: str, src_lang: str, tgt_lang: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
 
     if not clean_key or clean_key == "dummy_key":
-        return "[Error: GROQ_API_KEY Missing]"
+        return text
 
     source = LANG_NAMES.get(src_lang[:2].lower(), src_lang)
     target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
 
     system_prompt = (
-        f"You are a live bilingual call interpreter between {source} and {target}. "
-        f"Translate the spoken sentence directly and naturally into {target}. "
-        f"CRITICAL: Output ONLY the raw translated sentence in {target}. "
-        "Do NOT add notes, explanations, or quotes."
+        f"You are a professional bilateral real-time human interpreter between {source} and {target}. "
+        f"The speaker just said a sentence in {source}. "
+        f"Translate it directly, accurately, and naturally into {target} as if you are the speaker. "
+        "CRITICAL RULES: "
+        "1. Do NOT reply or converse. "
+        "2. Do NOT answer the questions. Only TRANSLATE the question or sentence. "
+        f"3. Output strictly the translated sentence in {target}. No quotes, no explanations."
     )
 
     groq_client = AsyncOpenAI(
@@ -114,17 +113,9 @@ async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
         api_key=clean_key
     )
 
-    active_models = []
-    try:
-        models_data = await groq_client.models.list()
-        active_models = [m.id for m in models_data.data if "whisper" not in m.id and "guard" not in m.id]
-    except Exception:
-        pass
+    models_to_try = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
 
-    if not active_models:
-        active_models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
-
-    for model_name in active_models:
+    for model_name in models_to_try:
         try:
             response = await groq_client.chat.completions.create(
                 model=model_name,
@@ -133,7 +124,7 @@ async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
                     {"role": "user", "content": text}
                 ],
                 temperature=0.1,
-                max_tokens=150
+                max_tokens=200
             )
             content = response.choices[0].message.content
             if content and content.strip():
@@ -143,7 +134,6 @@ async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
 
     return text
 
-# WebSocket Room Endpoint
 @app.websocket("/ws/{room_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str):
     await manager.connect(room_id, websocket)
@@ -162,7 +152,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
             if not original_text:
                 continue
 
-            translated_text = await llm_translate(original_text, src_lang, tgt_lang)
+            translated_text = await translate_sentence(original_text, src_lang, tgt_lang)
 
             payload = {
                 "sender_id": sender_id,
@@ -173,7 +163,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
                 "original": original_text,
                 "translated": translated_text
             }
-            await manager.broadcast_to_room(room_id, payload)
+            await manager.broadcast(room_id, payload)
 
     except WebSocketDisconnect:
         manager.disconnect(room_id, websocket)
