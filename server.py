@@ -8,8 +8,9 @@ from openai import AsyncOpenAI
 import edge_tts
 
 app = FastAPI(title="Syncora Multilingual Sourcing Bridge")
-# Safe Groq Client Initialization (Kabhi crash nahi hoga)
-groq_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or "dummy_key_to_prevent_crash"
+
+# Groq Client Initialization with Safe Fallback
+groq_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or "dummy_key"
 
 client = AsyncOpenAI(
     base_url="https://api.groq.com/openai/v1",
@@ -90,7 +91,7 @@ async def text_to_speech(text: str, lang: str, gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# Ultra-Fast Llama-3 Translation Engine via Groq
+# Ultra-Fast Llama Translation Engine via Groq
 async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
     source = LANG_NAMES.get(src_lang[:2].lower(), src_lang)
     target = LANG_NAMES.get(tgt_lang[:2].lower(), tgt_lang)
@@ -101,19 +102,27 @@ async def llm_translate(text: str, src_lang: str, tgt_lang: str) -> str:
         "Do NOT provide explanations, notes, pleasantries, or quotes. Output ONLY the raw translated sentence."
     )
 
-    try:
-        response = await client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text}
-            ],
-            temperature=0.2,
-            max_tokens=250
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        return f"[Groq LLM Error: {str(e)}]"
+    # Primary model llama-3.1-8b-instant with fallback
+    models_to_try = ["llama-3.1-8b-instant", "llama3-8b-8192"]
+    last_error = ""
+
+    for model_name in models_to_try:
+        try:
+            response = await client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": text}
+                ],
+                temperature=0.2,
+                max_tokens=250
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            last_error = str(e)
+            continue
+
+    return f"[Groq LLM Error: {last_error}]"
 
 @app.websocket("/ws/room")
 async def websocket_endpoint(websocket: WebSocket):
@@ -329,9 +338,3 @@ async def get_index():
 
 </body>
 </html>
-"""
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 8080))
-    uvicorn.run(app, host="0.0.0.0", port=port)
