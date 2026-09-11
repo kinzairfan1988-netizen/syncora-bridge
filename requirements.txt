@@ -2,3 +2,4 @@ fastapi
 uvicorn
 websockets
 deep-translator
+edge-tts
