@@ -1,3 +1,23 @@
+import io
+import edge_tts
+from fastapi.responses import Response
+
+VOICE_MAP = {
+    "ur": "ur-PK-AsadNeural",      # Natural Pakistan Urdu
+    "zh": "zh-CN-XiaoxiaoNeural",  # Natural Chinese
+    "en": "en-US-JennyNeural"      # Natural US English
+}
+
+@app.get("/tts")
+async def text_to_speech(text: str, lang: str):
+    prefix = lang[:2].lower()
+    voice = VOICE_MAP.get(prefix, "en-US-JennyNeural")
+    communicate = edge_tts.Communicate(text, voice)
+    mp3_bytes = b""
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            mp3_bytes += chunk["data"]
+    return Response(content=mp3_bytes, media_type="audio/mpeg")
 import json
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
