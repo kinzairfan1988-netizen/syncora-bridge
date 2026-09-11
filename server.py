@@ -7,16 +7,17 @@ from fastapi.responses import HTMLResponse, Response
 from deep_translator import GoogleTranslator
 import edge_tts
 
+# 1. App initialization (Yeh hamesha endpoints se upar aana chahiye)
 app = FastAPI(title="Syncora Sourcing Bridge")
 
-# Microsoft Neural Voices (Har language ki natural awaz)
+# 2. Microsoft Neural Voices
 VOICE_MAP = {
     "ur": "ur-PK-AsadNeural",       # Clear Pakistan Urdu
     "zh": "zh-CN-XiaoxiaoNeural",   # Standard Mandarin Chinese
     "en": "en-US-JennyNeural"       # Clear US English
 }
 
-# WebSocket Connection Manager
+# 3. WebSocket Connection Manager
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
@@ -38,7 +39,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# Backend Server-Side Text to Speech Endpoint
+# 4. Text-to-Speech Endpoint
 @app.get("/tts")
 async def text_to_speech(text: str, lang: str):
     if not text.strip():
@@ -55,7 +56,7 @@ async def text_to_speech(text: str, lang: str):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-# Real-time WebSocket Endpoint
+# 5. WebSocket Endpoint
 @app.websocket("/ws/room")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
@@ -72,7 +73,6 @@ async def websocket_endpoint(websocket: WebSocket):
             if not original_text:
                 continue
 
-            # Language code simplification (ur-PK -> ur, zh-CN -> zh-CN, en-US -> en)
             src_code = src_lang[:2].lower()
             tgt_code = "zh-CN" if tgt_lang.startswith("zh") else tgt_lang[:2].lower()
 
@@ -95,7 +95,7 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception:
         manager.disconnect(websocket)
 
-# Frontend UI Serving
+# 6. UI Frontend Serving
 @app.get("/", response_class=HTMLResponse)
 async def get_index():
     return """<!DOCTYPE html>
@@ -144,8 +144,6 @@ async def get_index():
 <script>
     const wsUrl = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/ws/room";
     let socket = new WebSocket(wsUrl);
-
-    // Audio player for natural server-side AI voices
     const audioPlayer = new Audio();
 
     socket.onmessage = function(event) {
@@ -165,7 +163,6 @@ async def get_index():
         const myLang = document.getElementById("my-lang").value;
         const myName = document.getElementById("username").value;
 
-        // Agar message doosre user ka hai aur mere language target se match karta hai
         if (msg.target_lang.startsWith(myLang.substring(0, 2)) || msg.sender !== myName) {
             speakText(msg.translated, msg.target_lang);
         }
@@ -200,7 +197,6 @@ async def get_index():
             const sender = document.getElementById("username").value;
             const myLang = document.getElementById("my-lang").value;
             
-            // Logic: Urdu wala Chinese ko bhejega, Chinese/English wala Urdu ko
             let targetLang = "ur-PK";
             if (myLang.startsWith("ur")) {
                 targetLang = "zh-CN";
@@ -229,7 +225,6 @@ async def get_index():
     }
 
     function toggleSpeech() {
-        // Mobile Browser Audio Unlock (pehle click par audio channel unlock ho jata hai)
         audioPlayer.play().then(() => audioPlayer.pause()).catch(() => {});
 
         if (!recognition) {
