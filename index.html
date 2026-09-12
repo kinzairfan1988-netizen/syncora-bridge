@@ -43,7 +43,6 @@
             overflow-x: hidden;
         }
 
-        /* Mobile Shell Frame */
         .app-viewport {
             width: 100%;
             max-width: 480px;
@@ -65,7 +64,6 @@
             }
         }
 
-        /* Top Header */
         .top-navbar {
             padding: 16px 20px;
             display: flex;
@@ -77,6 +75,12 @@
             z-index: 10;
         }
 
+        .brand-cluster {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         .brand-title {
             font-family: 'Space Grotesk', sans-serif;
             font-size: 19px;
@@ -85,27 +89,46 @@
             color: var(--text-primary);
         }
 
-        .brand-title span {
-            color: var(--accent-amber);
+        .brand-title span { color: var(--accent-amber); }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            color: var(--text-muted);
+            background: var(--surface-card);
+            padding: 3px 8px;
+            border-radius: 12px;
+            border: 1px solid var(--border-subtle);
         }
 
-        .nav-actions {
-            display: flex;
-            gap: 10px;
+        .dot-indicator {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-muted);
         }
+
+        .dot-indicator.live {
+            background: var(--online-green);
+            box-shadow: 0 0 6px var(--online-green);
+        }
+
+        .nav-actions { display: flex; gap: 8px; }
 
         .icon-btn {
             background: var(--surface-card);
             border: 1px solid var(--border-graphite);
             color: var(--text-primary);
-            width: 36px;
-            height: 36px;
+            padding: 6px 10px;
             border-radius: 10px;
             display: flex;
             align-items: center;
-            justify-content: center;
+            gap: 5px;
             cursor: pointer;
-            font-size: 15px;
+            font-size: 12px;
+            font-weight: 600;
             transition: all 0.2s ease;
         }
 
@@ -114,7 +137,6 @@
             background: var(--surface-hover);
         }
 
-        /* Segment Tabs */
         .tab-segmented-bar {
             display: flex;
             padding: 8px 20px 14px 20px;
@@ -142,7 +164,6 @@
             border-color: rgba(245, 158, 11, 0.3);
         }
 
-        /* Directory List */
         .directory-container {
             flex: 1;
             overflow-y: auto;
@@ -150,14 +171,6 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
-        }
-
-        .directory-container::-webkit-scrollbar {
-            width: 4px;
-        }
-        .directory-container::-webkit-scrollbar-thumb {
-            background: var(--border-graphite);
-            border-radius: 4px;
         }
 
         .section-label {
@@ -169,7 +182,6 @@
             margin: 10px 0 4px 4px;
         }
 
-        /* Contact Card */
         .contact-card {
             background: var(--surface-card);
             border: 1px solid var(--border-graphite);
@@ -217,12 +229,7 @@
             border: 2px solid var(--surface-card);
         }
 
-        .status-dot.online {
-            background: var(--online-green);
-        }
-        .status-dot.offline {
-            background: var(--text-muted);
-        }
+        .status-dot.online { background: var(--online-green); }
 
         .user-meta {
             display: flex;
@@ -260,91 +267,6 @@
             background: var(--accent-amber);
             color: #000;
             box-shadow: 0 0 16px var(--accent-amber-glow);
-        }
-
-        /* Modal: Add Contact */
-        .modal-backdrop {
-            position: absolute;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.75);
-            backdrop-filter: blur(6px);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-            z-index: 50;
-        }
-
-        .modal-box {
-            background: var(--surface-card);
-            border: 1px solid var(--border-graphite);
-            border-radius: 18px;
-            width: 100%;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-        }
-
-        .modal-title {
-            font-size: 16px;
-            font-weight: 700;
-            font-family: 'Space Grotesk', sans-serif;
-            color: var(--text-primary);
-        }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .input-group label {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-        }
-
-        .text-field {
-            background: var(--bg-obsidian);
-            border: 1px solid var(--border-graphite);
-            color: var(--text-primary);
-            padding: 10px 14px;
-            border-radius: 10px;
-            font-size: 13px;
-            outline: none;
-        }
-
-        .text-field:focus {
-            border-color: var(--accent-amber);
-        }
-
-        .modal-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 6px;
-        }
-
-        .btn-modal {
-            flex: 1;
-            padding: 10px 0;
-            border-radius: 10px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-        }
-
-        .btn-modal-cancel {
-            background: var(--surface-hover);
-            color: var(--text-secondary);
-            border: 1px solid var(--border-graphite);
-        }
-
-        .btn-modal-submit {
-            background: var(--accent-amber);
-            color: #000;
         }
 
         /* SCREEN 2: IN-CALL OVERLAY */
@@ -403,7 +325,6 @@
             margin-top: 4px;
         }
 
-        /* Avatar Pulse Wave */
         .call-stage-center {
             display: flex;
             flex-direction: column;
@@ -445,7 +366,6 @@
             box-shadow: 0 0 30px var(--accent-amber-glow);
         }
 
-        /* Future Subtitle Stage */
         .subtitles-box {
             background: var(--surface-card);
             border: 1px solid var(--border-graphite);
@@ -471,7 +391,6 @@
             color: var(--text-primary);
         }
 
-        /* Bottom In-Call Controls */
         .call-controls-row {
             display: flex;
             align-items: center;
@@ -510,195 +429,259 @@
 <body>
 
     <div class="app-viewport">
-
-        <!-- SCREEN 1: WHATSAPP DIRECTORY -->
+        <!-- SCREEN 1: MAIN DIRECTORY -->
         <header class="top-navbar">
-            <div class="brand-title">Syncora <span>Terminal</span></div>
+            <div class="brand-cluster">
+                <div class="brand-title">Syncora <span>Terminal</span></div>
+                <div class="status-pill">
+                    <span class="dot-indicator" id="status-dot"></span>
+                    <span id="conn-status">Connecting</span>
+                </div>
+            </div>
             <div class="nav-actions">
-                <button class="icon-btn" onclick="openAddModal()" title="Add Contact">➕</button>
+                <button class="icon-btn" onclick="copyInviteLink()" id="copy-btn">📋 Share</button>
             </div>
         </header>
 
         <div class="tab-segmented-bar">
-            <div class="tab-pill active" onclick="switchTab(this, 'contacts')">Contacts</div>
-            <div class="tab-pill" onclick="switchTab(this, 'groups')">Groups</div>
-            <div class="tab-pill" onclick="switchTab(this, 'recent')">Recents</div>
+            <div class="tab-pill active">Contacts</div>
+            <div class="tab-pill">Groups</div>
+            <div class="tab-pill">Recents</div>
         </div>
 
-        <main class="directory-container" id="directory-list">
-            <div class="section-label">Direct Contacts</div>
+        <main class="directory-container">
+            <div class="section-label">Live Call Line</div>
 
             <div class="contact-card">
                 <div class="user-identity">
                     <div class="avatar-box">
-                        AK
+                        P2
                         <span class="status-dot online"></span>
                     </div>
                     <div class="user-meta">
-                        <div class="contact-name">Ali Khan</div>
-                        <div class="contact-sub">+92 300 1234567 • Urdu</div>
+                        <div class="contact-name">Direct Peer Partner</div>
+                        <div class="contact-sub" id="room-sub">Room: Syncing...</div>
                     </div>
                 </div>
-                <button class="call-trigger-btn" onclick="dialCall('Ali Khan', '+92 300 1234567', 'AK')" title="Voice Call">📞</button>
-            </div>
-
-            <div class="contact-card">
-                <div class="user-identity">
-                    <div class="avatar-box">
-                        JD
-                        <span class="status-dot offline"></span>
-                    </div>
-                    <div class="user-meta">
-                        <div class="contact-name">John Doe</div>
-                        <div class="contact-sub">+1 415 555 2671 • English</div>
-                    </div>
-                </div>
-                <button class="call-trigger-btn" onclick="dialCall('John Doe', '+1 415 555 2671', 'JD')" title="Voice Call">📞</button>
-            </div>
-
-            <div class="section-label" style="margin-top: 14px;">Group Channels</div>
-
-            <div class="contact-card">
-                <div class="user-identity">
-                    <div class="avatar-box" style="color: #60a5fa;">👥</div>
-                    <div class="user-meta">
-                        <div class="contact-name">Trade Desk (3 Members)</div>
-                        <div class="contact-sub">Ali, John, You</div>
-                    </div>
-                </div>
-                <button class="call-trigger-btn" onclick="dialCall('Trade Desk', '3 Participants Active', '👥')" title="Group Voice">📞</button>
+                <button class="call-trigger-btn" onclick="startOutgoingCall()" title="Start Voice Call">📞</button>
             </div>
         </main>
-
-        <!-- MODAL: ADD CONTACT -->
-        <div class="modal-backdrop" id="add-modal">
-            <div class="modal-box">
-                <div class="modal-title">New Contact</div>
-                <div class="input-group">
-                    <label>Full Name</label>
-                    <input type="text" id="new-name" class="text-field" placeholder="e.g. Usman Tariq">
-                </div>
-                <div class="input-group">
-                    <label>Phone / Identifier</label>
-                    <input type="text" id="new-phone" class="text-field" placeholder="+92 321 ...">
-                </div>
-                <div class="modal-actions">
-                    <button class="btn-modal btn-modal-cancel" onclick="closeAddModal()">Cancel</button>
-                    <button class="btn-modal btn-modal-submit" onclick="saveNewContact()">Add Contact</button>
-                </div>
-            </div>
-        </div>
 
         <!-- SCREEN 2: IN-CALL OVERLAY -->
         <section class="call-screen-overlay" id="call-screen">
             <div class="call-header">
-                <div class="security-badge">🔒 Nordic Voice Protocol Active</div>
-                <div class="caller-title" id="active-name">Ali Khan</div>
-                <div class="caller-phone" id="active-phone">+92 300 1234567</div>
+                <div class="security-badge">🔒 Direct WebRTC Encrypted Voice</div>
+                <div class="caller-title">Direct Partner</div>
+                <div class="caller-phone" id="active-call-status">Calling...</div>
                 <div class="call-duration" id="call-timer">00:00</div>
             </div>
 
             <div class="call-stage-center">
                 <div class="pulse-wave-ring"></div>
-                <div class="caller-large-avatar" id="active-avatar">AK</div>
+                <div class="caller-large-avatar">P2</div>
             </div>
 
             <div class="subtitles-box">
-                <div class="sub-speaker" id="sub-author">Syncora Voice Engine</div>
-                <div class="sub-text" id="sub-caption">Connecting audio channels...</div>
+                <div class="sub-speaker">Audio Protocol</div>
+                <div class="sub-text" id="sub-caption">Establishing direct peer connection...</div>
             </div>
 
             <div class="call-controls-row">
                 <button class="ctrl-btn-circle" id="mute-btn" onclick="toggleMute()" title="Mute">🎙️</button>
-                <button class="ctrl-btn-circle" id="speaker-btn" onclick="toggleSpeaker()" title="Speaker">🔊</button>
-                <button class="ctrl-btn-circle hangup" onclick="hangupCall()" title="End Call">🛑</button>
+                <button class="ctrl-btn-circle hangup" onclick="hangupCall(true)" title="End Call">🛑</button>
             </div>
         </section>
 
+        <!-- Hidden Audio Element for Peer Stream -->
+        <audio id="peer-audio" autoplay playsinline></audio>
     </div>
 
     <script>
+        // Room Management
+        const urlParams = new URLSearchParams(window.location.search);
+        let roomId = urlParams.get('room') || ('call-' + Math.random().toString(36).substring(2, 7));
+        if (!urlParams.get('room')) {
+            window.history.replaceState(null, '', window.location.pathname + '?room=' + roomId);
+        }
+        document.getElementById("room-sub").innerText = `Room: ${roomId}`;
+
+        let socket = null;
+        let peerConnection = null;
+        let localStream = null;
         let timerInterval = null;
         let elapsedSeconds = 0;
         let isMuted = false;
-        let isSpeakerOn = true;
 
-        function switchTab(el, type) {
-            document.querySelectorAll('.tab-pill').forEach(t => t.classList.remove('active'));
-            el.classList.add('active');
+        const rtcConfig = {
+            iceServers: [
+                { urls: "stun:stun.l.google.com:19302" },
+                { urls: "stun:stun1.l.google.com:19302" }
+            ]
+        };
+
+        function copyInviteLink() {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                const btn = document.getElementById("copy-btn");
+                btn.innerText = "✅ Done";
+                setTimeout(() => { btn.innerText = "📋 Share"; }, 1500);
+            });
         }
 
-        function openAddModal() {
-            document.getElementById("add-modal").style.display = "flex";
+        function initSignaling() {
+            const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+            socket = new WebSocket(`${wsProtocol}${window.location.host}/ws/${roomId}`);
+
+            socket.onopen = () => {
+                document.getElementById("status-dot").classList.add("live");
+                document.getElementById("conn-status").innerText = "Online";
+            };
+
+            socket.onmessage = async (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.type === "offer") {
+                    handleIncomingOffer(data.offer);
+                } else if (data.type === "answer") {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                    document.getElementById("active-call-status").innerText = "Connected";
+                    document.getElementById("sub-caption").innerText = "Normal 2-Way Voice Active (Single Language).";
+                    startTimer();
+                } else if (data.type === "candidate") {
+                    if (peerConnection) {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    }
+                } else if (data.type === "hangup") {
+                    hangupCall(false);
+                }
+            };
+
+            socket.onclose = () => {
+                document.getElementById("status-dot").classList.remove("live");
+                document.getElementById("conn-status").innerText = "Offline";
+                setTimeout(initSignaling, 2000);
+            };
         }
 
-        function closeAddModal() {
-            document.getElementById("add-modal").style.display = "none";
-            document.getElementById("new-name").value = "";
-            document.getElementById("new-phone").value = "";
+        async function setupMedia() {
+            if (!localStream) {
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    },
+                    video: false
+                });
+            }
         }
 
-        function saveNewContact() {
-            const name = document.getElementById("new-name").value.trim();
-            const phone = document.getElementById("new-phone").value.trim();
+        function createPeerConnection() {
+            peerConnection = new RTCPeerConnection(rtcConfig);
 
-            if (!name) return;
+            // Local mic audio peer connection mein add karein
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
 
-            const initials = name.split(" ").map(n => n[0]).join("").toUpperCase().substring(0, 2) || "U";
-            const dir = document.getElementById("directory-list");
+            // Samne wale ki aawaz receive karna
+            peerConnection.ontrack = (event) => {
+                const remoteAudio = document.getElementById("peer-audio");
+                remoteAudio.srcObject = event.streams[0];
+            };
 
-            const card = document.createElement("div");
-            card.className = "contact-card";
-            card.innerHTML = `
-                <div class="user-identity">
-                    <div class="avatar-box">
-                        ${initials}
-                        <span class="status-dot online"></span>
-                    </div>
-                    <div class="user-meta">
-                        <div class="contact-name">${name}</div>
-                        <div class="contact-sub">${phone || "Terminal Contact"}</div>
-                    </div>
-                </div>
-                <button class="call-trigger-btn" onclick="dialCall('${name}', '${phone}', '${initials}')" title="Voice Call">📞</button>
-            `;
-
-            dir.appendChild(card);
-            closeAddModal();
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate && socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        type: "candidate",
+                        candidate: event.candidate
+                    }));
+                }
+            };
         }
 
-        function dialCall(name, phone, initials) {
-            document.getElementById("active-name").innerText = name;
-            document.getElementById("active-phone").innerText = phone;
-            document.getElementById("active-avatar").innerText = initials;
+        async function startOutgoingCall() {
+            try {
+                await setupMedia();
+                createPeerConnection();
 
-            document.getElementById("call-screen").style.display = "flex";
+                document.getElementById("call-screen").style.display = "flex";
+                document.getElementById("active-call-status").innerText = "Calling...";
+                document.getElementById("sub-caption").innerText = "Ringing peer...";
 
-            // Start Timer
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+
+                socket.send(JSON.stringify({
+                    type: "offer",
+                    offer: offer
+                }));
+            } catch (err) {
+                alert("Microphone permission required for voice calls: " + err.message);
+            }
+        }
+
+        async function handleIncomingOffer(offer) {
+            try {
+                await setupMedia();
+                createPeerConnection();
+
+                document.getElementById("call-screen").style.display = "flex";
+                document.getElementById("active-call-status").innerText = "Connected";
+                document.getElementById("sub-caption").innerText = "Normal 2-Way Voice Active (Single Language).";
+                startTimer();
+
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+
+                socket.send(JSON.stringify({
+                    type: "answer",
+                    answer: answer
+                }));
+            } catch (err) {
+                console.error("Error answering call:", err);
+            }
+        }
+
+        function startTimer() {
             elapsedSeconds = 0;
-            updateTimerDisplay();
             clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 elapsedSeconds++;
-                updateTimerDisplay();
+                const mins = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0');
+                const secs = String(elapsedSeconds % 60).padStart(2, '0');
+                document.getElementById("call-timer").innerText = `${mins}:${secs}`;
             }, 1000);
-
-            document.getElementById("sub-caption").innerText = "Normal 2-Way Audio Channel Established.";
         }
 
-        function updateTimerDisplay() {
-            const mins = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0');
-            const secs = String(elapsedSeconds % 60).padStart(2, '0');
-            document.getElementById("call-timer").innerText = `${mins}:${secs}`;
-        }
-
-        function hangupCall() {
+        function hangupCall(sendSignal = true) {
             clearInterval(timerInterval);
+            document.getElementById("call-timer").innerText = "00:00";
+
+            if (sendSignal && socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: "hangup" }));
+            }
+
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+            }
+
             document.getElementById("call-screen").style.display = "none";
         }
 
         function toggleMute() {
+            if (!localStream) return;
             isMuted = !isMuted;
+            localStream.getAudioTracks().forEach(track => {
+                track.enabled = !isMuted;
+            });
+
             const btn = document.getElementById("mute-btn");
             if (isMuted) {
                 btn.classList.add("active");
@@ -709,17 +692,9 @@
             }
         }
 
-        function toggleSpeaker() {
-            isSpeakerOn = !isSpeakerOn;
-            const btn = document.getElementById("speaker-btn");
-            if (!isSpeakerOn) {
-                btn.classList.add("active");
-                btn.innerText = "🔈";
-            } else {
-                btn.classList.remove("active");
-                btn.innerText = "🔊";
-            }
-        }
+        window.onload = () => {
+            initSignaling();
+        };
     </script>
 </body>
 </html>
