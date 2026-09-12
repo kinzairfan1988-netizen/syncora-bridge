@@ -36,6 +36,7 @@ class RoomManager:
         if room_id not in self.rooms:
             self.rooms[room_id] = []
         self.rooms[room_id].append(websocket)
+        print(f"[WS] User joined room {room_id}. Total: {len(self.rooms[room_id])}")
 
     def disconnect(self, room_id: str, websocket: WebSocket):
         if room_id in self.rooms:
@@ -43,14 +44,18 @@ class RoomManager:
                 self.rooms[room_id].remove(websocket)
             if not self.rooms[room_id]:
                 del self.rooms[room_id]
+        print(f"[WS] User left room {room_id}")
 
     async def broadcast(self, room_id: str, message: dict):
         if room_id in self.rooms:
+            dead_sockets = []
             for connection in self.rooms[room_id]:
                 try:
                     await connection.send_text(json.dumps(message))
                 except Exception:
-                    pass
+                    dead_sockets.append(connection)
+            for d in dead_sockets:
+                self.disconnect(room_id, d)
 
 manager = RoomManager()
 
@@ -65,43 +70,32 @@ async def text_to_speech(text: str, lang: str = "en", gender: str = "female"):
     lang_voices = VOICE_MAP.get(prefix, VOICE_MAP["en"])
     selected_voice = lang_voices.get(gender_clean, lang_voices["female"])
     
-    communicate = edge_tts.Communicate(
-        text=text, 
-        voice=selected_voice,
-        rate="+0%",
-        pitch="+0Hz"
-    )
-    
-    mp3_bytes = b""
-    async for chunk in communicate.stream():
-        if chunk["type"] == "audio":
-            mp3_bytes += chunk["data"]
-            
-    return Response(content=mp3_bytes, media_type="audio/mpeg")
-
-def call_gemini_rest(endpoint: str, payload_data: dict, api_key: str) -> tuple[int, str]:
-    req = urllib.request.Request(
-        endpoint,
-        data=json.dumps(payload_data).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "x-goog-api-key": api_key
-        }
-    )
     try:
-        with urllib.request.urlopen(req, timeout=10) as response:
-            return response.status, response.read().decode("utf-8")
-    except urllib.error.HTTPError as e:
-        return e.code, e.read().decode("utf-8")
+        communicate = edge_tts.Communicate(text=text, voice=selected_voice)
+        mp3_bytes = b""
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                mp3_bytes += chunk["data"]
+        return Response(content=mp3_bytes, media_type="audio/mpeg")
     except Exception as e:
-        return 500, str(e)
+        print(f"[TTS ERR] {e}")
+        return Response(content=b"", media_type="audio/mpeg")
+
+def call_gemini_api(endpoint: str, payload: dict, api_key: str):
+    req = urllib.request.Request(
+        f"{endpoint}?key={api_key}",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(req, timeout=10) as response:
+        return response.read().decode("utf-8")
 
 async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
     raw_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
 
     if not clean_key:
-        return "[Error: GEMINI_API_KEY is missing on Railway]"
+        return "[Error: GEMINI_API_KEY missing on Railway]"
 
     src_prefix = src_code.split("-")[0].lower()
     tgt_prefix = tgt_code.split("-")[0].lower()
@@ -109,86 +103,74 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
     target_lang = LANG_MAP.get(tgt_prefix, "English")
     source_lang = LANG_MAP.get(src_prefix, "Urdu")
 
-    prompt_text = (
-        f"You are a professional interpreter. Translate from {source_lang} to {target_lang}. "
-        f"Translate directly into {target_lang}. Output ONLY the translated text, no quotes, no extra notes.\n\n"
-        f"Sentence: {text}"
+    prompt = (
+        f"You are a fast verbal translator. Translate this text from {source_lang} to {target_lang}. "
+        f"Output ONLY the translated sentence in {target_lang}. Never output quotes or explanation.\n\n"
+        f"Text: {text}"
     )
 
     payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": prompt_text}
-                ]
-            }
-        ],
-        "generationConfig": {
-            "temperature": 0.1,
-            "maxOutputTokens": 100
-        }
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.0, "maxOutputTokens": 100}
     }
 
-    candidate_models = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-2.0-flash"]
-    last_err = ""
-
-    for model_name in candidate_models:
-        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+    # Standard endpoints
+    models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    for m in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent"
         try:
-            status, body = await asyncio.to_thread(call_gemini_rest, endpoint, payload, clean_key)
-            data = json.loads(body)
-
-            if status == 200:
-                candidates = data.get("candidates", [])
-                if candidates:
-                    parts = candidates[0].get("content", {}).get("parts", [])
-                    if parts:
-                        out = parts[0].get("text", "").strip()
-                        clean = re.sub(r'^(Translation:|Output:|"|\')', "", out, flags=re.IGNORECASE).strip().strip('"')
-                        return clean
-            else:
-                last_err = data.get("error", {}).get("message", body)
-                continue
+            res_text = await asyncio.to_thread(call_gemini_api, url, payload, clean_key)
+            data = json.loads(res_text)
+            candidates = data.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if parts:
+                    clean = parts[0].get("text", "").strip()
+                    clean = re.sub(r'^(Translation:|Output:|"|\')', "", clean, flags=re.IGNORECASE).strip().strip('"')
+                    return clean
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode("utf-8")
+            print(f"[GEMINI FAIL {m}] {err_body}")
+            continue
         except Exception as e:
-            last_err = str(e)
+            print(f"[GEMINI ERR {m}] {e}")
             continue
 
-    return f"[Error: {last_err}]"
+    return f"[Error: Translation failed]"
 
 @app.websocket("/ws/{room_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str):
     await manager.connect(room_id, websocket)
     try:
         while True:
-            raw_data = await websocket.receive_text()
-            data = json.loads(raw_data)
-            
+            raw = await websocket.receive_text()
+            data = json.loads(raw)
+
             sender_id = data.get("sender_id", "")
             sender_name = data.get("sender_name", "Caller")
             gender = data.get("gender", "male")
             src_lang = data.get("source_lang", "ur-PK")
             tgt_lang = data.get("target_lang", "en-US")
-            original_text = data.get("text", "").strip()
+            text = data.get("text", "").strip()
 
-            if not original_text:
+            if not text:
                 continue
 
-            translated = await pure_translate(original_text, src_lang, tgt_lang)
+            translated = await pure_translate(text, src_lang, tgt_lang)
 
-            payload = {
+            await manager.broadcast(room_id, {
                 "sender_id": sender_id,
                 "sender_name": sender_name,
                 "gender": gender,
                 "source_lang": src_lang,
                 "target_lang": tgt_lang,
-                "original": original_text,
+                "original": text,
                 "translated": translated
-            }
-            await manager.broadcast(room_id, payload)
-
+            })
     except WebSocketDisconnect:
         manager.disconnect(room_id, websocket)
-    except Exception:
+    except Exception as e:
+        print(f"[WS ERR] {e}")
         manager.disconnect(room_id, websocket)
 
 @app.get("/")
