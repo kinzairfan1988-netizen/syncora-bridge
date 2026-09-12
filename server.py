@@ -1,19 +1,13 @@
 import os
 import json
-import asyncio
 from typing import Dict, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, Response, FileResponse
+from fastapi.responses import Response, FileResponse
 import edge_tts
 
-app = FastAPI(title="Syncora Voice Engine")
+app = FastAPI(title="Syncora Clean Signal Hub")
 
-VOICE_MAP = {
-    "ur": {"male": "ur-PK-AsadNeural", "female": "ur-PK-UzmaNeural"},
-    "en": {"male": "en-US-BrianNeural", "female": "en-US-AvaNeural"}
-}
-
-class RoomManager:
+class RoomHub:
     def __init__(self):
         self.rooms: Dict[str, List[WebSocket]] = {}
 
@@ -30,54 +24,49 @@ class RoomManager:
             if not self.rooms[room_id]:
                 del self.rooms[room_id]
 
-    async def broadcast(self, room_id: str, message: dict):
+    async def broadcast(self, room_id: str, sender: WebSocket, payload: dict):
         if room_id in self.rooms:
             dead_sockets = []
-            for connection in self.rooms[room_id]:
-                try:
-                    await connection.send_text(json.dumps(message))
-                except Exception:
-                    dead_sockets.append(connection)
+            for client in self.rooms[room_id]:
+                if client != sender:
+                    try:
+                        await client.send_text(json.dumps(payload))
+                    except Exception:
+                        dead_sockets.append(client)
             for d in dead_sockets:
                 self.disconnect(room_id, d)
 
-manager = RoomManager()
+hub = RoomHub()
 
 @app.get("/tts")
-async def text_to_speech(text: str, lang: str = "ur", gender: str = "male"):
+async def text_to_speech(text: str):
     if not text.strip():
         return Response(content=b"", media_type="audio/mpeg")
-
-    prefix = (lang or "ur").split("-")[0].lower()
-    selected_voice = "ur-PK-AsadNeural" if prefix == "ur" else "en-US-BrianNeural"
-
     try:
-        communicate = edge_tts.Communicate(text=text, voice=selected_voice)
+        communicate = edge_tts.Communicate(text=text, voice="ur-PK-AsadNeural")
         mp3_bytes = b""
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
                 mp3_bytes += chunk["data"]
         return Response(content=mp3_bytes, media_type="audio/mpeg")
-    except Exception as e:
-        print(f"[TTS Error] {e}")
+    except Exception:
         return Response(content=b"", media_type="audio/mpeg")
 
 @app.websocket("/ws/{room_id}")
-async def websocket_endpoint(websocket: WebSocket, room_id: str):
-    await manager.connect(room_id, websocket)
+async def socket_endpoint(websocket: WebSocket, room_id: str):
+    await hub.connect(room_id, websocket)
     try:
         while True:
             raw = await websocket.receive_text()
             data = json.loads(raw)
-            # Direct forward to room participants
-            await manager.broadcast(room_id, data)
+            await hub.broadcast(room_id, websocket, data)
     except WebSocketDisconnect:
-        manager.disconnect(room_id, websocket)
+        hub.disconnect(room_id, websocket)
     except Exception:
-        manager.disconnect(room_id, websocket)
+        hub.disconnect(room_id, websocket)
 
 @app.get("/")
-async def get_index():
+async def serve_index():
     return FileResponse("index.html")
 
 if __name__ == "__main__":
