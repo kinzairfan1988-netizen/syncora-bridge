@@ -107,22 +107,31 @@
             display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer;
         }
 
-        /* INCOMING CALL MODAL */
+        /* INCOMING CALL MODAL (RINGTONE ALERT) */
         .incoming-modal-backdrop {
-            position: absolute; inset: 0; background: rgba(0, 0, 0, 0.88);
-            backdrop-filter: blur(10px); z-index: 200; display: none;
+            position: absolute; inset: 0; background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(12px); z-index: 200; display: none;
             flex-direction: column; align-items: center; justify-content: center; padding: 24px;
         }
         .incoming-dialog {
-            background: var(--surface-card); border: 1px solid var(--border-graphite);
-            border-radius: 24px; padding: 28px 24px; width: 100%; text-align: center;
-            box-shadow: 0 0 40px rgba(0,0,0,0.9);
+            background: var(--surface-card); border: 1px solid var(--accent-amber);
+            border-radius: 24px; padding: 32px 24px; width: 100%; text-align: center;
+            box-shadow: 0 0 50px var(--accent-amber-glow);
+            animation: ringPulse 1.2s infinite ease-in-out;
         }
+
+        @keyframes ringPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+
         .incoming-avatar {
-            width: 70px; height: 70px; border-radius: 50%; background: #18181b;
+            width: 76px; height: 76px; border-radius: 50%; background: #18181b;
             border: 2px solid var(--accent-amber); margin: 0 auto 16px auto;
             display: flex; align-items: center; justify-content: center;
-            font-size: 24px; font-weight: 700; color: var(--accent-amber);
+            font-size: 26px; font-weight: 700; color: var(--accent-amber);
+            box-shadow: 0 0 20px var(--accent-amber-glow);
         }
         .incoming-actions { display: flex; gap: 16px; margin-top: 24px; }
         .btn-call-action {
@@ -132,7 +141,7 @@
         .btn-accept { background: var(--online-green); color: white; box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
         .btn-decline { background: var(--danger-red); color: white; box-shadow: 0 0 15px var(--danger-glow); }
 
-        /* IN-CALL OVERLAY */
+        /* ACTIVE CALL SCREEN */
         .call-screen-overlay {
             position: absolute; inset: 0; background: var(--bg-obsidian); z-index: 100;
             display: none; flex-direction: column; justify-content: space-between; padding: 40px 24px 34px 24px;
@@ -176,8 +185,10 @@
             width: 54px; height: 54px; border-radius: 50%; border: 1px solid var(--border-graphite);
             background: var(--surface-card); color: var(--text-primary); font-size: 18px;
             cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s ease;
         }
-        .ctrl-btn-circle.active { background: var(--text-primary); color: #000; }
+        .ctrl-btn-circle.active { background: var(--accent-amber); color: #000; border-color: var(--accent-amber); }
+        .ctrl-btn-circle.muted-state { background: var(--text-primary); color: #000; }
         .ctrl-btn-circle.hangup { background: var(--danger-red); border-color: var(--danger-red); color: white; }
     </style>
 </head>
@@ -214,8 +225,8 @@
         <div class="incoming-modal-backdrop" id="incoming-modal">
             <div class="incoming-dialog">
                 <div class="incoming-avatar">P2</div>
-                <h3 style="font-size: 19px; margin-bottom: 6px;">Incoming Voice Call</h3>
-                <p style="font-size: 13px; color: var(--text-secondary);">Direct Encrypted Channel</p>
+                <h3 style="font-size: 20px; margin-bottom: 6px;">Incoming Call...</h3>
+                <p style="font-size: 13px; color: var(--text-secondary);">Direct Voice Channel</p>
                 <div class="incoming-actions">
                     <button class="btn-call-action btn-decline" onclick="declineCall()">Decline</button>
                     <button class="btn-call-action btn-accept" onclick="acceptCall()">Accept</button>
@@ -241,8 +252,9 @@
             </div>
 
             <div class="call-controls-row">
-                <button class="ctrl-btn-circle" id="mute-btn" onclick="toggleMute()">🎙️</button>
-                <button class="ctrl-btn-circle hangup" onclick="endCall(true)">🛑</button>
+                <button class="ctrl-btn-circle" id="mute-btn" onclick="toggleMute()" title="Mute Mic">🎙️</button>
+                <button class="ctrl-btn-circle" id="speaker-btn" onclick="toggleSpeaker()" title="Loudspeaker">🔊</button>
+                <button class="ctrl-btn-circle hangup" onclick="endCall(true)" title="End Call">🛑</button>
             </div>
         </section>
     </div>
@@ -261,9 +273,12 @@
         let scriptNode = null;
         let isCallActive = false;
         let isMuted = false;
+        let isSpeakerOn = false;
         let timerInterval = null;
         let elapsedSeconds = 0;
         let playbackTime = 0;
+        let ringInterval = null;
+        let gainNode = null;
 
         function copyInviteLink() {
             navigator.clipboard.writeText(window.location.href).then(() => {
@@ -271,6 +286,60 @@
                 btn.innerText = "✅ Done";
                 setTimeout(() => { btn.innerText = "📋 Share Link"; }, 1500);
             });
+        }
+
+        // --- RINGTONE & VIBRATION ALERT SYSTEM ---
+        function startIncomingRingtone() {
+            stopIncomingRingtone();
+
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            const ringCtx = new AudioCtx();
+
+            function playBeep() {
+                if (!document.getElementById("incoming-modal").style.display || document.getElementById("incoming-modal").style.display === "none") {
+                    return;
+                }
+
+                // Standard WhatsApp / Phone melody chord
+                const osc1 = ringCtx.createOscillator();
+                const osc2 = ringCtx.createOscillator();
+                const gain = ringCtx.createGain();
+
+                osc1.type = "sine";
+                osc2.type = "sine";
+                osc1.frequency.setValueAtTime(440, ringCtx.currentTime); // A4
+                osc2.frequency.setValueAtTime(480, ringCtx.currentTime); // Tone B
+
+                gain.gain.setValueAtTime(0.3, ringCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ringCtx.currentTime + 1.8);
+
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(ringCtx.destination);
+
+                osc1.start();
+                osc2.start();
+                osc1.stop(ringCtx.currentTime + 1.8);
+                osc2.stop(ringCtx.currentTime + 1.8);
+
+                // Phone Vibration
+                if (navigator.vibrate) {
+                    navigator.vibrate([400, 200, 400, 1000]);
+                }
+            }
+
+            playBeep();
+            ringInterval = setInterval(playBeep, 3000);
+        }
+
+        function stopIncomingRingtone() {
+            if (ringInterval) {
+                clearInterval(ringInterval);
+                ringInterval = null;
+            }
+            if (navigator.vibrate) {
+                navigator.vibrate(0);
+            }
         }
 
         function initSocket() {
@@ -288,12 +357,15 @@
                     const data = JSON.parse(event.data);
                     if (data.type === "call_invite") {
                         document.getElementById("incoming-modal").style.display = "flex";
+                        startIncomingRingtone();
                     } else if (data.type === "call_accepted") {
+                        stopIncomingRingtone();
                         document.getElementById("call-status-label").innerText = "Direct Partner";
                         document.getElementById("sub-caption").innerText = "Call Connected • Speak Naturally";
                         startCallTimer();
                         startContinuousAudioCapture();
                     } else if (data.type === "call_declined" || data.type === "call_ended") {
+                        stopIncomingRingtone();
                         endCall(false);
                     }
                 } else if (event.data instanceof ArrayBuffer) {
@@ -312,6 +384,9 @@
             if (!audioContext || audioContext.state === "closed") {
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
                 audioContext = new AudioCtx({ sampleRate: 16000 });
+                gainNode = audioContext.createGain();
+                gainNode.gain.value = 1.0;
+                gainNode.connect(audioContext.destination);
             }
             if (audioContext.state === "suspended") {
                 await audioContext.resume();
@@ -332,7 +407,6 @@
                 });
 
                 const source = audioContext.createMediaStreamSource(mediaStream);
-                // Increased to 4096 to prevent stutter and network packet drops
                 scriptNode = audioContext.createScriptProcessor(4096, 1, 1);
 
                 scriptNode.onaudioprocess = (e) => {
@@ -372,10 +446,9 @@
 
             const source = audioContext.createBufferSource();
             source.buffer = audioBuf;
-            source.connect(audioContext.destination);
+            source.connect(gainNode);
 
             const currentTime = audioContext.currentTime;
-            // Add 40ms jitter buffer margin to eliminate choppy gaps
             if (playbackTime < currentTime) {
                 playbackTime = currentTime + 0.04;
             }
@@ -396,6 +469,7 @@
         }
 
         async function acceptCall() {
+            stopIncomingRingtone();
             await ensureAudioContext();
             document.getElementById("incoming-modal").style.display = "none";
             isCallActive = true;
@@ -412,6 +486,7 @@
         }
 
         function declineCall() {
+            stopIncomingRingtone();
             document.getElementById("incoming-modal").style.display = "none";
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ type: "call_declined" }));
@@ -430,6 +505,7 @@
         }
 
         function endCall(sendSignal = true) {
+            stopIncomingRingtone();
             isCallActive = false;
             clearInterval(timerInterval);
             document.getElementById("call-timer").innerText = "00:00";
@@ -457,11 +533,24 @@
             isMuted = !isMuted;
             const btn = document.getElementById("mute-btn");
             if (isMuted) {
-                btn.classList.add("active");
+                btn.classList.add("muted-state");
                 btn.innerText = "🔇";
             } else {
-                btn.classList.remove("active");
+                btn.classList.remove("muted-state");
                 btn.innerText = "🎙️";
+            }
+        }
+
+        // --- LOUDSPEAKER TOGGLE ---
+        function toggleSpeaker() {
+            isSpeakerOn = !isSpeakerOn;
+            const btn = document.getElementById("speaker-btn");
+            if (isSpeakerOn) {
+                btn.classList.add("active");
+                if (gainNode) gainNode.gain.value = 2.5; // Boosted volume for loudspeaker mode
+            } else {
+                btn.classList.remove("active");
+                if (gainNode) gainNode.gain.value = 1.0; // Normal earpiece volume
             }
         }
 
