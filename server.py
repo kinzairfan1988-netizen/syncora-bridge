@@ -79,11 +79,14 @@ async def text_to_speech(text: str, lang: str = "en", gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-def call_gemini_rest(endpoint: str, payload_data: dict) -> tuple[int, str]:
+def call_gemini_rest(endpoint: str, payload_data: dict, api_key: str) -> tuple[int, str]:
     req = urllib.request.Request(
         endpoint,
         data=json.dumps(payload_data).encode("utf-8"),
-        headers={"Content-Type": "application/json"}
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key
+        }
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as response:
@@ -98,7 +101,7 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
     clean_key = raw_key.strip().strip("'").strip('"')
 
     if not clean_key:
-        return "[Error: GEMINI_API_KEY is missing in Railway Variables]"
+        return "[Error: GEMINI_API_KEY is missing on Railway]"
 
     src_prefix = src_code.split("-")[0].lower()
     tgt_prefix = tgt_code.split("-")[0].lower()
@@ -107,10 +110,9 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
     source_lang = LANG_MAP.get(src_prefix, "Urdu")
 
     prompt_text = (
-        f"You are a direct verbal interpreter. Translate spoken text from {source_lang} to {target_lang}. "
-        f"Output ONLY the translated sentence in {target_lang}. "
-        f"Never output notes, explanation, or quotes. Never use Arabic unless target is Arabic.\n\n"
-        f"Input: {text}"
+        f"You are a professional interpreter. Translate from {source_lang} to {target_lang}. "
+        f"Translate directly into {target_lang}. Output ONLY the translated text, no quotes, no extra notes.\n\n"
+        f"Sentence: {text}"
     )
 
     payload = {
@@ -127,13 +129,13 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
         }
     }
 
-    candidate_models = ["gemini-3.6-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"]
+    candidate_models = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-2.0-flash"]
     last_err = ""
 
     for model_name in candidate_models:
-        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={clean_key}"
+        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
         try:
-            status, body = await asyncio.to_thread(call_gemini_rest, endpoint, payload)
+            status, body = await asyncio.to_thread(call_gemini_rest, endpoint, payload, clean_key)
             data = json.loads(body)
 
             if status == 200:
@@ -168,7 +170,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
             tgt_lang = data.get("target_lang", "en-US")
             original_text = data.get("text", "").strip()
 
-            if not original_text or len(original_text) < 2:
+            if not original_text:
                 continue
 
             translated = await pure_translate(original_text, src_lang, tgt_lang)
