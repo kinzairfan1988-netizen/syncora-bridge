@@ -87,7 +87,6 @@
             cursor: pointer; overflow: hidden; background-size: cover; background-position: center;
         }
 
-        .nav-actions { display: flex; align-items: center; gap: 8px; }
         .btn-add-contact {
             background: var(--accent-amber-dim);
             border: 1px solid rgba(245, 158, 11, 0.3);
@@ -104,7 +103,8 @@
             padding: 18px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
+            overflow-y: auto;
         }
 
         .section-label {
@@ -113,14 +113,14 @@
             text-transform: uppercase;
             letter-spacing: 0.8px;
             color: var(--text-muted);
-            margin-bottom: 2px;
+            margin-bottom: 4px;
         }
 
         .contact-card {
             background: var(--surface-card);
             border: 1px solid var(--border-graphite);
             border-radius: 16px;
-            padding: 14px 16px;
+            padding: 12px 14px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -132,26 +132,46 @@
             background: var(--surface-hover);
         }
 
-        .user-identity { display: flex; align-items: center; gap: 14px; }
+        .user-identity { display: flex; align-items: center; gap: 12px; flex: 1; }
         .avatar-box {
-            width: 46px; height: 46px; border-radius: 50%; background: #1c1c21;
+            width: 44px; height: 44px; border-radius: 50%; background: #1c1c21;
             border: 1px solid var(--border-subtle); display: flex; align-items: center;
             justify-content: center; font-weight: 700; color: var(--accent-amber);
-            text-transform: uppercase; font-size: 15px; overflow: hidden;
-            background-size: cover; background-position: center;
+            text-transform: uppercase; font-size: 14px; overflow: hidden;
+            background-size: cover; background-position: center; flex-shrink: 0;
         }
 
-        .contact-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
-        .contact-sub { font-size: 12px; color: var(--text-muted); font-family: 'Space Grotesk', monospace; }
+        .contact-name { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+        .contact-sub { font-size: 12px; color: var(--text-muted); font-family: 'Space Grotesk', monospace; margin-top: 2px; }
 
-        .btn-mini-chat {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border-subtle);
-            color: var(--text-secondary);
-            width: 38px; height: 38px; border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 15px;
+        .card-actions { display: flex; align-items: center; gap: 8px; }
+        .btn-card-del {
+            background: transparent; border: none; color: var(--text-muted);
+            font-size: 16px; cursor: pointer; padding: 4px;
         }
+        .btn-card-del:hover { color: var(--danger-red); }
+
+        .fab-add {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            border-radius: 18px;
+            background: var(--accent-amber);
+            color: #000;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 20px var(--accent-amber-glow);
+            transition: all 0.2s ease;
+            z-index: 20;
+        }
+        .fab-add:active { transform: scale(0.92); }
 
         /* 2. DIRECT CHAT VIEW */
         .view-chat-screen {
@@ -247,7 +267,7 @@
             font-weight: 700; cursor: pointer;
         }
 
-        /* 3. INCOMING CALL MODAL (WHATSAPP PROFILE LAYOUT) */
+        /* 3. INCOMING CALL MODAL */
         .incoming-modal-backdrop {
             position: absolute; inset: 0; background: rgba(0, 0, 0, 0.92);
             backdrop-filter: blur(14px); z-index: 200; display: none;
@@ -372,44 +392,33 @@
 
     <div class="app-viewport">
         
-        <!-- 1. DIRECTORY SCREEN (FOR HOST) -->
+        <!-- 1. DIRECTORY SCREEN (MULTIPLE CONTACTS) -->
         <div class="view-directory" id="view-dir">
             <header class="top-navbar">
                 <div class="brand-cluster">
                     <div class="my-profile-badge" id="my-profile-avatar-btn" onclick="openProfileModal()" title="Edit My Profile">U</div>
                     <div class="brand-title">Syncora <span>Terminal</span></div>
                 </div>
-                <div class="nav-actions">
-                    <button class="btn-add-contact" onclick="openAddModal()">＋ Add</button>
-                    <button class="chat-header-btn" onclick="copyInviteLink()" id="copy-btn">📋 Link</button>
-                </div>
+                <button class="btn-add-contact" onclick="openAddModal()">＋ Add Contact</button>
             </header>
 
-            <main class="directory-container">
-                <div class="section-label">Saved Contacts</div>
-
-                <div class="contact-card" onclick="openContactChat()">
-                    <div class="user-identity">
-                        <div class="avatar-box" id="active-avatar-initials">AF</div>
-                        <div class="user-meta">
-                            <div class="contact-name" id="active-line-title">Ahmad Farman TBT</div>
-                            <div class="contact-sub" id="room-sub">03488674051</div>
-                        </div>
-                    </div>
-                    <div class="btn-mini-chat">💬</div>
-                </div>
+            <main class="directory-container" id="contact-list-container">
+                <div class="section-label">Contacts Directory</div>
+                <!-- Contacts dynamically render here -->
             </main>
+
+            <button class="fab-add" onclick="openAddModal()" title="Add New Contact">＋</button>
         </div>
 
-        <!-- 2. DIRECT CHAT VIEW (LANDING FOR GUEST) -->
+        <!-- 2. DIRECT CHAT VIEW -->
         <div class="view-chat-screen" id="view-chat-screen">
             <header class="chat-top-header">
                 <div class="chat-contact-meta">
                     <button class="btn-back-arrow" id="chat-back-btn" onclick="closeContactChat()">←</button>
                     <div class="avatar-box" id="chat-header-avatar" style="width: 40px; height: 40px; font-size: 14px;">AF</div>
                     <div>
-                        <div style="font-size: 14px; font-weight: 700;" id="chat-header-title">Ahmad Farman TBT</div>
-                        <div style="font-size: 11px; color: var(--online-green);" id="chat-header-status">Online</div>
+                        <div style="font-size: 14px; font-weight: 700;" id="chat-header-title">Contact</div>
+                        <div style="font-size: 11px; color: var(--online-green);">Direct Line Active</div>
                     </div>
                 </div>
 
@@ -435,11 +444,11 @@
             </div>
         </div>
 
-        <!-- 3. INCOMING CALL MODAL (WHATSAPP CALL POPUP) -->
+        <!-- 3. INCOMING CALL MODAL -->
         <div class="incoming-modal-backdrop" id="incoming-modal">
             <div class="incoming-dialog">
                 <div class="incoming-avatar" id="incoming-caller-avatar">AF</div>
-                <h3 style="font-size: 21px; margin-bottom: 6px;" id="incoming-caller-name">Ahmad Farman is calling...</h3>
+                <h3 style="font-size: 21px; margin-bottom: 6px;" id="incoming-caller-name">Incoming Call...</h3>
                 <p style="font-size: 13px; color: var(--accent-amber);" id="incoming-call-type-label">Voice Line</p>
                 <div class="incoming-actions">
                     <button class="btn-call-action btn-decline" onclick="declineCall()">Decline</button>
@@ -452,13 +461,13 @@
         <section class="call-screen-overlay" id="call-screen">
             <div class="call-header">
                 <div class="call-mode-pill" id="call-mode-badge">Direct Voice Line</div>
-                <div class="caller-title" id="call-status-label">Ahmad Farman TBT</div>
+                <div class="caller-title" id="call-status-label">Partner</div>
                 <div class="call-duration" id="call-timer">00:00</div>
             </div>
 
             <div class="call-stage-center">
                 <div class="pulse-wave-ring"></div>
-                <div class="caller-large-avatar" id="active-call-avatar">AF</div>
+                <div class="caller-large-avatar" id="active-call-avatar">P</div>
             </div>
 
             <div class="subtitles-box" id="call-subtitle-box">
@@ -477,23 +486,23 @@
         <div class="modal-backdrop" id="add-modal">
             <div class="modal-card">
                 <div class="modal-header">
-                    <div class="modal-title">Save Contact</div>
+                    <div class="modal-title">New Contact</div>
                     <button class="modal-close" onclick="closeAddModal()">✕</button>
                 </div>
                 <div class="input-group">
-                    <input type="text" id="modal-name-input" class="input-field" placeholder="Contact Name">
-                    <input type="tel" id="modal-phone-input" class="input-field" placeholder="Mobile Number (e.g. 03488674051)">
+                    <input type="text" id="modal-name-input" class="input-field" placeholder="Contact Name (e.g. Ali Khan)">
+                    <input type="tel" id="modal-phone-input" class="input-field" placeholder="Mobile Number (e.g. 03001234567)">
                 </div>
                 <button class="btn-modal-save" onclick="saveContactFromModal()">Save Contact</button>
-                <button class="btn-modal-wa" onclick="openDirectWhatsApp()">💬 Open in WhatsApp Directly</button>
+                <button class="btn-modal-wa" onclick="openDirectWhatsAppFromModal()">💬 Send Invite on WhatsApp</button>
             </div>
         </div>
 
-        <!-- MY PROFILE MODAL (EDIT PHOTO & NAME) -->
+        <!-- MY PROFILE MODAL -->
         <div class="modal-backdrop" id="profile-modal">
             <div class="modal-card">
                 <div class="modal-header">
-                    <div class="modal-title">My Profile (Caller Identity)</div>
+                    <div class="modal-title">My Profile</div>
                     <button class="modal-close" onclick="closeProfileModal()">✕</button>
                 </div>
                 <div class="input-group">
@@ -511,18 +520,20 @@
         const urlParams = new URLSearchParams(window.location.search);
         const isGuest = urlParams.get('role') === 'guest';
         const hostNameParam = urlParams.get('host_name') ? decodeURIComponent(urlParams.get('host_name')) : null;
-        const hostPhotoParam = urlParams.get('host_photo') || null;
 
-        // User's own identity (Host identity saved in browser)
         let myName = localStorage.getItem("syncora_my_name") || "Muhammad";
         let myPhoto = localStorage.getItem("syncora_my_photo") || "";
 
-        // Partner identity
-        let partnerName = isGuest ? (hostNameParam || "Host Partner") : (localStorage.getItem("syncora_contact_name") || "Ahmad Farman TBT");
-        let partnerPhone = localStorage.getItem("syncora_contact_phone") || "03488674051";
-        let partnerPhoto = isGuest ? (hostPhotoParam || "") : "";
+        // MULTIPLE CONTACTS STORAGE
+        let contacts = JSON.parse(localStorage.getItem("syncora_contacts_list") || "[]");
+        if (contacts.length === 0) {
+            contacts.push({ name: "Ahmad Farman TBT", phone: "03488674051" });
+            localStorage.setItem("syncora_contacts_list", JSON.stringify(contacts));
+        }
 
-        let currentRoom = urlParams.get('room') || ('room-' + partnerPhone.replace(/[^0-9]/g, ''));
+        // Active conversation contact
+        let activeContact = contacts[0] || { name: "Partner", phone: "03000000000" };
+        let currentRoom = urlParams.get('room') || ('room-' + activeContact.phone.replace(/[^0-9]/g, ''));
 
         const myId = "usr-" + Math.random().toString(36).substring(2, 8);
         let socket = null;
@@ -557,35 +568,84 @@
             }
         }
 
-        function updateUI() {
-            // Apply My Avatar
-            const myAvatarBtn = document.getElementById("my-profile-avatar-btn");
-            applyAvatar(myAvatarBtn, myName, myPhoto);
+        function renderContactList() {
+            const container = document.getElementById("contact-list-container");
+            container.innerHTML = '<div class="section-label">Contacts Directory</div>';
 
-            // Apply Partner Details
-            document.getElementById("active-line-title").innerText = partnerName;
-            document.getElementById("room-sub").innerText = partnerPhone;
-            applyAvatar(document.getElementById("active-avatar-initials"), partnerName, partnerPhoto);
+            contacts.forEach((c, index) => {
+                const card = document.createElement("div");
+                card.className = "contact-card";
+                card.innerHTML = `
+                    <div class="user-identity" onclick="selectContact(${index})">
+                        <div class="avatar-box">${getInitials(c.name)}</div>
+                        <div class="user-meta">
+                            <div class="contact-name">${c.name}</div>
+                            <div class="contact-sub">${c.phone}</div>
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn-card-del" onclick="event.stopPropagation(); deleteContact(${index})" title="Delete Contact">🗑️</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
 
-            document.getElementById("chat-header-title").innerText = partnerName;
-            applyAvatar(document.getElementById("chat-header-avatar"), partnerName, partnerPhoto);
-
-            document.getElementById("call-status-label").innerText = partnerName;
-            applyAvatar(document.getElementById("active-call-avatar"), partnerName, partnerPhoto);
-
-            document.getElementById("incoming-caller-name").innerText = `${partnerName} is calling...`;
-            applyAvatar(document.getElementById("incoming-caller-avatar"), partnerName, partnerPhoto);
-
-            // GUEST VIEW AUTO-LANDING:
-            if (isGuest) {
-                document.getElementById("view-dir").style.display = "none";
-                document.getElementById("view-chat-screen").style.display = "flex";
-                document.getElementById("chat-back-btn").style.display = "none"; // Hide back button for guest
-                fetchOfflineHistory();
+        function deleteContact(index) {
+            if (confirm(`Delete ${contacts[index].name}?`)) {
+                contacts.splice(index, 1);
+                localStorage.setItem("syncora_contacts_list", JSON.stringify(contacts));
+                renderContactList();
             }
         }
 
-        // --- MY PROFILE MODAL ---
+        function selectContact(index) {
+            activeContact = contacts[index];
+            currentRoom = 'room-' + activeContact.phone.replace(/[^0-9]/g, '');
+            openContactChat();
+        }
+
+        function updateUI() {
+            applyAvatar(document.getElementById("my-profile-avatar-btn"), myName, myPhoto);
+
+            if (isGuest) {
+                activeContact = { name: hostNameParam || "Host Partner", phone: "Direct Line" };
+                currentRoom = urlParams.get('room') || 'room-guest';
+                document.getElementById("view-dir").style.display = "none";
+                document.getElementById("view-chat-screen").style.display = "flex";
+                document.getElementById("chat-back-btn").style.display = "none";
+            }
+
+            document.getElementById("chat-header-title").innerText = activeContact.name;
+            document.getElementById("call-status-label").innerText = activeContact.name;
+            applyAvatar(document.getElementById("chat-header-avatar"), activeContact.name, "");
+            applyAvatar(document.getElementById("active-call-avatar"), activeContact.name, "");
+            applyAvatar(document.getElementById("incoming-caller-avatar"), activeContact.name, "");
+            document.getElementById("incoming-caller-name").innerText = `${activeContact.name} is calling...`;
+        }
+
+        function openAddModal() {
+            document.getElementById("modal-name-input").value = "";
+            document.getElementById("modal-phone-input").value = "";
+            document.getElementById("add-modal").style.display = "flex";
+        }
+        function closeAddModal() {
+            document.getElementById("add-modal").style.display = "none";
+        }
+        function saveContactFromModal() {
+            const nameInput = document.getElementById("modal-name-input").value.trim();
+            const phoneInput = document.getElementById("modal-phone-input").value.trim();
+            if (!nameInput || !phoneInput) {
+                alert("Please enter Name and Phone Number");
+                return;
+            }
+
+            contacts.push({ name: nameInput, phone: phoneInput });
+            localStorage.setItem("syncora_contacts_list", JSON.stringify(contacts));
+            renderContactList();
+            closeAddModal();
+        }
+
         function openProfileModal() {
             document.getElementById("my-name-input").value = myName;
             document.getElementById("profile-modal").style.display = "flex";
@@ -614,31 +674,12 @@
             }
         }
 
-        // --- ADD CONTACT MODAL ---
-        function openAddModal() {
-            document.getElementById("modal-name-input").value = partnerName;
-            document.getElementById("modal-phone-input").value = partnerPhone;
-            document.getElementById("add-modal").style.display = "flex";
-        }
-        function closeAddModal() {
-            document.getElementById("add-modal").style.display = "none";
-        }
-        function saveContactFromModal() {
-            const nameInput = document.getElementById("modal-name-input").value.trim() || "Ahmad Farman TBT";
-            const phoneInput = document.getElementById("modal-phone-input").value.trim() || "03488674051";
-            partnerName = nameInput;
-            partnerPhone = phoneInput.replace(/[^0-9]/g, '');
-
-            localStorage.setItem("syncora_contact_name", partnerName);
-            localStorage.setItem("syncora_contact_phone", partnerPhone);
-
-            updateUI();
-            closeAddModal();
-        }
-
         function openContactChat() {
             document.getElementById("view-dir").style.display = "none";
             document.getElementById("view-chat-screen").style.display = "flex";
+            updateUI();
+            if (socket) socket.close();
+            initSocket();
             fetchOfflineHistory();
         }
 
@@ -647,7 +688,6 @@
             document.getElementById("view-dir").style.display = "flex";
         }
 
-        // --- SMART GUEST LINK FOR WHATSAPP ---
         function generateGuestShareUrl() {
             const origin = window.location.origin;
             const path = window.location.pathname;
@@ -655,27 +695,72 @@
             params.set("room", currentRoom);
             params.set("role", "guest");
             params.set("host_name", myName);
-            if (myPhoto && myPhoto.startsWith("http")) params.set("host_photo", myPhoto);
             return `${origin}${path}?${params.toString()}`;
         }
 
-        function openDirectWhatsApp() {
-            let num = partnerPhone.replace(/[^0-9]/g, '');
+        function openDirectWhatsAppFromModal() {
+            const phoneInput = document.getElementById("modal-phone-input").value.trim().replace(/[^0-9]/g, '');
+            const nameInput = document.getElementById("modal-name-input").value.trim() || "Friend";
+            if (!phoneInput) {
+                alert("Please enter a phone number first.");
+                return;
+            }
+
+            let num = phoneInput;
             if (num.startsWith("03")) num = "92" + num.substring(1);
 
             const shareUrl = generateGuestShareUrl();
-            const msg = encodeURIComponent(`Assalam o Alaikum ${partnerName}! Please click this link to chat and call with ${myName} on Syncora: ${shareUrl}`);
+            const msg = encodeURIComponent(`Assalam o Alaikum ${nameInput}! Please join my secure line on Syncora: ${shareUrl}`);
 
-            window.location.href = num ? `whatsapp://send?phone=${num}&text=${msg}` : `whatsapp://send?text=${msg}`;
+            window.location.href = `whatsapp://send?phone=${num}&text=${msg}`;
         }
 
-        function copyInviteLink() {
-            const shareUrl = generateGuestShareUrl();
-            navigator.clipboard.writeText(shareUrl).then(() => {
-                const btn = document.getElementById("copy-btn");
-                btn.innerText = "✅ Done";
-                setTimeout(() => { btn.innerText = "📋 Link"; }, 1500);
-            });
+        function initSocket() {
+            const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+            socket = new WebSocket(`${wsProtocol}${window.location.host}/ws/${currentRoom}`);
+            socket.binaryType = "arraybuffer";
+
+            socket.onopen = () => {
+                const statusDot = document.getElementById("status-dot");
+                if (statusDot) statusDot.classList.add("live");
+            };
+
+            socket.onmessage = (event) => {
+                if (typeof event.data === "string") {
+                    const data = JSON.parse(event.data);
+                    if (data.type === "call_invite") {
+                        isTranslationCall = data.is_translation || false;
+                        if (data.caller_name) {
+                            document.getElementById("incoming-caller-name").innerText = `${data.caller_name} is calling...`;
+                            document.getElementById("call-status-label").innerText = data.caller_name;
+                        }
+                        document.getElementById("incoming-call-type-label").innerText = isTranslationCall ? "🌐 AI Live Translation Call" : "📞 Voice Call";
+                        document.getElementById("incoming-modal").style.display = "flex";
+                        startIncomingRingtone();
+                    } else if (data.type === "call_accepted") {
+                        stopIncomingRingtone();
+                        isTranslationCall = data.is_translation || false;
+                        setupActiveCallUI();
+                        startCallTimer();
+                        startContinuousAudioCapture();
+                        if (isTranslationCall) startSpeechEngine();
+                    } else if (data.type === "call_declined" || data.type === "call_ended") {
+                        stopIncomingRingtone();
+                        endCall(false);
+                    } else if (data.type === "text_message") {
+                        appendChatMessage(data.text, 'received', data.translated, data.time);
+                    } else if (data.type === "live_subtitle") {
+                        document.getElementById("sub-original").innerText = `Partner: "${data.original}"`;
+                        document.getElementById("sub-translated").innerText = `AI: ${data.translated}`;
+                    }
+                } else if (event.data instanceof ArrayBuffer) {
+                    playRawAudio(event.data);
+                }
+            };
+
+            socket.onclose = () => {
+                setTimeout(initSocket, 1500);
+            };
         }
 
         async function fetchOfflineHistory() {
@@ -725,7 +810,6 @@
                 translated: translated,
                 sender: myId,
                 sender_name: myName,
-                sender_photo: myPhoto,
                 time: timeStr
             }));
 
@@ -780,61 +864,6 @@
         function stopIncomingRingtone() {
             if (ringInterval) { clearInterval(ringInterval); ringInterval = null; }
             if (navigator.vibrate) navigator.vibrate(0);
-        }
-
-        function initSocket() {
-            const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-            socket = new WebSocket(`${wsProtocol}${window.location.host}/ws/${currentRoom}`);
-            socket.binaryType = "arraybuffer";
-
-            socket.onopen = () => {
-                const statusDot = document.getElementById("status-dot");
-                if (statusDot) statusDot.classList.add("live");
-            };
-
-            socket.onmessage = (event) => {
-                if (typeof event.data === "string") {
-                    const data = JSON.parse(event.data);
-                    if (data.type === "call_invite") {
-                        isTranslationCall = data.is_translation || false;
-
-                        // Synchronize caller name and picture
-                        if (data.caller_name) {
-                            document.getElementById("incoming-caller-name").innerText = `${data.caller_name} is calling...`;
-                            document.getElementById("call-status-label").innerText = data.caller_name;
-                        }
-                        if (data.caller_photo) {
-                            applyAvatar(document.getElementById("incoming-caller-avatar"), data.caller_name, data.caller_photo);
-                            applyAvatar(document.getElementById("active-call-avatar"), data.caller_name, data.caller_photo);
-                        }
-
-                        document.getElementById("incoming-call-type-label").innerText = isTranslationCall ? "🌐 AI Live Translation Call" : "📞 Voice Call";
-                        document.getElementById("incoming-modal").style.display = "flex";
-                        startIncomingRingtone();
-                    } else if (data.type === "call_accepted") {
-                        stopIncomingRingtone();
-                        isTranslationCall = data.is_translation || false;
-                        setupActiveCallUI();
-                        startCallTimer();
-                        startContinuousAudioCapture();
-                        if (isTranslationCall) startSpeechEngine();
-                    } else if (data.type === "call_declined" || data.type === "call_ended") {
-                        stopIncomingRingtone();
-                        endCall(false);
-                    } else if (data.type === "text_message") {
-                        appendChatMessage(data.text, 'received', data.translated, data.time);
-                    } else if (data.type === "live_subtitle") {
-                        document.getElementById("sub-original").innerText = `Partner said: "${data.original}"`;
-                        document.getElementById("sub-translated").innerText = `AI: ${data.translated}`;
-                    }
-                } else if (event.data instanceof ArrayBuffer) {
-                    playRawAudio(event.data);
-                }
-            };
-
-            socket.onclose = () => {
-                setTimeout(initSocket, 1500);
-            };
         }
 
         function setupActiveCallUI() {
@@ -984,8 +1013,7 @@
                 socket.send(JSON.stringify({
                     type: "call_invite",
                     is_translation: withTranslation,
-                    caller_name: myName,
-                    caller_photo: myPhoto
+                    caller_name: myName
                 }));
             }
         }
@@ -1064,8 +1092,8 @@
         }
 
         window.onload = () => {
+            renderContactList();
             updateUI();
-            initSocket();
             initSpeechEngine();
         };
     </script>
