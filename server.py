@@ -3,14 +3,24 @@ import json
 from typing import Dict, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
+import google.generativeai as genai
 
-app = FastAPI(title="Syncora Signal & Inbox Hub")
+# Setup Gemini Client
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
+if GEMINI_KEY:
+    genai.configure(api_key=GEMINI_KEY)
+
+app = FastAPI(title="Syncora Signal & Gemini Translation Hub")
+
+class TranslationPayload(BaseModel):
+    text: str
+    source_lang: str = "ur"
+    target_lang: str = "en"
 
 class SystemHub:
     def __init__(self):
-        # room_id -> active websocket connections
         self.rooms: Dict[str, List[WebSocket]] = {}
-        # room_id -> list of saved offline messages
         self.offline_messages: Dict[str, List[dict]] = {}
 
     async def connect(self, room_id: str, websocket: WebSocket):
@@ -39,7 +49,6 @@ class SystemHub:
                 self.disconnect(room_id, d)
 
     async def broadcast_text(self, room_id: str, sender: WebSocket, payload: dict):
-        # Agar text message hai to history mein save karein taake offline banda aakar dekh sake
         if payload.get("type") == "text_message":
             if room_id not in self.offline_messages:
                 self.offline_messages[room_id] = []
@@ -62,9 +71,32 @@ class SystemHub:
 
 hub = SystemHub()
 
+@app.post("/translate")
+async def translate_text(req: TranslationPayload):
+    """Fast Real-Time Translation via Google Gemini"""
+    clean_text = req.text.strip()
+    if not clean_text:
+        return {"translated_text": ""}
+
+    if not GEMINI_KEY:
+        return {"translated_text": clean_text, "note": "GEMINI_API_KEY missing"}
+
+    try:
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        prompt = (
+            f"You are a real-time conversational translator. Translate this spoken text accurately "
+            f"from {req.source_lang} to {req.target_lang}. Return ONLY the direct translated sentence without any explanation, quotes or greetings:\n\n"
+            f"{clean_text}"
+        )
+        response = model.generate_content(prompt)
+        translated = response.text.strip() if response and response.text else clean_text
+        return {"translated_text": translated}
+    except Exception as e:
+        print(f"[Gemini Error]: {e}")
+        return {"translated_text": clean_text}
+
 @app.get("/messages/{room_id}")
 async def get_saved_messages(room_id: str):
-    """Jab dost link open karega to uske phone number line ke saray purane messages usay mil jayenge"""
     msgs = hub.offline_messages.get(room_id, [])
     return JSONResponse(content={"messages": msgs})
 
