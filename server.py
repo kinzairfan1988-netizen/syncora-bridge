@@ -2,13 +2,16 @@ import os
 import json
 from typing import Dict, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
-app = FastAPI(title="Syncora Realtime Relay")
+app = FastAPI(title="Syncora Signal & Inbox Hub")
 
-class ConnectionHub:
+class SystemHub:
     def __init__(self):
+        # room_id -> active websocket connections
         self.rooms: Dict[str, List[WebSocket]] = {}
+        # room_id -> list of saved offline messages
+        self.offline_messages: Dict[str, List[dict]] = {}
 
     async def connect(self, room_id: str, websocket: WebSocket):
         await websocket.accept()
@@ -35,19 +38,35 @@ class ConnectionHub:
             for d in dead:
                 self.disconnect(room_id, d)
 
-    async def broadcast_text(self, room_id: str, sender: WebSocket, text: str):
+    async def broadcast_text(self, room_id: str, sender: WebSocket, payload: dict):
+        # Agar text message hai to history mein save karein taake offline banda aakar dekh sake
+        if payload.get("type") == "text_message":
+            if room_id not in self.offline_messages:
+                self.offline_messages[room_id] = []
+            self.offline_messages[room_id].append({
+                "sender": payload.get("sender"),
+                "text": payload.get("text"),
+                "time": payload.get("time", "")
+            })
+
         if room_id in self.rooms:
             dead = []
             for client in self.rooms[room_id]:
                 if client != sender:
                     try:
-                        await client.send_text(text)
+                        await client.send_text(json.dumps(payload))
                     except Exception:
                         dead.append(client)
             for d in dead:
                 self.disconnect(room_id, d)
 
-hub = ConnectionHub()
+hub = SystemHub()
+
+@app.get("/messages/{room_id}")
+async def get_saved_messages(room_id: str):
+    """Jab dost link open karega to uske phone number line ke saray purane messages usay mil jayenge"""
+    msgs = hub.offline_messages.get(room_id, [])
+    return JSONResponse(content={"messages": msgs})
 
 @app.websocket("/ws/{room_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str):
@@ -58,7 +77,8 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
             if "bytes" in msg and msg["bytes"]:
                 await hub.broadcast_bytes(room_id, websocket, msg["bytes"])
             elif "text" in msg and msg["text"]:
-                await hub.broadcast_text(room_id, websocket, msg["text"])
+                payload = json.loads(msg["text"])
+                await hub.broadcast_text(room_id, websocket, payload)
     except WebSocketDisconnect:
         hub.disconnect(room_id, websocket)
     except Exception:
