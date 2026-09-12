@@ -55,7 +55,7 @@
             .app-viewport { max-height: 100vh; border: none; }
         }
 
-        /* 1. DIRECTORY SCREEN (FOR HOST ONLY) */
+        /* 1. DIRECTORY SCREEN */
         .view-directory {
             flex: 1;
             display: flex;
@@ -65,7 +65,7 @@
         }
 
         .top-navbar {
-            padding: 14px 18px;
+            padding: 12px 18px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -75,15 +75,32 @@
             z-index: 10;
         }
 
-        .brand-cluster { display: flex; align-items: center; gap: 10px; }
-        .brand-title { font-family: 'Space Grotesk', sans-serif; font-size: 19px; font-weight: 700; color: var(--text-primary); }
-        .brand-title span { color: var(--accent-amber); }
+        .brand-cluster { display: flex; align-items: center; gap: 12px; }
+        
+        .profile-title-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+        .brand-app-name {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--accent-amber);
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .user-display-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
 
         .my-profile-badge {
-            width: 38px; height: 38px; border-radius: 50%;
+            width: 40px; height: 40px; border-radius: 50%;
             border: 2px solid var(--accent-amber); background: #1c1c21;
             display: flex; align-items: center; justify-content: center;
-            font-size: 13px; font-weight: 700; color: var(--accent-amber);
+            font-size: 14px; font-weight: 700; color: var(--accent-amber);
             cursor: pointer; overflow: hidden; background-size: cover; background-position: center;
             flex-shrink: 0;
         }
@@ -423,24 +440,21 @@
             background: var(--accent-amber); color: #000; font-weight: 700;
             border: none; border-radius: 12px; padding: 12px; font-size: 14px; cursor: pointer;
         }
-
-        .btn-modal-wa {
-            background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4);
-            color: var(--online-green); padding: 11px; border-radius: 12px;
-            font-size: 13px; font-weight: 700; cursor: pointer; text-align: center;
-        }
     </style>
 </head>
 <body>
 
     <div class="app-viewport">
         
-        <!-- 1. DIRECTORY SCREEN (STRICTLY FOR HOST ONLY) -->
+        <!-- 1. DIRECTORY SCREEN (FOR HOST ONLY) -->
         <div class="view-directory" id="view-dir">
             <header class="top-navbar">
                 <div class="brand-cluster">
-                    <div class="my-profile-badge" id="my-profile-avatar-btn" onclick="openProfileModal()" title="Edit My Profile & DP">U</div>
-                    <div class="brand-title">Syncora <span>Terminal</span></div>
+                    <div class="my-profile-badge" id="my-profile-avatar-btn" onclick="openProfileModal()" title="Edit My Profile & DP">IA</div>
+                    <div class="profile-title-group">
+                        <div class="brand-app-name">Syncora Terminal</div>
+                        <div class="user-display-name" id="host-navbar-name">Irfan Anees</div>
+                    </div>
                 </div>
                 <div class="header-actions">
                     <button class="btn-header-action" onclick="copyMyPersonalDirectLink()" id="main-copy-btn">📋 My Link</button>
@@ -460,9 +474,9 @@
             <header class="chat-top-header">
                 <div class="chat-contact-meta">
                     <button class="btn-back-arrow" id="chat-back-btn" onclick="closeContactChat()">←</button>
-                    <div class="avatar-box" id="chat-header-avatar" style="width: 38px; height: 38px; font-size: 14px;" onclick="openProfileModal()" title="Tap to update Profile/DP">P</div>
+                    <div class="avatar-box" id="chat-header-avatar" style="width: 38px; height: 38px; font-size: 14px;" onclick="openProfileModal()" title="Tap to update Profile/DP">IA</div>
                     <div style="overflow: hidden;">
-                        <div style="font-size: 13px; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;" id="chat-header-title">Partner</div>
+                        <div style="font-size: 13px; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;" id="chat-header-title">Irfan Anees</div>
                         <div style="font-size: 10px; color: var(--online-green);">Direct Line Active</div>
                     </div>
                 </div>
@@ -521,7 +535,7 @@
         <!-- 3. INCOMING CALL MODAL -->
         <div class="incoming-modal-backdrop" id="incoming-modal">
             <div class="incoming-dialog">
-                <div class="incoming-avatar" id="incoming-caller-avatar">P</div>
+                <div class="incoming-avatar" id="incoming-caller-avatar">IA</div>
                 <h3 style="font-size: 21px; margin-bottom: 6px;" id="incoming-caller-name">Incoming Call...</h3>
                 <p style="font-size: 13px; color: var(--accent-amber);" id="incoming-call-type-label">Voice Line</p>
                 <div class="incoming-actions">
@@ -579,7 +593,7 @@
 
                 <div class="call-stage-center" id="voice-avatar-stage">
                     <div class="pulse-wave-ring"></div>
-                    <div class="caller-large-avatar" id="active-call-avatar">P</div>
+                    <div class="caller-large-avatar" id="active-call-avatar">IA</div>
                 </div>
 
                 <div class="subtitles-box" id="call-subtitle-box">
@@ -637,27 +651,25 @@
         const hostNameParam = urlParams.get('host_name') ? decodeURIComponent(urlParams.get('host_name')) : null;
         const hostPhotoParam = urlParams.get('host_photo') ? decodeURIComponent(urlParams.get('host_photo')) : "";
 
-        let myName = localStorage.getItem("syncora_my_name") || (isGuest ? "Guest" : "Muhammad");
+        // Default name set to Irfan Anees
+        let myName = localStorage.getItem("syncora_my_name") || (isGuest ? "Guest" : "Irfan Anees");
         let myPhoto = localStorage.getItem("syncora_my_photo") || "";
 
-        // YOUR PERMANENT PERSONAL ROOM (Host Room Isolation)
         let myPersonalRoomId = localStorage.getItem("syncora_personal_room");
         if (!myPersonalRoomId) {
             myPersonalRoomId = "direct-" + Math.random().toString(36).substring(2, 9);
             localStorage.setItem("syncora_personal_room", myPersonalRoomId);
         }
 
-        // Active room selection
-        let currentRoom = isGuest ? (urlParams.get('room') || myPersonalRoomId) : myPersonalRoomId;
+        let currentRoom = urlParams.get('room') || (isGuest ? myPersonalRoomId : myPersonalRoomId);
 
-        // Contacts list: Strictly stored locally for Host only
         let contacts = [];
         if (!isGuest) {
             contacts = JSON.parse(localStorage.getItem("syncora_contacts_list") || "[]");
         }
 
         let partnerLivePhoto = isGuest ? hostPhotoParam : "";
-        let partnerLiveName = isGuest ? (hostNameParam || "Direct Line") : "Direct Line";
+        let partnerLiveName = isGuest ? (hostNameParam || "Irfan Anees") : "Irfan Anees";
 
         const myId = "usr-" + Math.random().toString(36).substring(2, 8);
         let socket = null;
@@ -678,7 +690,7 @@
         let gainNode = null;
 
         function getInitials(name) {
-            if (!name) return "P";
+            if (!name) return "IA";
             const parts = name.trim().split(" ");
             if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
             return name.substring(0, 2).toUpperCase();
@@ -696,10 +708,10 @@
         }
 
         function renderContactList() {
-            if (isGuest) return; // Guests never have contacts directory
+            if (isGuest) return;
 
             const container = document.getElementById("contact-list-container");
-            container.innerHTML = '<div class="section-label">Contacts Directory</div>';
+            container.innerHTML = '<div class="section-label">Saved Contacts</div>';
 
             if (contacts.length === 0) {
                 container.innerHTML += '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No contacts saved yet.<br>Tap <b>＋ Add</b> to add someone.</div>';
@@ -742,15 +754,15 @@
 
         function updateUI() {
             applyAvatar(document.getElementById("my-profile-avatar-btn"), myName, myPhoto);
+            document.getElementById("host-navbar-name").innerText = myName;
 
-            // GUEST VIEW LOCK: LAND DIRECTLY ON SECURE BLANK CHAT PAGE
             if (isGuest) {
                 document.getElementById("view-dir").style.display = "none";
                 document.getElementById("view-chat-screen").style.display = "flex";
-                document.getElementById("chat-back-btn").style.display = "none"; // Hide back button for guest
+                document.getElementById("chat-back-btn").style.display = "none";
             }
 
-            document.getElementById("chat-header-title").innerText = partnerLiveName;
+            document.getElementById("chat-header-title").innerText = isGuest ? partnerLiveName : "Direct Line";
             document.getElementById("call-status-label").innerText = partnerLiveName;
             applyAvatar(document.getElementById("chat-header-avatar"), partnerLiveName, partnerLivePhoto);
             applyAvatar(document.getElementById("active-call-avatar"), partnerLiveName, partnerLivePhoto);
@@ -833,7 +845,6 @@
             document.getElementById("view-dir").style.display = "flex";
         }
 
-        // YOUR SECURE PERSONAL CHAT LINK GENERATOR
         function copyMyPersonalDirectLink() {
             const origin = window.location.origin;
             const path = window.location.pathname;
