@@ -107,7 +107,7 @@
             display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer;
         }
 
-        /* INCOMING CALL DIALOG (WHATSAPP STYLE) */
+        /* INCOMING CALL DIALOG */
         .incoming-modal-backdrop {
             position: absolute; inset: 0; background: rgba(0, 0, 0, 0.88);
             backdrop-filter: blur(10px); z-index: 200; display: none;
@@ -211,7 +211,7 @@
             </div>
         </main>
 
-        <!-- WHATSAPP INCOMING CALL MODAL -->
+        <!-- INCOMING CALL MODAL -->
         <div class="incoming-modal-backdrop" id="incoming-modal">
             <div class="incoming-dialog">
                 <div class="incoming-avatar">P2</div>
@@ -224,7 +224,7 @@
             </div>
         </div>
 
-        <!-- SCREEN 2: IN-CALL OVERLAY -->
+        <!-- ACTIVE CALL SCREEN -->
         <section class="call-screen-overlay" id="call-screen">
             <div class="call-header">
                 <div class="security-badge">🔒 Direct Line Active</div>
@@ -247,6 +247,9 @@
                 <button class="ctrl-btn-circle hangup" onclick="endCall(true)">🛑</button>
             </div>
         </section>
+
+        <!-- Hidden Audio Element for Reliable Playback on Web/Desktop -->
+        <audio id="global-player" playsinline></audio>
     </div>
 
     <script>
@@ -263,7 +266,6 @@
         let isCallActive = false;
         let isMuted = false;
         let isAudioPlaying = false;
-        let currentAudio = null;
         let timerInterval = null;
         let elapsedSeconds = 0;
 
@@ -273,6 +275,12 @@
                 btn.innerText = "✅ Done";
                 setTimeout(() => { btn.innerText = "📋 Share Link"; }, 1500);
             });
+        }
+
+        function unlockAudioContext() {
+            const player = document.getElementById("global-player");
+            player.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+            player.play().catch(() => {});
         }
 
         function initSocket() {
@@ -287,9 +295,13 @@
             socket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
 
+                // Ignore messages sent by oneself
+                if (data.sender === myId) return;
+
                 if (data.type === "call_invite") {
                     document.getElementById("incoming-modal").style.display = "flex";
                 } else if (data.type === "call_accepted") {
+                    document.getElementById("call-status-label").innerText = "Direct Partner";
                     document.getElementById("sub-caption").innerText = "Connected • Speak naturally";
                     startCallTimer();
                     startSpeechRecognition();
@@ -327,6 +339,7 @@
                     document.getElementById("sub-caption").innerText = transcript;
 
                     socket.send(JSON.stringify({
+                        sender: myId,
                         type: "speech",
                         text: transcript
                     }));
@@ -347,21 +360,19 @@
         }
 
         function initiateCall() {
+            unlockAudioContext();
             isCallActive = true;
             document.getElementById("call-screen").style.display = "flex";
             document.getElementById("call-status-label").innerText = "Ringing...";
             document.getElementById("sub-caption").innerText = "Waiting for partner to answer...";
 
-            // Unlock audio on iOS/Chrome
-            const dummy = new Audio();
-            dummy.play().catch(() => {});
-
             if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type: "call_invite" }));
+                socket.send(JSON.stringify({ sender: myId, type: "call_invite" }));
             }
         }
 
         function acceptCall() {
+            unlockAudioContext();
             document.getElementById("incoming-modal").style.display = "none";
             isCallActive = true;
             document.getElementById("call-screen").style.display = "flex";
@@ -372,14 +383,14 @@
             startSpeechRecognition();
 
             if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type: "call_accepted" }));
+                socket.send(JSON.stringify({ sender: myId, type: "call_accepted" }));
             }
         }
 
         function declineCall() {
             document.getElementById("incoming-modal").style.display = "none";
             if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type: "call_declined" }));
+                socket.send(JSON.stringify({ sender: myId, type: "call_declined" }));
             }
         }
 
@@ -389,32 +400,29 @@
             document.getElementById("sub-author").innerText = "Partner";
             document.getElementById("sub-caption").innerText = text;
 
-            // Stop mic while audio is playing (Strict Echo Prevention)
+            // Strict Echo Guard: Mic ko temporarily stop karein jab partner ki aawaz baj rahi ho
             isAudioPlaying = true;
             if (recognition) {
                 try { recognition.stop(); } catch (e) {}
             }
 
-            // Kill any prior running audio
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio.currentTime = 0;
-                currentAudio = null;
-            }
+            const player = document.getElementById("global-player");
+            player.pause();
+            player.src = `/tts?text=${encodeURIComponent(text)}&t=${Date.now()}`;
 
-            currentAudio = new Audio(`/tts?text=${encodeURIComponent(text)}`);
-
-            const donePlaying = () => {
+            const onPlaybackEnd = () => {
                 isAudioPlaying = false;
-                currentAudio = null;
                 if (isCallActive && !isMuted && recognition) {
                     try { recognition.start(); } catch (e) {}
                 }
             };
 
-            currentAudio.onended = donePlaying;
-            currentAudio.onerror = donePlaying;
-            currentAudio.play().catch(donePlaying);
+            player.onended = onPlaybackEnd;
+            player.onerror = onPlaybackEnd;
+            player.play().catch(e => {
+                console.log("Web autoplay handled:", e);
+                onPlaybackEnd();
+            });
         }
 
         function startCallTimer() {
@@ -433,12 +441,9 @@
             clearInterval(timerInterval);
             document.getElementById("call-timer").innerText = "00:00";
 
-            // HARD KILL AUDIO: Koi purana message call khatam hone par na bajey
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio.src = "";
-                currentAudio = null;
-            }
+            const player = document.getElementById("global-player");
+            player.pause();
+            player.src = "";
             isAudioPlaying = false;
 
             if (recognition) {
@@ -449,7 +454,7 @@
             document.getElementById("call-screen").style.display = "none";
 
             if (sendSignal && socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type: "call_ended" }));
+                socket.send(JSON.stringify({ sender: myId, type: "call_ended" }));
             }
         }
 
