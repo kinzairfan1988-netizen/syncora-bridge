@@ -5,7 +5,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response, FileResponse
 import edge_tts
 
-app = FastAPI(title="Syncora Clean Signal Hub")
+app = FastAPI(title="Syncora Signal Hub")
 
 class RoomHub:
     def __init__(self):
@@ -28,6 +28,7 @@ class RoomHub:
         if room_id in self.rooms:
             dead_sockets = []
             for client in self.rooms[room_id]:
+                # SENDER KO APNA HI MESSAGE KABHI WAPAS NA BHEJEIN
                 if client != sender:
                     try:
                         await client.send_text(json.dumps(payload))
@@ -40,16 +41,18 @@ hub = RoomHub()
 
 @app.get("/tts")
 async def text_to_speech(text: str):
-    if not text.strip():
+    clean_text = text.strip()
+    if not clean_text:
         return Response(content=b"", media_type="audio/mpeg")
     try:
-        communicate = edge_tts.Communicate(text=text, voice="ur-PK-AsadNeural")
+        communicate = edge_tts.Communicate(text=clean_text, voice="ur-PK-AsadNeural")
         mp3_bytes = b""
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
                 mp3_bytes += chunk["data"]
         return Response(content=mp3_bytes, media_type="audio/mpeg")
-    except Exception:
+    except Exception as e:
+        print(f"[TTS Error]: {e}")
         return Response(content=b"", media_type="audio/mpeg")
 
 @app.websocket("/ws/{room_id}")
@@ -59,6 +62,7 @@ async def socket_endpoint(websocket: WebSocket, room_id: str):
         while True:
             raw = await websocket.receive_text()
             data = json.loads(raw)
+            # Sirf doosre users ko relay karein, bolne wale ko nahi
             await hub.broadcast(room_id, websocket, data)
     except WebSocketDisconnect:
         hub.disconnect(room_id, websocket)
