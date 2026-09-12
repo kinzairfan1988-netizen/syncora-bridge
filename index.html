@@ -211,15 +211,30 @@
             border-color: rgba(245, 158, 11, 0.4);
         }
 
+        /* MULTI-LANGUAGE BAR IN CHAT */
         .chat-translate-toggle-bar {
-            padding: 6px 16px; background: rgba(245, 158, 11, 0.05);
-            border-bottom: 1px solid var(--border-subtle); display: flex;
-            align-items: center; justify-content: space-between; font-size: 11px;
+            padding: 8px 14px;
+            background: rgba(245, 158, 11, 0.05);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            gap: 6px;
         }
-        .toggle-switch-label {
-            display: flex; align-items: center; gap: 6px; color: var(--accent-amber);
-            font-weight: 600; cursor: pointer;
+
+        .lang-dropdown-pill {
+            background: var(--surface-card);
+            border: 1px solid var(--border-graphite);
+            color: var(--accent-amber);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 6px;
+            border-radius: 8px;
+            outline: none;
+            cursor: pointer;
         }
+        .lang-dropdown-pill option { background: #18181b; color: #fff; }
 
         .chat-messages-area {
             flex: 1; padding: 16px; overflow-y: auto;
@@ -301,18 +316,20 @@
         /* 4. ACTIVE CALL OVERLAY */
         .call-screen-overlay {
             position: absolute; inset: 0; background: var(--bg-obsidian); z-index: 100;
-            display: none; flex-direction: column; justify-content: space-between; padding: 30px 24px;
+            display: none; flex-direction: column; justify-content: space-between; padding: 24px 20px;
         }
         .call-header { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 
-        .call-mode-pill {
-            font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px;
-            background: var(--surface-card); border: 1px solid var(--border-graphite);
+        .call-lang-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--surface-card);
+            border: 1px solid var(--border-graphite);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
             color: var(--text-muted);
-        }
-        .call-mode-pill.live-ai {
-            background: var(--accent-amber-dim); border-color: rgba(245, 158, 11, 0.3);
-            color: var(--accent-amber);
         }
 
         .caller-title { font-size: 22px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
@@ -410,13 +427,12 @@
             <button class="fab-add" onclick="openAddModal()" title="Add New Contact">＋</button>
         </div>
 
-        <!-- 2. DIRECT CHAT VIEW (FOR BOTH HOST & GUEST) -->
+        <!-- 2. DIRECT CHAT VIEW -->
         <div class="view-chat-screen" id="view-chat-screen">
             <header class="chat-top-header">
                 <div class="chat-contact-meta">
                     <button class="btn-back-arrow" id="chat-back-btn" onclick="closeContactChat()">←</button>
-                    <!-- Tapping this avatar also allows Guest to set their DP -->
-                    <div class="avatar-box" id="chat-header-avatar" style="width: 40px; height: 40px; font-size: 14px;" onclick="openProfileModal()" title="Tap to update your Profile/DP">AF</div>
+                    <div class="avatar-box" id="chat-header-avatar" style="width: 40px; height: 40px; font-size: 14px;" onclick="openProfileModal()" title="Tap to update Profile/DP">AF</div>
                     <div>
                         <div style="font-size: 14px; font-weight: 700;" id="chat-header-title">Contact</div>
                         <div style="font-size: 11px; color: var(--online-green);">Direct Line Active</div>
@@ -429,12 +445,39 @@
                 </div>
             </header>
 
+            <!-- MULTI-LANGUAGE CONTROLS IN CHAT -->
             <div class="chat-translate-toggle-bar">
-                <span>Auto-Translate Chat (Urdu ⇄ English)</span>
-                <label class="toggle-switch-label">
-                    <input type="checkbox" id="chat-translate-toggle" checked>
-                    <span>Active</span>
-                </label>
+                <span>Translate:</span>
+                <select class="lang-dropdown-pill" id="chat-source-lang">
+                    <option value="ur">Urdu (اردو)</option>
+                    <option value="en">English (US)</option>
+                    <option value="de">German (Deutsch)</option>
+                    <option value="fr">French (Français)</option>
+                    <option value="es">Spanish (Español)</option>
+                    <option value="it">Italian (Italiano)</option>
+                    <option value="ru">Russian (Русский)</option>
+                    <option value="pt">Portuguese (Português)</option>
+                    <option value="ms">Malay (Bahasa Melayu)</option>
+                    <option value="ar">Arabic (العربية)</option>
+                    <option value="tr">Turkish (Türkçe)</option>
+                    <option value="zh">Chinese (中文)</option>
+                </select>
+                <span>➔</span>
+                <select class="lang-dropdown-pill" id="chat-target-lang">
+                    <option value="en">English (US)</option>
+                    <option value="ur">Urdu (اردو)</option>
+                    <option value="de">German (Deutsch)</option>
+                    <option value="fr">French (Français)</option>
+                    <option value="es">Spanish (Español)</option>
+                    <option value="it">Italian (Italiano)</option>
+                    <option value="ru">Russian (Русский)</option>
+                    <option value="pt">Portuguese (Português)</option>
+                    <option value="ms">Malay (Bahasa Melayu)</option>
+                    <option value="ar">Arabic (العربية)</option>
+                    <option value="tr">Turkish (Türkçe)</option>
+                    <option value="zh">Chinese (中文)</option>
+                </select>
+                <input type="checkbox" id="chat-translate-toggle" checked title="Enable Auto-Translate">
             </div>
 
             <div class="chat-messages-area" id="chat-msgs-box"></div>
@@ -461,7 +504,40 @@
         <!-- 4. ACTIVE CALL OVERLAY -->
         <section class="call-screen-overlay" id="call-screen">
             <div class="call-header">
-                <div class="call-mode-pill" id="call-mode-badge">Direct Voice Line</div>
+                <!-- MULTI-LANGUAGE SELECTOR IN CALL -->
+                <div class="call-lang-bar" id="call-lang-bar">
+                    <span>Speak:</span>
+                    <select class="lang-dropdown-pill" id="call-speak-lang" onchange="syncCallSpeechLang()">
+                        <option value="ur-PK">Urdu (اردو)</option>
+                        <option value="en-US">English (US)</option>
+                        <option value="de-DE">German (Deutsch)</option>
+                        <option value="fr-FR">French (Français)</option>
+                        <option value="es-ES">Spanish (Español)</option>
+                        <option value="it-IT">Italian (Italiano)</option>
+                        <option value="ru-RU">Russian (Русский)</option>
+                        <option value="pt-PT">Portuguese (Português)</option>
+                        <option value="ms-MY">Malay (Melayu)</option>
+                        <option value="ar-SA">Arabic (العربية)</option>
+                        <option value="tr-TR">Turkish (Türkçe)</option>
+                        <option value="zh-CN">Chinese (中文)</option>
+                    </select>
+                    <span>➔ Translate:</span>
+                    <select class="lang-dropdown-pill" id="call-target-lang">
+                        <option value="en">English (US)</option>
+                        <option value="ur">Urdu (اردو)</option>
+                        <option value="de">German (Deutsch)</option>
+                        <option value="fr">French (Français)</option>
+                        <option value="es">Spanish (Español)</option>
+                        <option value="it">Italian (Italiano)</option>
+                        <option value="ru">Russian (Русский)</option>
+                        <option value="pt">Portuguese (Português)</option>
+                        <option value="ms">Malay (Melayu)</option>
+                        <option value="ar">Arabic (العربية)</option>
+                        <option value="tr">Turkish (Türkçe)</option>
+                        <option value="zh">Chinese (中文)</option>
+                    </select>
+                </div>
+
                 <div class="caller-title" id="call-status-label">Partner</div>
                 <div class="call-duration" id="call-timer">00:00</div>
             </div>
@@ -491,7 +567,7 @@
                     <button class="modal-close" onclick="closeAddModal()">✕</button>
                 </div>
                 <div class="input-group">
-                    <input type="text" id="modal-name-input" class="input-field" placeholder="Contact Name (e.g. Ali Khan)">
+                    <input type="text" id="modal-name-input" class="input-field" placeholder="Contact Name (e.g. Hans Müller)">
                     <input type="tel" id="modal-phone-input" class="input-field" placeholder="Mobile Number (e.g. 03001234567)">
                 </div>
                 <button class="btn-modal-save" onclick="saveContactFromModal()">Save Contact</button>
@@ -499,7 +575,7 @@
             </div>
         </div>
 
-        <!-- PROFILE & DP SETUP MODAL (FOR BOTH HOST & GUEST) -->
+        <!-- PROFILE & DP SETUP MODAL -->
         <div class="modal-backdrop" id="profile-modal">
             <div class="modal-card">
                 <div class="modal-header">
@@ -534,7 +610,6 @@
         let activeContact = contacts[0] || { name: "Partner", phone: "03000000000" };
         let currentRoom = urlParams.get('room') || ('room-' + activeContact.phone.replace(/[^0-9]/g, ''));
 
-        // Partner's live received DP & Name
         let partnerLivePhoto = "";
         let partnerLiveName = isGuest ? (hostNameParam || "Host Partner") : activeContact.name;
 
@@ -731,7 +806,6 @@
             socket.binaryType = "arraybuffer";
 
             socket.onopen = () => {
-                // Announce identity to partner upon joining
                 broadcastIdentity();
             };
 
@@ -802,14 +876,15 @@
             const isAutoTranslate = document.getElementById("chat-translate-toggle").checked;
             if (isAutoTranslate) {
                 try {
-                    const isUrdu = /[\u0600-\u06FF]/.test(text);
+                    const src = document.getElementById("chat-source-lang").value;
+                    const tgt = document.getElementById("chat-target-lang").value;
                     const res = await fetch("/translate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             text: text,
-                            source_lang: isUrdu ? "ur" : "en",
-                            target_lang: isUrdu ? "en" : "ur"
+                            source_lang: src,
+                            target_lang: tgt
                         })
                     });
                     const data = await res.json();
@@ -881,17 +956,28 @@
         }
 
         function setupActiveCallUI() {
-            const badge = document.getElementById("call-mode-badge");
+            const langBar = document.getElementById("call-lang-bar");
             const subBox = document.getElementById("call-subtitle-box");
             if (isTranslationCall) {
-                badge.className = "call-mode-pill live-ai";
-                badge.innerText = "🌐 AI Live Translation Mode";
+                langBar.style.display = "flex";
                 subBox.style.display = "flex";
-                document.getElementById("sub-translated").innerText = "Speak in Urdu or English...";
+                document.getElementById("sub-translated").innerText = "AI Live Translation Active";
             } else {
-                badge.className = "call-mode-pill";
-                badge.innerText = "🔒 Clear Voice Line Active";
+                langBar.style.display = "none";
                 subBox.style.display = "none";
+            }
+        }
+
+        function syncCallSpeechLang() {
+            const lang = document.getElementById("call-speak-lang").value;
+            if (speechRecognition) {
+                speechRecognition.lang = lang;
+                if (isCallActive && isTranslationCall) {
+                    try {
+                        speechRecognition.stop();
+                        setTimeout(() => { speechRecognition.start(); }, 200);
+                    } catch (e) {}
+                }
             }
         }
 
@@ -902,7 +988,7 @@
             speechRecognition = new SpeechRec();
             speechRecognition.continuous = true;
             speechRecognition.interimResults = false;
-            speechRecognition.lang = "ur-PK";
+            speechRecognition.lang = document.getElementById("call-speak-lang") ? document.getElementById("call-speak-lang").value : "ur-PK";
 
             speechRecognition.onresult = async (event) => {
                 if (!isCallActive || !isTranslationCall || isMuted) return;
@@ -913,15 +999,17 @@
                     document.getElementById("sub-original").innerText = `You: "${originalText}"`;
                     document.getElementById("sub-translated").innerText = "Translating...";
 
-                    const isUrdu = /[\u0600-\u06FF]/.test(originalText);
+                    const src = document.getElementById("call-speak-lang").value.split("-")[0];
+                    const tgt = document.getElementById("call-target-lang").value;
+
                     try {
                         const res = await fetch("/translate", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
                                 text: originalText,
-                                source_lang: isUrdu ? "ur" : "en",
-                                target_lang: isUrdu ? "en" : "ur"
+                                source_lang: src,
+                                target_lang: tgt
                             })
                         });
                         const data = await res.json();
@@ -948,7 +1036,10 @@
 
         function startSpeechEngine() {
             if (speechRecognition && isCallActive) {
-                try { speechRecognition.start(); } catch (e) {}
+                try {
+                    speechRecognition.lang = document.getElementById("call-speak-lang").value;
+                    speechRecognition.start();
+                } catch (e) {}
             }
         }
 
