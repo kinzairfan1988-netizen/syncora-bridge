@@ -55,7 +55,7 @@ manager = RoomManager()
 
 @app.get("/tts")
 async def text_to_speech(text: str, lang: str = "en", gender: str = "female"):
-    if not text.strip():
+    if not text.strip() or text.startswith("[Error:"):
         return Response(content=b"", media_type="audio/mpeg")
     
     prefix = (lang or "en").split("-")[0].lower()
@@ -79,11 +79,11 @@ async def text_to_speech(text: str, lang: str = "en", gender: str = "female"):
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
 async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
-    raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
+    raw_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
 
     if not clean_key:
-        return "[Error: GROQ_API_KEY is missing on Railway]"
+        return "[Error: GEMINI_API_KEY is missing on Railway]"
 
     src_prefix = src_code.split("-")[0].lower()
     tgt_prefix = tgt_code.split("-")[0].lower()
@@ -91,36 +91,37 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
     target_lang = LANG_MAP.get(tgt_prefix, "English")
     source_lang = LANG_MAP.get(src_prefix, "Urdu")
 
-    client = AsyncOpenAI(
-        base_url="https://api.groq.com/openai/v1",
+    # High-speed Google Gemini OpenAI-compatible engine
+    gemini_client = AsyncOpenAI(
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
         api_key=clean_key
     )
 
-    models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+    try:
+        response = await gemini_client.chat.completions.create(
+            model="gemini-2.5-flash",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        f"You are a direct verbal interpreter. Translate spoken text from {source_lang} to {target_lang}. "
+                        f"Output ONLY the translated sentence in {target_lang}. "
+                        f"Never output notes, reasoning, or quotes. Never use Arabic unless target is Arabic."
+                    )
+                },
+                {"role": "user", "content": text}
+            ],
+            temperature=0.1,
+            max_tokens=100
+        )
+        out = response.choices[0].message.content
+        if out and out.strip():
+            clean = re.sub(r'^(Translation:|Output:|"|\')', "", out.strip(), flags=re.IGNORECASE).strip().strip('"')
+            return clean
+    except Exception as e:
+        return f"[Error: {str(e)}]"
 
-    for model_name in models_to_try:
-        try:
-            response = await client.chat.completions.create(
-                model=model_name,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": f"You are a translator. Translate the text from {source_lang} into {target_lang}. Output ONLY the direct translation in {target_lang}. Do not explain or add notes."
-                    },
-                    {"role": "user", "content": text}
-                ],
-                temperature=0.1,
-                max_tokens=100
-            )
-            out = response.choices[0].message.content
-            if out and out.strip():
-                clean = re.sub(r'^(Translation:|Output:|"|\')', "", out.strip(), flags=re.IGNORECASE).strip().strip('"')
-                return clean
-        except Exception as err:
-            last_err = str(err)
-            continue
-
-    return f"[Error: {last_err}]"
+    return text
 
 @app.websocket("/ws/{room_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str):
