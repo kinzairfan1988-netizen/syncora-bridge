@@ -185,11 +185,6 @@
         }
         .btn-start { background: linear-gradient(135deg, #22c55e, #16a34a); }
         .btn-end { background: linear-gradient(135deg, #ef4444, #dc2626); display: none; }
-        .btn-mic-toggle {
-            background: var(--surface-elevated); border: 1px solid var(--border-subtle);
-            color: var(--text-main); border-radius: 50px; padding: 10px 16px;
-            font-size: 13px; font-weight: 500; cursor: pointer; display: none;
-        }
     </style>
 </head>
 <body>
@@ -200,7 +195,7 @@
             <div class="brand-title">Syncora Workspace</div>
             <div class="status-pill">
                 <span class="dot-indicator" id="status-dot"></span>
-                <span id="call-status">Ready</span>
+                <span id="call-status">Connecting...</span>
             </div>
         </div>
 
@@ -266,7 +261,7 @@
             <div class="panel-header">Interpretation Feed</div>
             <div class="transcript-feed" id="captions">
                 <div id="placeholder-msg" style="text-align: center; color: var(--text-muted); font-size: 12px; margin: auto;">
-                    Tap "Start Call" below to begin.
+                    Tap "Start Call" below to begin live interpretation.
                 </div>
             </div>
         </aside>
@@ -274,7 +269,6 @@
 
     <footer class="bottom-call-dock">
         <button class="dock-btn btn-start" id="start-call-btn" onclick="startCall()">📞 Start Call</button>
-        <button class="btn-mic-toggle" id="mute-toggle-btn" onclick="toggleMute()">🎙️ Mic: ON</button>
         <button class="dock-btn btn-end" id="end-call-btn" onclick="endCall()">🛑 End Call</button>
     </footer>
 
@@ -290,7 +284,6 @@
         let socket = null;
         let recognition = null;
         let isCallActive = false;
-        let isMuted = false;
 
         const audioQueue = [];
         let isPlayingAudio = false;
@@ -313,18 +306,15 @@
         function syncLanguages() {
             const myLangSelect = document.getElementById("my-lang");
             const tgtLangSelect = document.getElementById("target-lang");
-            
             document.getElementById("local-lang-label").innerText = myLangSelect.options[myLangSelect.selectedIndex].text;
             document.getElementById("remote-lang-label").innerText = tgtLangSelect.options[tgtLangSelect.selectedIndex].text;
-
-            if (recognition && isCallActive) {
-                restartMicDirectly();
-            }
         }
 
         function initSocket() {
             const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-            socket = new WebSocket(`${wsProtocol}${window.location.host}/ws/${roomId}`);
+            const wsUrl = `${wsProtocol}${window.location.host}/ws/${roomId}`;
+            
+            socket = new WebSocket(wsUrl);
 
             socket.onopen = () => {
                 document.getElementById("status-dot").classList.add("live");
@@ -332,7 +322,6 @@
             };
 
             socket.onmessage = (event) => {
-                if (!isCallActive) return;
                 const data = JSON.parse(event.data);
                 const isMe = (data.sender_id === myClientId);
 
@@ -347,7 +336,12 @@
             socket.onclose = () => {
                 document.getElementById("status-dot").classList.remove("live");
                 document.getElementById("call-status").innerText = "Disconnected";
-                if (isCallActive) setTimeout(initSocket, 2000);
+                setTimeout(initSocket, 1500);
+            };
+
+            socket.onerror = () => {
+                document.getElementById("status-dot").classList.remove("live");
+                document.getElementById("call-status").innerText = "Disconnected";
             };
         }
 
@@ -392,10 +386,8 @@
                     processAudioQueue();
                 } else {
                     setTimeout(() => {
-                        if (isCallActive && !isMuted) {
-                            restartMicDirectly();
-                        }
-                    }, 350);
+                        if (isCallActive) startListening();
+                    }, 300);
                 }
             };
 
@@ -404,8 +396,8 @@
             audio.play().catch(finishAudio);
         }
 
-        function restartMicDirectly() {
-            if (!recognition || !isCallActive || isPlayingAudio || isMuted) return;
+        function startListening() {
+            if (!recognition || !isCallActive || isPlayingAudio) return;
             try {
                 recognition.abort();
             } catch(e) {}
@@ -417,26 +409,23 @@
 
         function setupSpeechRecognition() {
             if (!SpeechRecognition) {
-                alert("Please open this link in Chrome or Edge browser.");
+                alert("Please use Chrome or Edge browser.");
                 return;
             }
 
             recognition = new SpeechRecognition();
-            recognition.continuous = false; // False is 10x more stable on mobile Chrome
+            recognition.continuous = false;
             recognition.interimResults = false;
 
             recognition.onstart = () => {
                 document.getElementById("local-tile").classList.add("speaking");
-                document.getElementById("call-status").innerText = "Listening...";
             };
 
             recognition.onresult = (event) => {
-                if (!isCallActive || isPlayingAudio || isMuted) return;
+                if (!isCallActive || isPlayingAudio) return;
 
                 const transcript = event.results[0][0].transcript.trim();
                 if (!transcript) return;
-
-                document.getElementById("call-status").innerText = "Translating...";
 
                 const myLangVal = document.getElementById("my-lang").value;
                 const targetLangVal = document.getElementById("target-lang").value;
@@ -453,36 +442,25 @@
                 }
             };
 
-            recognition.onerror = (event) => {
-                if (event.error === 'not-allowed') {
-                    alert("Microphone permission blocked. Please enable mic in site settings.");
-                }
-            };
-
             recognition.onend = () => {
                 document.getElementById("local-tile").classList.remove("speaking");
-                document.getElementById("call-status").innerText = "Connected";
-                // Instant auto restart on sentence completion
-                if (isCallActive && !isPlayingAudio && !isMuted) {
-                    setTimeout(restartMicDirectly, 200);
+                if (isCallActive && !isPlayingAudio) {
+                    setTimeout(startListening, 200);
                 }
             };
         }
 
         function startCall() {
             isCallActive = true;
-            isMuted = false;
-
             document.getElementById("start-call-btn").style.display = "none";
             document.getElementById("end-call-btn").style.display = "flex";
-            document.getElementById("mute-toggle-btn").style.display = "flex";
 
+            // Audio unlock
             const unlock = new Audio();
             unlock.play().catch(() => {});
 
-            initSocket();
             setupSpeechRecognition();
-            restartMicDirectly();
+            startListening();
         }
 
         function endCall() {
@@ -492,30 +470,15 @@
 
             document.getElementById("start-call-btn").style.display = "flex";
             document.getElementById("end-call-btn").style.display = "none";
-            document.getElementById("mute-toggle-btn").style.display = "none";
 
             if (recognition) try { recognition.abort(); } catch(e) {}
-            if (socket) socket.close();
 
             document.getElementById("local-tile").classList.remove("speaking");
             document.getElementById("remote-tile").classList.remove("speaking");
-            document.getElementById("status-dot").classList.remove("live");
-            document.getElementById("call-status").innerText = "Ended";
-        }
-
-        function toggleMute() {
-            isMuted = !isMuted;
-            const btn = document.getElementById("mute-toggle-btn");
-            if (isMuted) {
-                btn.innerText = "🔇 Muted";
-                if (recognition) try { recognition.abort(); } catch(e) {}
-            } else {
-                btn.innerText = "🎙️ Mic: ON";
-                restartMicDirectly();
-            }
         }
 
         window.onload = () => {
+            initSocket();
             syncLanguages();
             updateNames();
         };
