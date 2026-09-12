@@ -55,7 +55,7 @@
             .app-viewport { max-height: 100vh; border: none; }
         }
 
-        /* 1. DIRECTORY SCREEN (STRICTLY FOR HOST ONLY) */
+        /* 1. DIRECTORY SCREEN (FOR HOST ONLY) */
         .view-directory {
             flex: 1;
             display: flex;
@@ -88,11 +88,12 @@
             flex-shrink: 0;
         }
 
-        .btn-add-contact {
+        .header-actions { display: flex; align-items: center; gap: 6px; }
+        .btn-header-action {
             background: var(--accent-amber-dim);
             border: 1px solid rgba(245, 158, 11, 0.3);
             color: var(--accent-amber);
-            padding: 6px 12px;
+            padding: 6px 11px;
             border-radius: 10px;
             font-size: 12px;
             font-weight: 700;
@@ -173,7 +174,7 @@
             z-index: 20;
         }
 
-        /* 2. DIRECT BLANK CHAT VIEW (LANDING FOR GUEST) */
+        /* 2. DIRECT CHAT VIEW */
         .view-chat-screen {
             display: none;
             flex: 1;
@@ -422,6 +423,7 @@
             background: var(--accent-amber); color: #000; font-weight: 700;
             border: none; border-radius: 12px; padding: 12px; font-size: 14px; cursor: pointer;
         }
+
         .btn-modal-wa {
             background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4);
             color: var(--online-green); padding: 11px; border-radius: 12px;
@@ -433,18 +435,21 @@
 
     <div class="app-viewport">
         
-        <!-- 1. DIRECTORY SCREEN (FOR HOST ONLY) -->
+        <!-- 1. DIRECTORY SCREEN (STRICTLY FOR HOST ONLY) -->
         <div class="view-directory" id="view-dir">
             <header class="top-navbar">
                 <div class="brand-cluster">
                     <div class="my-profile-badge" id="my-profile-avatar-btn" onclick="openProfileModal()" title="Edit My Profile & DP">U</div>
                     <div class="brand-title">Syncora <span>Terminal</span></div>
                 </div>
-                <button class="btn-add-contact" onclick="openAddModal()">＋ Add Contact</button>
+                <div class="header-actions">
+                    <button class="btn-header-action" onclick="copyMyPersonalDirectLink()" id="main-copy-btn">📋 My Link</button>
+                    <button class="btn-add-contact" onclick="openAddModal()">＋ Add</button>
+                </div>
             </header>
 
             <main class="directory-container" id="contact-list-container">
-                <div class="section-label">Contacts Directory</div>
+                <div class="section-label">Saved Contacts</div>
             </main>
 
             <button class="fab-add" onclick="openAddModal()" title="Add New Contact">＋</button>
@@ -466,7 +471,7 @@
                     <button class="chat-header-btn" onclick="initiateCall('voice')" title="Voice Call">📞</button>
                     <button class="chat-header-btn video-call" onclick="initiateCall('video')" title="Video Call">📹</button>
                     <button class="chat-header-btn translate-call" onclick="initiateCall('translate')" title="AI Live Translate">🌐</button>
-                    <button class="chat-header-btn share-link-btn" onclick="copyGuestInviteLink()" id="copy-btn" title="Copy Invite Link">📋 Link</button>
+                    <button class="chat-header-btn share-link-btn" onclick="copyMyPersonalDirectLink()" id="chat-copy-btn" title="Copy My Direct Link">📋 Link</button>
                 </div>
             </header>
 
@@ -603,7 +608,6 @@
                     <input type="tel" id="modal-phone-input" class="input-field" placeholder="Mobile Number (e.g. 03001234567)">
                 </div>
                 <button class="btn-modal-save" onclick="saveContactFromModal()">Save Contact</button>
-                <button class="btn-modal-wa" onclick="openDirectWhatsAppFromModal()">💬 Send Invite on WhatsApp</button>
             </div>
         </div>
 
@@ -633,20 +637,27 @@
         const hostNameParam = urlParams.get('host_name') ? decodeURIComponent(urlParams.get('host_name')) : null;
         const hostPhotoParam = urlParams.get('host_photo') ? decodeURIComponent(urlParams.get('host_photo')) : "";
 
-        let myName = localStorage.getItem("syncora_my_name") || (isGuest ? "Guest Partner" : "Muhammad");
+        let myName = localStorage.getItem("syncora_my_name") || (isGuest ? "Guest" : "Muhammad");
         let myPhoto = localStorage.getItem("syncora_my_photo") || "";
 
-        // Contacts list strictly for Host; Guest will never have access to this list
+        // YOUR PERMANENT PERSONAL ROOM (Host Room Isolation)
+        let myPersonalRoomId = localStorage.getItem("syncora_personal_room");
+        if (!myPersonalRoomId) {
+            myPersonalRoomId = "direct-" + Math.random().toString(36).substring(2, 9);
+            localStorage.setItem("syncora_personal_room", myPersonalRoomId);
+        }
+
+        // Active room selection
+        let currentRoom = isGuest ? (urlParams.get('room') || myPersonalRoomId) : myPersonalRoomId;
+
+        // Contacts list: Strictly stored locally for Host only
         let contacts = [];
         if (!isGuest) {
             contacts = JSON.parse(localStorage.getItem("syncora_contacts_list") || "[]");
         }
 
-        let activeContact = contacts.length > 0 ? contacts[0] : { name: "Direct Partner", phone: "03000000000" };
-        let currentRoom = urlParams.get('room') || ('room-' + (isGuest ? 'direct' : activeContact.phone.replace(/[^0-9]/g, '')));
-
         let partnerLivePhoto = isGuest ? hostPhotoParam : "";
-        let partnerLiveName = isGuest ? (hostNameParam || "Host Partner") : activeContact.name;
+        let partnerLiveName = isGuest ? (hostNameParam || "Direct Line") : "Direct Line";
 
         const myId = "usr-" + Math.random().toString(36).substring(2, 8);
         let socket = null;
@@ -685,13 +696,13 @@
         }
 
         function renderContactList() {
-            if (isGuest) return; // Prevent rendering contacts for guests completely
+            if (isGuest) return; // Guests never have contacts directory
 
             const container = document.getElementById("contact-list-container");
             container.innerHTML = '<div class="section-label">Contacts Directory</div>';
 
             if (contacts.length === 0) {
-                container.innerHTML += '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No contacts saved yet.<br>Tap <b>＋ Add Contact</b> below.</div>';
+                container.innerHTML += '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No contacts saved yet.<br>Tap <b>＋ Add</b> to add someone.</div>';
                 return;
             }
 
@@ -723,21 +734,20 @@
         }
 
         function selectContact(index) {
-            activeContact = contacts[index];
-            partnerLiveName = activeContact.name;
+            const c = contacts[index];
+            partnerLiveName = c.name;
             partnerLivePhoto = "";
-            currentRoom = 'room-' + activeContact.phone.replace(/[^0-9]/g, '');
             openContactChat();
         }
 
         function updateUI() {
             applyAvatar(document.getElementById("my-profile-avatar-btn"), myName, myPhoto);
 
-            // GUEST VIEW LOCK: LAND DIRECTLY ON BLANK CHAT SCREEN WITH NO BACK BUTTON
+            // GUEST VIEW LOCK: LAND DIRECTLY ON SECURE BLANK CHAT PAGE
             if (isGuest) {
                 document.getElementById("view-dir").style.display = "none";
                 document.getElementById("view-chat-screen").style.display = "flex";
-                document.getElementById("chat-back-btn").style.display = "none";
+                document.getElementById("chat-back-btn").style.display = "none"; // Hide back button for guest
             }
 
             document.getElementById("chat-header-title").innerText = partnerLiveName;
@@ -811,52 +821,38 @@
             document.getElementById("view-dir").style.display = "none";
             document.getElementById("view-chat-screen").style.display = "flex";
             updateUI();
-            if (socket) socket.close();
-            initSocket();
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                initSocket();
+            }
             fetchOfflineHistory();
         }
 
         function closeContactChat() {
-            if (isGuest) return; // Guests can never exit to contact directory
+            if (isGuest) return;
             document.getElementById("view-chat-screen").style.display = "none";
             document.getElementById("view-dir").style.display = "flex";
         }
 
-        // GENERATE SECURE GUEST LINK
-        function generateGuestShareUrl() {
+        // YOUR SECURE PERSONAL CHAT LINK GENERATOR
+        function copyMyPersonalDirectLink() {
             const origin = window.location.origin;
             const path = window.location.pathname;
             const params = new URLSearchParams();
-            params.set("room", currentRoom);
+            params.set("room", myPersonalRoomId);
             params.set("role", "guest");
             params.set("host_name", myName);
-            if (myPhoto && myPhoto.startsWith("http")) {
-                params.set("host_photo", myPhoto);
-            }
-            return `${origin}${path}?${params.toString()}`;
-        }
 
-        function copyGuestInviteLink() {
-            const shareUrl = generateGuestShareUrl();
-            navigator.clipboard.writeText(shareUrl).then(() => {
-                const btn = document.getElementById("copy-btn");
-                btn.innerText = "✅ Done";
-                setTimeout(() => { btn.innerText = "📋 Link"; }, 1500);
+            const finalUrl = `${origin}${path}?${params.toString()}`;
+            navigator.clipboard.writeText(finalUrl).then(() => {
+                const b1 = document.getElementById("main-copy-btn");
+                const b2 = document.getElementById("chat-copy-btn");
+                if (b1) b1.innerText = "✅ Copied";
+                if (b2) b2.innerText = "✅ Done";
+                setTimeout(() => {
+                    if (b1) b1.innerText = "📋 My Link";
+                    if (b2) b2.innerText = "📋 Link";
+                }, 1500);
             });
-        }
-
-        function openDirectWhatsAppFromModal() {
-            const phoneInput = document.getElementById("modal-phone-input").value.trim().replace(/[^0-9]/g, '');
-            const nameInput = document.getElementById("modal-name-input").value.trim() || "Friend";
-            if (!phoneInput) return;
-
-            let num = phoneInput;
-            if (num.startsWith("03")) num = "92" + num.substring(1);
-
-            const shareUrl = generateGuestShareUrl();
-            const msg = encodeURIComponent(`Assalam o Alaikum ${nameInput}! Please join my secure direct line on Syncora: ${shareUrl}`);
-
-            window.location.href = `whatsapp://send?phone=${num}&text=${msg}`;
         }
 
         function initSocket() {
