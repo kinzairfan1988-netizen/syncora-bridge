@@ -1,5 +1,4 @@
 fastapi
-uvicorn
-httpx
+uvicorn[standard]
+websockets
 edge-tts
-openai
