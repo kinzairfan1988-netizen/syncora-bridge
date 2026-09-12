@@ -6,12 +6,11 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 import google.generativeai as genai
 
-# Setup Gemini Client
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 if GEMINI_KEY:
     genai.configure(api_key=GEMINI_KEY)
 
-app = FastAPI(title="Syncora Signal & Gemini Translation Hub")
+app = FastAPI(title="Syncora Unified Contact & Translation Hub")
 
 class TranslationPayload(BaseModel):
     text: str
@@ -55,6 +54,7 @@ class SystemHub:
             self.offline_messages[room_id].append({
                 "sender": payload.get("sender"),
                 "text": payload.get("text"),
+                "translated": payload.get("translated", ""),
                 "time": payload.get("time", "")
             })
 
@@ -73,7 +73,6 @@ hub = SystemHub()
 
 @app.post("/translate")
 async def translate_text(req: TranslationPayload):
-    """Fast Real-Time Translation via Google Gemini"""
     clean_text = req.text.strip()
     if not clean_text:
         return {"translated_text": ""}
@@ -84,8 +83,8 @@ async def translate_text(req: TranslationPayload):
     try:
         model = genai.GenerativeModel("gemini-1.5-flash")
         prompt = (
-            f"You are a real-time conversational translator. Translate this spoken text accurately "
-            f"from {req.source_lang} to {req.target_lang}. Return ONLY the direct translated sentence without any explanation, quotes or greetings:\n\n"
+            f"You are a real-time conversational translator. Translate this text accurately "
+            f"from {req.source_lang} to {req.target_lang}. Return ONLY the direct translation without explanation, quotes, or conversational filler:\n\n"
             f"{clean_text}"
         )
         response = model.generate_content(prompt)
