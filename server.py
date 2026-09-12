@@ -10,7 +10,7 @@ GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 if GEMINI_KEY:
     genai.configure(api_key=GEMINI_KEY)
 
-app = FastAPI(title="Syncora Unified Contact & Translation Hub")
+app = FastAPI(title="Syncora Multi-Language AI Terminal")
 
 class TranslationPayload(BaseModel):
     text: str
@@ -83,15 +83,16 @@ async def translate_text(req: TranslationPayload):
     try:
         model = genai.GenerativeModel("gemini-1.5-flash")
         prompt = (
-            f"You are a real-time conversational translator. Translate this text accurately "
-            f"from {req.source_lang} to {req.target_lang}. Return ONLY the direct translation without explanation, quotes, or conversational filler:\n\n"
+            f"You are a professional real-time conversational translator. Translate this spoken dialogue sentence "
+            f"directly from language code '{req.source_lang}' to language code '{req.target_lang}'. "
+            f"Keep the tone natural, colloquial, and accurate. Return ONLY the direct translation without any explanation, markdown, quotation marks, or meta notes:\n\n"
             f"{clean_text}"
         )
         response = model.generate_content(prompt)
         translated = response.text.strip() if response and response.text else clean_text
         return {"translated_text": translated}
     except Exception as e:
-        print(f"[Gemini Error]: {e}")
+        print(f"[Gemini Translation Error]: {e}")
         return {"translated_text": clean_text}
 
 @app.get("/messages/{room_id}")
