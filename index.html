@@ -78,13 +78,13 @@
         .dot-indicator { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
         .dot-indicator.live { background: var(--online-green); box-shadow: 0 0 6px var(--online-green); }
 
+        .nav-actions { display: flex; gap: 8px; }
         .icon-btn {
             background: var(--surface-card); border: 1px solid var(--border-graphite);
             color: var(--text-primary); padding: 6px 12px; border-radius: 10px;
             cursor: pointer; font-size: 12px; font-weight: 600;
         }
 
-        /* NAVIGATION TABS */
         .tab-segmented-bar {
             display: flex;
             padding: 10px 20px 0 20px;
@@ -112,7 +112,6 @@
             border-color: rgba(245, 158, 11, 0.3);
         }
 
-        /* SCREEN VIEWS */
         .content-view {
             flex: 1;
             display: flex;
@@ -129,12 +128,67 @@
             overflow-y: auto;
         }
 
+        /* DIAL NUMBER BAR */
+        .dial-bar-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border-graphite);
+            border-radius: 16px;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .dial-input-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .dial-input {
+            flex: 1;
+            background: var(--bg-obsidian);
+            border: 1px solid var(--border-graphite);
+            color: var(--text-primary);
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: 'Space Grotesk', sans-serif;
+            outline: none;
+        }
+        .dial-input:focus { border-color: var(--accent-amber); }
+
+        .btn-set-target {
+            background: var(--accent-amber);
+            color: #000;
+            font-weight: 700;
+            border: none;
+            border-radius: 10px;
+            padding: 0 16px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .quick-wa-btn {
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--online-green);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            display: block;
+        }
+
         .section-label {
             font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.8px;
             color: var(--text-muted);
+            margin-top: 6px;
         }
 
         .contact-card {
@@ -162,7 +216,7 @@
             display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer;
         }
 
-        /* FULL MAIN CHAT VIEW */
+        /* CHAT VIEW */
         .chat-view-container {
             display: none;
             flex: 1;
@@ -203,6 +257,13 @@
             color: var(--text-primary);
             border: 1px solid var(--border-graphite);
             border-bottom-left-radius: 4px;
+        }
+
+        .chat-time {
+            font-size: 10px;
+            opacity: 0.6;
+            margin-top: 4px;
+            text-align: right;
         }
 
         .chat-input-bar {
@@ -326,38 +387,20 @@
 
         /* IN-CALL SLIDE-UP CHAT DRAWER */
         .in-call-chat-drawer {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 60%;
-            background: rgba(18, 18, 21, 0.96);
-            backdrop-filter: blur(16px);
-            border-top: 1px solid var(--border-graphite);
-            border-radius: 24px 24px 0 0;
-            display: none;
-            flex-direction: column;
-            z-index: 150;
+            position: absolute; bottom: 0; left: 0; right: 0; height: 60%;
+            background: rgba(18, 18, 21, 0.96); backdrop-filter: blur(16px);
+            border-top: 1px solid var(--border-graphite); border-radius: 24px 24px 0 0;
+            display: none; flex-direction: column; z-index: 150;
             animation: slideDrawer 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
-
-        @keyframes slideDrawer {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-        }
+        @keyframes slideDrawer { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
         .drawer-header {
-            padding: 12px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border-subtle);
+            padding: 12px 20px; display: flex; justify-content: space-between;
+            align-items: center; border-bottom: 1px solid var(--border-subtle);
         }
         .drawer-header span { font-size: 14px; font-weight: 700; color: var(--accent-amber); }
-        .drawer-close-btn {
-            background: transparent; border: none; color: var(--text-muted);
-            font-size: 18px; cursor: pointer;
-        }
+        .drawer-close-btn { background: transparent; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -372,40 +415,50 @@
                     <span id="conn-status">Connecting</span>
                 </div>
             </div>
-            <button class="icon-btn" onclick="copyInviteLink()" id="copy-btn">📋 Share Link</button>
+            <div class="nav-actions">
+                <button class="icon-btn" onclick="copyInviteLink()" id="copy-btn">📋 Link</button>
+            </div>
         </header>
 
-        <!-- MAIN TABS -->
+        <!-- TABS -->
         <div class="tab-segmented-bar">
             <div class="tab-pill active" id="tab-call" onclick="switchView('call')">Voice Line</div>
             <div class="tab-pill" id="tab-chat" onclick="switchView('chat')">Chat Box</div>
         </div>
 
-        <!-- VIEW 1: DIRECTORY / CALL LAUNCH -->
+        <!-- VIEW 1: DIRECTORY / DIAL NUMBER -->
         <div class="content-view" id="view-call">
             <main class="directory-container">
-                <div class="section-label">Direct Voice Line</div>
+                <!-- DIAL NUMBER SECTION -->
+                <div class="dial-bar-card">
+                    <div style="font-size: 12px; font-weight: 700; color: var(--accent-amber);">DIRECT PHONE CALL / SMS LINE</div>
+                    <div class="dial-input-row">
+                        <input type="tel" id="target-phone" class="dial-input" placeholder="Enter Phone (e.g. 03001234567)">
+                        <button class="btn-set-target" onclick="switchTargetNumber()">Connect</button>
+                    </div>
+                    <a id="wa-invite-link" href="#" target="_blank" class="quick-wa-btn">💬 Send Invite Link on WhatsApp</a>
+                </div>
+
+                <div class="section-label">Active Connection Target</div>
 
                 <div class="contact-card">
                     <div class="user-identity">
-                        <div class="avatar-box">P2</div>
+                        <div class="avatar-box" id="active-avatar-initials">#</div>
                         <div class="user-meta">
-                            <div class="contact-name">Direct Voice Partner</div>
-                            <div class="contact-sub" id="room-sub">Room: Syncing...</div>
+                            <div class="contact-name" id="active-line-title">Direct Partner</div>
+                            <div class="contact-sub" id="room-sub">Line: Initializing...</div>
                         </div>
                     </div>
-                    <button class="call-trigger-btn" onclick="initiateCall()" title="Call">📞</button>
+                    <button class="call-trigger-btn" onclick="initiateCall()" title="Call Now">📞</button>
                 </div>
             </main>
         </div>
 
-        <!-- VIEW 2: FULL MAIN CHAT BOX -->
+        <!-- VIEW 2: FULL CHAT VIEW WITH PERSISTENT INBOX -->
         <div class="content-view chat-view-container" id="view-chat">
-            <div class="chat-messages-area" id="main-chat-msgs">
-                <div class="chat-bubble received">Encrypted Syncora Line connected. Send messages or start voice call anytime.</div>
-            </div>
+            <div class="chat-messages-area" id="main-chat-msgs"></div>
             <div class="chat-input-bar">
-                <input type="text" class="chat-input" id="main-chat-input" placeholder="Type a message..." onkeypress="handleEnter(event, 'main')">
+                <input type="text" class="chat-input" id="main-chat-input" placeholder="Leave a message for this number..." onkeypress="handleEnter(event, 'main')">
                 <button class="chat-send-btn" onclick="sendChatMessage('main')">➤</button>
             </div>
         </div>
@@ -413,9 +466,9 @@
         <!-- INCOMING CALL MODAL -->
         <div class="incoming-modal-backdrop" id="incoming-modal">
             <div class="incoming-dialog">
-                <div class="incoming-avatar">P2</div>
+                <div class="incoming-avatar" id="incoming-caller-avatar">📞</div>
                 <h3 style="font-size: 20px; margin-bottom: 6px;">Incoming Call...</h3>
-                <p style="font-size: 13px; color: var(--text-secondary);">Direct Voice Channel</p>
+                <p style="font-size: 13px; color: var(--text-secondary);" id="incoming-line-label">Direct Voice Channel</p>
                 <div class="incoming-actions">
                     <button class="btn-call-action btn-decline" onclick="declineCall()">Decline</button>
                     <button class="btn-call-action btn-accept" onclick="acceptCall()">Accept</button>
@@ -423,17 +476,17 @@
             </div>
         </div>
 
-        <!-- ACTIVE CALL SCREEN -->
+        <!-- ACTIVE CALL OVERLAY -->
         <section class="call-screen-overlay" id="call-screen">
             <div class="call-header">
-                <div class="security-badge">🔒 Live Audio Line Active</div>
+                <div class="security-badge">🔒 Direct Line Active</div>
                 <div class="caller-title" id="call-status-label">Direct Partner</div>
                 <div class="call-duration" id="call-timer">00:00</div>
             </div>
 
             <div class="call-stage-center">
                 <div class="pulse-wave-ring"></div>
-                <div class="caller-large-avatar">P2</div>
+                <div class="caller-large-avatar" id="active-call-avatar">#</div>
             </div>
 
             <div class="subtitles-box">
@@ -447,10 +500,10 @@
                 <button class="ctrl-btn-circle hangup" onclick="endCall(true)" title="End Call">🛑</button>
             </div>
 
-            <!-- IN-CALL SLIDE-UP CHAT DRAWER -->
+            <!-- IN-CALL CHAT DRAWER -->
             <div class="in-call-chat-drawer" id="call-drawer">
                 <div class="drawer-header">
-                    <span>Live Conversation & Subtitles</span>
+                    <span>Live In-Call Chat</span>
                     <button class="drawer-close-btn" onclick="toggleCallDrawer()">✕</button>
                 </div>
                 <div class="chat-messages-area" id="drawer-chat-msgs"></div>
@@ -464,11 +517,12 @@
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        let roomId = urlParams.get('room') || ('call-' + Math.random().toString(36).substring(2, 7));
-        if (!urlParams.get('room')) {
-            window.history.replaceState(null, '', window.location.pathname + '?room=' + roomId);
+        let phoneParam = urlParams.get('phone');
+        let currentRoom = phoneParam ? ('num-' + phoneParam.replace(/[^0-9]/g, '')) : (urlParams.get('room') || ('call-' + Math.random().toString(36).substring(2, 7)));
+
+        if (!phoneParam && !urlParams.get('room')) {
+            window.history.replaceState(null, '', window.location.pathname + '?room=' + currentRoom);
         }
-        document.getElementById("room-sub").innerText = `Room: ${roomId}`;
 
         const myId = "usr-" + Math.random().toString(36).substring(2, 8);
         let socket = null;
@@ -484,11 +538,37 @@
         let ringInterval = null;
         let gainNode = null;
 
+        function updateUIForCurrentRoom() {
+            document.getElementById("room-sub").innerText = `Target Line: ${currentRoom}`;
+            const targetPhoneInput = document.getElementById("target-phone");
+            if (phoneParam) {
+                targetPhoneInput.value = phoneParam;
+                document.getElementById("active-line-title").innerText = `Phone: ${phoneParam}`;
+                document.getElementById("active-avatar-initials").innerText = phoneParam.slice(-2);
+                document.getElementById("active-call-avatar").innerText = phoneParam.slice(-2);
+            } else {
+                document.getElementById("active-avatar-initials").innerText = "P2";
+                document.getElementById("active-call-avatar").innerText = "P2";
+            }
+
+            // Setup WhatsApp invite link
+            const shareUrl = window.location.origin + window.location.pathname + `?phone=${encodeURIComponent(targetPhoneInput.value || 'partner')}`;
+            const waText = encodeURIComponent(`Assalam o Alaikum! Please click this secure link to join my direct voice call and message line on Syncora: ${shareUrl}`);
+            document.getElementById("wa-invite-link").href = `https://api.whatsapp.com/send?phone=${encodeURIComponent(targetPhoneInput.value)}&text=${waText}`;
+        }
+
+        function switchTargetNumber() {
+            const num = document.getElementById("target-phone").value.trim();
+            if (!num) return;
+            const cleanNum = num.replace(/[^0-9]/g, '');
+            window.location.href = `${window.location.pathname}?phone=${cleanNum}`;
+        }
+
         function copyInviteLink() {
             navigator.clipboard.writeText(window.location.href).then(() => {
                 const btn = document.getElementById("copy-btn");
                 btn.innerText = "✅ Done";
-                setTimeout(() => { btn.innerText = "📋 Share Link"; }, 1500);
+                setTimeout(() => { btn.innerText = "📋 Link"; }, 1500);
             });
         }
 
@@ -499,59 +579,59 @@
             document.getElementById("view-chat").style.display = (view === 'chat') ? 'flex' : 'none';
         }
 
-        // --- RINGTONE & VIBRATION ALERT SYSTEM ---
+        // --- FETCH SAVED OFFLINE MESSAGES ---
+        async function fetchOfflineHistory() {
+            try {
+                const res = await fetch(`/messages/${currentRoom}`);
+                const data = await res.json();
+                if (data.messages && data.messages.length > 0) {
+                    data.messages.forEach(msg => {
+                        const type = (msg.sender === myId) ? 'sent' : 'received';
+                        appendChatMessage(msg.text, type, msg.time);
+                    });
+                }
+            } catch (e) {
+                console.log("No previous messages:", e);
+            }
+        }
+
+        // --- RINGTONE & VIBRATION ---
         function startIncomingRingtone() {
             stopIncomingRingtone();
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             const ringCtx = new AudioCtx();
 
             function playBeep() {
-                if (!document.getElementById("incoming-modal").style.display || document.getElementById("incoming-modal").style.display === "none") {
-                    return;
-                }
+                if (!document.getElementById("incoming-modal").style.display || document.getElementById("incoming-modal").style.display === "none") return;
                 const osc1 = ringCtx.createOscillator();
                 const osc2 = ringCtx.createOscillator();
                 const gain = ringCtx.createGain();
 
-                osc1.type = "sine";
-                osc2.type = "sine";
+                osc1.type = "sine"; osc2.type = "sine";
                 osc1.frequency.setValueAtTime(440, ringCtx.currentTime);
                 osc2.frequency.setValueAtTime(480, ringCtx.currentTime);
 
                 gain.gain.setValueAtTime(0.3, ringCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, ringCtx.currentTime + 1.8);
 
-                osc1.connect(gain);
-                osc2.connect(gain);
-                gain.connect(ringCtx.destination);
+                osc1.connect(gain); osc2.connect(gain); gain.connect(ringCtx.destination);
+                osc1.start(); osc2.start();
+                osc1.stop(ringCtx.currentTime + 1.8); osc2.stop(ringCtx.currentTime + 1.8);
 
-                osc1.start();
-                osc2.start();
-                osc1.stop(ringCtx.currentTime + 1.8);
-                osc2.stop(ringCtx.currentTime + 1.8);
-
-                if (navigator.vibrate) {
-                    navigator.vibrate([400, 200, 400, 1000]);
-                }
+                if (navigator.vibrate) navigator.vibrate([400, 200, 400, 1000]);
             }
-
             playBeep();
             ringInterval = setInterval(playBeep, 3000);
         }
 
         function stopIncomingRingtone() {
-            if (ringInterval) {
-                clearInterval(ringInterval);
-                ringInterval = null;
-            }
-            if (navigator.vibrate) {
-                navigator.vibrate(0);
-            }
+            if (ringInterval) { clearInterval(ringInterval); ringInterval = null; }
+            if (navigator.vibrate) navigator.vibrate(0);
         }
 
         function initSocket() {
             const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-            socket = new WebSocket(`${wsProtocol}${window.location.host}/ws/${roomId}`);
+            socket = new WebSocket(`${wsProtocol}${window.location.host}/ws/${currentRoom}`);
             socket.binaryType = "arraybuffer";
 
             socket.onopen = () => {
@@ -567,7 +647,6 @@
                         startIncomingRingtone();
                     } else if (data.type === "call_accepted") {
                         stopIncomingRingtone();
-                        document.getElementById("call-status-label").innerText = "Direct Partner";
                         document.getElementById("sub-caption").innerText = "Call Connected • Speak Naturally";
                         startCallTimer();
                         startContinuousAudioCapture();
@@ -575,7 +654,7 @@
                         stopIncomingRingtone();
                         endCall(false);
                     } else if (data.type === "text_message") {
-                        appendChatMessage(data.text, 'received');
+                        appendChatMessage(data.text, 'received', data.time);
                     }
                 } else if (event.data instanceof ArrayBuffer) {
                     playRawAudio(event.data);
@@ -589,34 +668,34 @@
             };
         }
 
-        // --- CHAT SYSTEM SYNC ---
+        // --- CHAT MESSAGING ---
         function sendChatMessage(source) {
             const inputEl = document.getElementById(source === 'drawer' ? "drawer-chat-input" : "main-chat-input");
             const text = inputEl.value.trim();
             if (!text || !socket || socket.readyState !== WebSocket.OPEN) return;
 
-            // Broadcast text
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
             socket.send(JSON.stringify({
                 type: "text_message",
                 text: text,
-                sender: myId
+                sender: myId,
+                time: timeStr
             }));
 
-            appendChatMessage(text, 'sent');
+            appendChatMessage(text, 'sent', timeStr);
             inputEl.value = "";
         }
 
         function handleEnter(e, source) {
-            if (e.key === 'Enter') {
-                sendChatMessage(source);
-            }
+            if (e.key === 'Enter') sendChatMessage(source);
         }
 
-        function appendChatMessage(text, type) {
+        function appendChatMessage(text, type, timeStr = "") {
             const createBubble = () => {
                 const bubble = document.createElement("div");
                 bubble.className = `chat-bubble ${type}`;
-                bubble.innerText = text;
+                bubble.innerHTML = `<div>${text}</div><div class="chat-time">${timeStr || 'now'}</div>`;
                 return bubble;
             };
 
@@ -644,21 +723,14 @@
                 gainNode.gain.value = 1.0;
                 gainNode.connect(audioContext.destination);
             }
-            if (audioContext.state === "suspended") {
-                await audioContext.resume();
-            }
+            if (audioContext.state === "suspended") await audioContext.resume();
         }
 
         async function startContinuousAudioCapture() {
             await ensureAudioContext();
-
             try {
                 mediaStream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
-                    },
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
                     video: false
                 });
 
@@ -668,7 +740,6 @@
                 scriptNode.onaudioprocess = (e) => {
                     if (!isCallActive || isMuted || !socket || socket.readyState !== WebSocket.OPEN) return;
                     const channelData = e.inputBuffer.getChannelData(0);
-
                     const pcmData = new Int16Array(channelData.length);
                     for (let i = 0; i < channelData.length; i++) {
                         const s = Math.max(-1, Math.min(1, channelData[i]));
@@ -682,20 +753,16 @@
                 silentGain.gain.value = 0;
                 scriptNode.connect(silentGain);
                 silentGain.connect(audioContext.destination);
-
             } catch (err) {
-                alert("Microphone permission required: " + err.message);
+                alert("Microphone required: " + err.message);
             }
         }
 
         function playRawAudio(arrayBuffer) {
             if (!audioContext || !isCallActive) return;
-
             const pcmData = new Int16Array(arrayBuffer);
             const floatData = new Float32Array(pcmData.length);
-            for (let i = 0; i < pcmData.length; i++) {
-                floatData[i] = pcmData[i] / 32768.0;
-            }
+            for (let i = 0; i < pcmData.length; i++) floatData[i] = pcmData[i] / 32768.0;
 
             const audioBuf = audioContext.createBuffer(1, floatData.length, 16000);
             audioBuf.copyToChannel(floatData, 0);
@@ -705,9 +772,7 @@
             source.connect(gainNode);
 
             const currentTime = audioContext.currentTime;
-            if (playbackTime < currentTime) {
-                playbackTime = currentTime + 0.04;
-            }
+            if (playbackTime < currentTime) playbackTime = currentTime + 0.04;
             source.start(playbackTime);
             playbackTime += audioBuf.duration;
         }
@@ -730,7 +795,6 @@
             document.getElementById("incoming-modal").style.display = "none";
             isCallActive = true;
             document.getElementById("call-screen").style.display = "flex";
-            document.getElementById("call-status-label").innerText = "Direct Partner";
             document.getElementById("sub-caption").innerText = "Call Connected • Speak Naturally";
 
             startCallTimer();
@@ -766,15 +830,8 @@
             clearInterval(timerInterval);
             document.getElementById("call-timer").innerText = "00:00";
 
-            if (scriptNode) {
-                scriptNode.disconnect();
-                scriptNode = null;
-            }
-
-            if (mediaStream) {
-                mediaStream.getTracks().forEach(track => track.stop());
-                mediaStream = null;
-            }
+            if (scriptNode) { scriptNode.disconnect(); scriptNode = null; }
+            if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
 
             playbackTime = 0;
             document.getElementById("incoming-modal").style.display = "none";
@@ -789,29 +846,21 @@
         function toggleMute() {
             isMuted = !isMuted;
             const btn = document.getElementById("mute-btn");
-            if (isMuted) {
-                btn.classList.add("muted-state");
-                btn.innerText = "🔇";
-            } else {
-                btn.classList.remove("muted-state");
-                btn.innerText = "🎙️";
-            }
+            btn.classList.toggle("muted-state", isMuted);
+            btn.innerText = isMuted ? "🔇" : "🎙️";
         }
 
         function toggleSpeaker() {
             isSpeakerOn = !isSpeakerOn;
             const btn = document.getElementById("speaker-btn");
-            if (isSpeakerOn) {
-                btn.classList.add("active");
-                if (gainNode) gainNode.gain.value = 2.5;
-            } else {
-                btn.classList.remove("active");
-                if (gainNode) gainNode.gain.value = 1.0;
-            }
+            btn.classList.toggle("active", isSpeakerOn);
+            if (gainNode) gainNode.gain.value = isSpeakerOn ? 2.5 : 1.0;
         }
 
         window.onload = () => {
+            updateUIForCurrentRoom();
             initSocket();
+            fetchOfflineHistory();
         };
     </script>
 </body>
