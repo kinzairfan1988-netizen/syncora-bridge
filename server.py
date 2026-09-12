@@ -64,8 +64,6 @@ async def text_to_speech(text: str, lang: str = "en", gender: str = "female"):
     lang_voices = VOICE_MAP.get(prefix, VOICE_MAP["en"])
     selected_voice = lang_voices.get(gender_clean, lang_voices["female"])
     
-    print(f"[TTS ACTIVE] Voice: {selected_voice} | Lang: {prefix} | Saying: {text}")
-    
     communicate = edge_tts.Communicate(
         text=text, 
         voice=selected_voice,
@@ -84,8 +82,8 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
 
-    if not clean_key or clean_key == "dummy_key":
-        return text
+    if not clean_key:
+        return "[Error: GROQ_API_KEY is missing on Railway]"
 
     src_prefix = src_code.split("-")[0].lower()
     tgt_prefix = tgt_code.split("-")[0].lower()
@@ -93,39 +91,36 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
     target_lang = LANG_MAP.get(tgt_prefix, "English")
     source_lang = LANG_MAP.get(src_prefix, "Urdu")
 
-    print(f"[RECV INPUT] '{text}' (Claimed source: {source_lang} -> Target: {target_lang})")
-
-    groq_client = AsyncOpenAI(
+    client = AsyncOpenAI(
         base_url="https://api.groq.com/openai/v1",
         api_key=clean_key
     )
 
-    try:
-        response = await groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        f"Translate this spoken sentence from {source_lang} to {target_lang}. "
-                        f"Output ONLY the translated sentence in {target_lang}. "
-                        f"CRITICAL: Do NOT write Arabic words or letters. Only {target_lang}."
-                    )
-                },
-                {"role": "user", "content": text}
-            ],
-            temperature=0.0,
-            max_tokens=80
-        )
-        content = response.choices[0].message.content
-        if content and content.strip():
-            clean = re.sub(r'^(Translation:|Output:|"|\')', "", content.strip(), flags=re.IGNORECASE).strip().strip('"')
-            print(f"[TRANSLATED CLEAN] '{clean}'")
-            return clean
-    except Exception as e:
-        print(f"[ERROR IN GROQ] {e}")
+    models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
 
-    return text
+    for model_name in models_to_try:
+        try:
+            response = await client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"You are a translator. Translate the text from {source_lang} into {target_lang}. Output ONLY the direct translation in {target_lang}. Do not explain or add notes."
+                    },
+                    {"role": "user", "content": text}
+                ],
+                temperature=0.1,
+                max_tokens=100
+            )
+            out = response.choices[0].message.content
+            if out and out.strip():
+                clean = re.sub(r'^(Translation:|Output:|"|\')', "", out.strip(), flags=re.IGNORECASE).strip().strip('"')
+                return clean
+        except Exception as err:
+            last_err = str(err)
+            continue
+
+    return f"[Error: {last_err}]"
 
 @app.websocket("/ws/{room_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str):
