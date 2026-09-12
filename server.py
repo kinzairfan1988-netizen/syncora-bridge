@@ -1,12 +1,19 @@
 import os
 import json
+import asyncio
 from typing import Dict, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse, Response, FileResponse
+import edge_tts
 
-app = FastAPI(title="Syncora Call Signaling Hub")
+app = FastAPI(title="Syncora Voice Engine")
 
-class CallHub:
+VOICE_MAP = {
+    "ur": {"male": "ur-PK-AsadNeural", "female": "ur-PK-UzmaNeural"},
+    "en": {"male": "en-US-BrianNeural", "female": "en-US-AvaNeural"}
+}
+
+class RoomManager:
     def __init__(self):
         self.rooms: Dict[str, List[WebSocket]] = {}
 
@@ -23,35 +30,54 @@ class CallHub:
             if not self.rooms[room_id]:
                 del self.rooms[room_id]
 
-    async def relay_signal(self, room_id: str, sender_ws: WebSocket, message: dict):
+    async def broadcast(self, room_id: str, message: dict):
         if room_id in self.rooms:
             dead_sockets = []
-            for client in self.rooms[room_id]:
-                if client != sender_ws:
-                    try:
-                        await client.send_text(json.dumps(message))
-                    except Exception:
-                        dead_sockets.append(client)
+            for connection in self.rooms[room_id]:
+                try:
+                    await connection.send_text(json.dumps(message))
+                except Exception:
+                    dead_sockets.append(connection)
             for d in dead_sockets:
                 self.disconnect(room_id, d)
 
-hub = CallHub()
+manager = RoomManager()
+
+@app.get("/tts")
+async def text_to_speech(text: str, lang: str = "ur", gender: str = "male"):
+    if not text.strip():
+        return Response(content=b"", media_type="audio/mpeg")
+
+    prefix = (lang or "ur").split("-")[0].lower()
+    selected_voice = "ur-PK-AsadNeural" if prefix == "ur" else "en-US-BrianNeural"
+
+    try:
+        communicate = edge_tts.Communicate(text=text, voice=selected_voice)
+        mp3_bytes = b""
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                mp3_bytes += chunk["data"]
+        return Response(content=mp3_bytes, media_type="audio/mpeg")
+    except Exception as e:
+        print(f"[TTS Error] {e}")
+        return Response(content=b"", media_type="audio/mpeg")
 
 @app.websocket("/ws/{room_id}")
-async def call_websocket(websocket: WebSocket, room_id: str):
-    await hub.connect(room_id, websocket)
+async def websocket_endpoint(websocket: WebSocket, room_id: str):
+    await manager.connect(room_id, websocket)
     try:
         while True:
-            raw_data = await websocket.receive_text()
-            data = json.loads(raw_data)
-            await hub.relay_signal(room_id, websocket, data)
+            raw = await websocket.receive_text()
+            data = json.loads(raw)
+            # Direct forward to room participants
+            await manager.broadcast(room_id, data)
     except WebSocketDisconnect:
-        hub.disconnect(room_id, websocket)
+        manager.disconnect(room_id, websocket)
     except Exception:
-        hub.disconnect(room_id, websocket)
+        manager.disconnect(room_id, websocket)
 
 @app.get("/")
-async def serve_index():
+async def get_index():
     return FileResponse("index.html")
 
 if __name__ == "__main__":
