@@ -2,10 +2,11 @@ import os
 import json
 import asyncio
 import re
+import urllib.request
+import urllib.error
 from typing import Dict, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, Response, FileResponse
-import httpx
 import edge_tts
 
 app = FastAPI(title="Syncora Call Bridge")
@@ -78,6 +79,20 @@ async def text_to_speech(text: str, lang: str = "en", gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
+def call_gemini_rest(endpoint: str, payload_data: dict) -> tuple[int, str]:
+    req = urllib.request.Request(
+        endpoint,
+        data=json.dumps(payload_data).encode("utf-8"),
+        headers={"Content-Type": "application/json"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return response.status, response.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode("utf-8")
+    except Exception as e:
+        return 500, str(e)
+
 async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
     raw_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
@@ -112,31 +127,29 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
         }
     }
 
-    # Latest active Google Gemini model endpoints
     candidate_models = ["gemini-3.6-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"]
     last_err = ""
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        for model_name in candidate_models:
-            endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={clean_key}"
-            try:
-                resp = await client.post(endpoint, json=payload)
-                data = resp.json()
+    for model_name in candidate_models:
+        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={clean_key}"
+        try:
+            status, body = await asyncio.to_thread(call_gemini_rest, endpoint, payload)
+            data = json.loads(body)
 
-                if resp.status_code == 200:
-                    candidates = data.get("candidates", [])
-                    if candidates:
-                        parts = candidates[0].get("content", {}).get("parts", [])
-                        if parts:
-                            out = parts[0].get("text", "").strip()
-                            clean = re.sub(r'^(Translation:|Output:|"|\')', "", out, flags=re.IGNORECASE).strip().strip('"')
-                            return clean
-                else:
-                    last_err = data.get("error", {}).get("message", resp.text)
-                    continue
-            except Exception as e:
-                last_err = str(e)
+            if status == 200:
+                candidates = data.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts:
+                        out = parts[0].get("text", "").strip()
+                        clean = re.sub(r'^(Translation:|Output:|"|\')', "", out, flags=re.IGNORECASE).strip().strip('"')
+                        return clean
+            else:
+                last_err = data.get("error", {}).get("message", body)
                 continue
+        except Exception as e:
+            last_err = str(e)
+            continue
 
     return f"[Error: {last_err}]"
 
