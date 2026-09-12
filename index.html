@@ -55,7 +55,7 @@
             .app-viewport { max-height: 100vh; border: none; }
         }
 
-        /* 1. DIRECTORY SCREEN */
+        /* DIRECTORY VIEW */
         .view-directory {
             flex: 1;
             display: flex;
@@ -172,9 +172,8 @@
             transition: all 0.2s ease;
             z-index: 20;
         }
-        .fab-add:active { transform: scale(0.92); }
 
-        /* 2. DIRECT CHAT VIEW */
+        /* DIRECT CHAT VIEW */
         .view-chat-screen {
             display: none;
             flex: 1;
@@ -193,27 +192,31 @@
             z-index: 10;
         }
 
-        .chat-contact-meta { display: flex; align-items: center; gap: 8px; }
+        .chat-contact-meta { display: flex; align-items: center; gap: 8px; max-width: 50%; }
         .btn-back-arrow {
             background: transparent; border: none; color: var(--text-muted);
-            font-size: 20px; cursor: pointer; padding: 4px;
+            font-size: 20px; cursor: pointer; padding: 2px;
         }
 
-        .chat-action-cluster { display: flex; align-items: center; gap: 6px; }
+        .chat-action-cluster { display: flex; align-items: center; gap: 5px; }
         .chat-header-btn {
             background: var(--surface-card); border: 1px solid var(--border-graphite);
-            color: var(--text-primary); padding: 7px 11px; border-radius: 10px;
+            color: var(--text-primary); padding: 7px 9px; border-radius: 10px;
             font-size: 12px; font-weight: 700; display: flex; align-items: center;
-            gap: 5px; cursor: pointer;
+            gap: 3px; cursor: pointer; white-space: nowrap;
         }
         .chat-header-btn.translate-call {
             background: var(--accent-amber-dim); color: var(--accent-amber);
             border-color: rgba(245, 158, 11, 0.4);
         }
+        .chat-header-btn.video-call {
+            background: rgba(16, 185, 129, 0.15); color: var(--online-green);
+            border-color: rgba(16, 185, 129, 0.4);
+        }
 
-        /* MULTI-LANGUAGE BAR IN CHAT */
+        /* TRANSLATION BAR */
         .chat-translate-toggle-bar {
-            padding: 8px 14px;
+            padding: 8px 12px;
             background: rgba(245, 158, 11, 0.05);
             border-bottom: 1px solid var(--border-subtle);
             display: flex;
@@ -233,6 +236,7 @@
             border-radius: 8px;
             outline: none;
             cursor: pointer;
+            max-width: 110px;
         }
         .lang-dropdown-pill option { background: #18181b; color: #fff; }
 
@@ -283,7 +287,7 @@
             font-weight: 700; cursor: pointer;
         }
 
-        /* 3. INCOMING CALL MODAL */
+        /* INCOMING CALL MODAL */
         .incoming-modal-backdrop {
             position: absolute; inset: 0; background: rgba(0, 0, 0, 0.92);
             backdrop-filter: blur(14px); z-index: 200; display: none;
@@ -313,26 +317,41 @@
         .btn-accept { background: var(--online-green); color: white; box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
         .btn-decline { background: var(--danger-red); color: white; box-shadow: 0 0 15px var(--danger-glow); }
 
-        /* 4. ACTIVE CALL OVERLAY */
+        /* ACTIVE CALL SCREEN */
         .call-screen-overlay {
             position: absolute; inset: 0; background: var(--bg-obsidian); z-index: 100;
             display: none; flex-direction: column; justify-content: space-between; padding: 24px 20px;
+            overflow: hidden;
         }
+
+        .video-stage-container {
+            position: absolute; inset: 0; z-index: 1; display: none;
+            background: #000;
+        }
+        .remote-video-frame {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+        .local-video-pip {
+            position: absolute; top: 70px; right: 16px;
+            width: 100px; height: 145px; border-radius: 14px;
+            border: 2px solid var(--accent-amber); object-fit: cover;
+            background: #18181b; z-index: 20; box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+        }
+
+        .call-ui-layer {
+            position: relative; z-index: 10; height: 100%;
+            display: flex; flex-direction: column; justify-content: space-between;
+        }
+
         .call-header { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 
         .call-lang-bar {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            background: var(--surface-card);
-            border: 1px solid var(--border-graphite);
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 11px;
-            color: var(--text-muted);
+            display: flex; align-items: center; gap: 6px; background: rgba(18, 18, 21, 0.85);
+            backdrop-filter: blur(8px); border: 1px solid var(--border-graphite);
+            padding: 4px 10px; border-radius: 20px; font-size: 11px; color: var(--text-muted);
         }
 
-        .caller-title { font-size: 22px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
+        .caller-title { font-size: 22px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; text-shadow: 0 2px 8px rgba(0,0,0,0.8); }
         .call-duration { font-size: 14px; font-weight: 600; color: var(--accent-amber); font-variant-numeric: tabular-nums; }
 
         .call-stage-center {
@@ -354,16 +373,21 @@
         }
 
         .subtitles-box {
-            background: var(--surface-card); border: 1px solid var(--border-graphite);
-            border-radius: 14px; padding: 12px 14px; min-height: 80px; display: flex;
+            background: rgba(18, 18, 21, 0.88); backdrop-filter: blur(10px);
+            border: 1px solid var(--border-graphite); border-radius: 14px;
+            padding: 12px 14px; min-height: 70px; display: flex;
             flex-direction: column; justify-content: center; gap: 4px; text-align: center;
         }
         .sub-original { font-size: 11px; color: var(--text-muted); }
         .sub-translated { font-size: 14px; color: var(--online-green); font-weight: 600; }
 
-        .call-controls-row { display: flex; align-items: center; justify-content: space-around; }
+        .call-controls-row {
+            display: flex; align-items: center; justify-content: space-around;
+            background: rgba(18, 18, 21, 0.85); backdrop-filter: blur(12px);
+            padding: 12px; border-radius: 28px; border: 1px solid var(--border-graphite);
+        }
         .ctrl-btn-circle {
-            width: 50px; height: 50px; border-radius: 50%; border: 1px solid var(--border-graphite);
+            width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--border-graphite);
             background: var(--surface-card); color: var(--text-primary); font-size: 18px;
             cursor: pointer; display: flex; align-items: center; justify-content: center;
             transition: all 0.2s ease;
@@ -410,7 +434,7 @@
 
     <div class="app-viewport">
         
-        <!-- 1. DIRECTORY SCREEN (FOR HOST) -->
+        <!-- 1. DIRECTORY SCREEN -->
         <div class="view-directory" id="view-dir">
             <header class="top-navbar">
                 <div class="brand-cluster">
@@ -427,25 +451,29 @@
             <button class="fab-add" onclick="openAddModal()" title="Add New Contact">＋</button>
         </div>
 
-        <!-- 2. DIRECT CHAT VIEW -->
+        <!-- 2. DIRECT CHAT VIEW (3 DISTINCT CALL BUTTONS) -->
         <div class="view-chat-screen" id="view-chat-screen">
             <header class="chat-top-header">
                 <div class="chat-contact-meta">
                     <button class="btn-back-arrow" id="chat-back-btn" onclick="closeContactChat()">←</button>
-                    <div class="avatar-box" id="chat-header-avatar" style="width: 40px; height: 40px; font-size: 14px;" onclick="openProfileModal()" title="Tap to update Profile/DP">AF</div>
-                    <div>
-                        <div style="font-size: 14px; font-weight: 700;" id="chat-header-title">Contact</div>
-                        <div style="font-size: 11px; color: var(--online-green);">Direct Line Active</div>
+                    <div class="avatar-box" id="chat-header-avatar" style="width: 38px; height: 38px; font-size: 14px;" onclick="openProfileModal()" title="Tap to update Profile/DP">AF</div>
+                    <div style="overflow: hidden;">
+                        <div style="font-size: 13px; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;" id="chat-header-title">Contact</div>
+                        <div style="font-size: 10px; color: var(--online-green);">Direct Line</div>
                     </div>
                 </div>
 
                 <div class="chat-action-cluster">
-                    <button class="chat-header-btn" onclick="initiateCall(false)" title="Normal Voice Call">📞 Call</button>
-                    <button class="chat-header-btn translate-call" onclick="initiateCall(true)" title="AI Live Translate Call">🌐 AI Translate</button>
+                    <!-- AUDIO CALL -->
+                    <button class="chat-header-btn" onclick="initiateCall('voice')" title="Voice Call">📞 Call</button>
+                    <!-- VIDEO CALL -->
+                    <button class="chat-header-btn video-call" onclick="initiateCall('video')" title="Video Call">📹 Video</button>
+                    <!-- AI TRANSLATE CALL -->
+                    <button class="chat-header-btn translate-call" onclick="initiateCall('translate')" title="AI Live Translate">🌐 AI</button>
                 </div>
             </header>
 
-            <!-- MULTI-LANGUAGE CONTROLS IN CHAT -->
+            <!-- TRANSLATION BAR -->
             <div class="chat-translate-toggle-bar">
                 <span>Translate:</span>
                 <select class="lang-dropdown-pill" id="chat-source-lang">
@@ -457,7 +485,7 @@
                     <option value="it">Italian (Italiano)</option>
                     <option value="ru">Russian (Русский)</option>
                     <option value="pt">Portuguese (Português)</option>
-                    <option value="ms">Malay (Bahasa Melayu)</option>
+                    <option value="ms">Malay (Melayu)</option>
                     <option value="ar">Arabic (العربية)</option>
                     <option value="tr">Turkish (Türkçe)</option>
                     <option value="zh">Chinese (中文)</option>
@@ -472,7 +500,7 @@
                     <option value="it">Italian (Italiano)</option>
                     <option value="ru">Russian (Русский)</option>
                     <option value="pt">Portuguese (Português)</option>
-                    <option value="ms">Malay (Bahasa Melayu)</option>
+                    <option value="ms">Malay (Melayu)</option>
                     <option value="ar">Arabic (العربية)</option>
                     <option value="tr">Turkish (Türkçe)</option>
                     <option value="zh">Chinese (中文)</option>
@@ -503,59 +531,66 @@
 
         <!-- 4. ACTIVE CALL OVERLAY -->
         <section class="call-screen-overlay" id="call-screen">
-            <div class="call-header">
-                <!-- MULTI-LANGUAGE SELECTOR IN CALL -->
-                <div class="call-lang-bar" id="call-lang-bar">
-                    <span>Speak:</span>
-                    <select class="lang-dropdown-pill" id="call-speak-lang" onchange="syncCallSpeechLang()">
-                        <option value="ur-PK">Urdu (اردو)</option>
-                        <option value="en-US">English (US)</option>
-                        <option value="de-DE">German (Deutsch)</option>
-                        <option value="fr-FR">French (Français)</option>
-                        <option value="es-ES">Spanish (Español)</option>
-                        <option value="it-IT">Italian (Italiano)</option>
-                        <option value="ru-RU">Russian (Русский)</option>
-                        <option value="pt-PT">Portuguese (Português)</option>
-                        <option value="ms-MY">Malay (Melayu)</option>
-                        <option value="ar-SA">Arabic (العربية)</option>
-                        <option value="tr-TR">Turkish (Türkçe)</option>
-                        <option value="zh-CN">Chinese (中文)</option>
-                    </select>
-                    <span>➔ Translate:</span>
-                    <select class="lang-dropdown-pill" id="call-target-lang">
-                        <option value="en">English (US)</option>
-                        <option value="ur">Urdu (اردو)</option>
-                        <option value="de">German (Deutsch)</option>
-                        <option value="fr">French (Français)</option>
-                        <option value="es">Spanish (Español)</option>
-                        <option value="it">Italian (Italiano)</option>
-                        <option value="ru">Russian (Русский)</option>
-                        <option value="pt">Portuguese (Português)</option>
-                        <option value="ms">Malay (Melayu)</option>
-                        <option value="ar">Arabic (العربية)</option>
-                        <option value="tr">Turkish (Türkçe)</option>
-                        <option value="zh">Chinese (中文)</option>
-                    </select>
+            <div class="video-stage-container" id="video-stage">
+                <img id="remote-video-feed" class="remote-video-frame" alt="Partner Video">
+                <video id="local-video-pip" class="local-video-pip" autoplay playsinline muted></video>
+            </div>
+
+            <div class="call-ui-layer">
+                <div class="call-header">
+                    <div class="call-lang-bar" id="call-lang-bar">
+                        <span>Speak:</span>
+                        <select class="lang-dropdown-pill" id="call-speak-lang" onchange="syncCallSpeechLang()">
+                            <option value="ur-PK">Urdu (اردو)</option>
+                            <option value="en-US">English (US)</option>
+                            <option value="de-DE">German (Deutsch)</option>
+                            <option value="fr-FR">French (Français)</option>
+                            <option value="es-ES">Spanish (Español)</option>
+                            <option value="it-IT">Italian (Italiano)</option>
+                            <option value="ru-RU">Russian (Русский)</option>
+                            <option value="pt-PT">Portuguese (Português)</option>
+                            <option value="ms-MY">Malay (Melayu)</option>
+                            <option value="ar-SA">Arabic (العربية)</option>
+                            <option value="tr-TR">Turkish (Türkçe)</option>
+                            <option value="zh-CN">Chinese (中文)</option>
+                        </select>
+                        <span>➔ Translate:</span>
+                        <select class="lang-dropdown-pill" id="call-target-lang">
+                            <option value="en">English (US)</option>
+                            <option value="ur">Urdu (اردو)</option>
+                            <option value="de">German (Deutsch)</option>
+                            <option value="fr">French (Français)</option>
+                            <option value="es">Spanish (Español)</option>
+                            <option value="it">Italian (Italiano)</option>
+                            <option value="ru">Russian (Русский)</option>
+                            <option value="pt">Portuguese (Português)</option>
+                            <option value="ms">Malay (Melayu)</option>
+                            <option value="ar">Arabic (العربية)</option>
+                            <option value="tr">Turkish (Türkçe)</option>
+                            <option value="zh">Chinese (中文)</option>
+                        </select>
+                    </div>
+
+                    <div class="caller-title" id="call-status-label">Partner</div>
+                    <div class="call-duration" id="call-timer">00:00</div>
                 </div>
 
-                <div class="caller-title" id="call-status-label">Partner</div>
-                <div class="call-duration" id="call-timer">00:00</div>
-            </div>
+                <div class="call-stage-center" id="voice-avatar-stage">
+                    <div class="pulse-wave-ring"></div>
+                    <div class="caller-large-avatar" id="active-call-avatar">P</div>
+                </div>
 
-            <div class="call-stage-center">
-                <div class="pulse-wave-ring"></div>
-                <div class="caller-large-avatar" id="active-call-avatar">P</div>
-            </div>
+                <div class="subtitles-box" id="call-subtitle-box">
+                    <div class="sub-original" id="sub-original">Speak naturally...</div>
+                    <div class="sub-translated" id="sub-translated">Voice Channel Ready</div>
+                </div>
 
-            <div class="subtitles-box" id="call-subtitle-box">
-                <div class="sub-original" id="sub-original">Speak naturally...</div>
-                <div class="sub-translated" id="sub-translated">Voice Channel Ready</div>
-            </div>
-
-            <div class="call-controls-row">
-                <button class="ctrl-btn-circle" id="mute-btn" onclick="toggleMute()" title="Mute Mic">🎙️</button>
-                <button class="ctrl-btn-circle" id="speaker-btn" onclick="toggleSpeaker()" title="Loudspeaker">🔊</button>
-                <button class="ctrl-btn-circle hangup" onclick="endCall(true)" title="End Call">🛑</button>
+                <div class="call-controls-row">
+                    <button class="ctrl-btn-circle" id="mute-btn" onclick="toggleMute()" title="Mute Mic">🎙️</button>
+                    <button class="ctrl-btn-circle" id="video-toggle-btn" onclick="toggleVideoCamera()" title="Camera Switch">📷</button>
+                    <button class="ctrl-btn-circle" id="speaker-btn" onclick="toggleSpeaker()" title="Loudspeaker">🔊</button>
+                    <button class="ctrl-btn-circle hangup" onclick="endCall(true)" title="End Call">🛑</button>
+                </div>
             </div>
         </section>
 
@@ -567,7 +602,7 @@
                     <button class="modal-close" onclick="closeAddModal()">✕</button>
                 </div>
                 <div class="input-group">
-                    <input type="text" id="modal-name-input" class="input-field" placeholder="Contact Name (e.g. Hans Müller)">
+                    <input type="text" id="modal-name-input" class="input-field" placeholder="Contact Name (e.g. Ali Khan)">
                     <input type="tel" id="modal-phone-input" class="input-field" placeholder="Mobile Number (e.g. 03001234567)">
                 </div>
                 <button class="btn-modal-save" onclick="saveContactFromModal()">Save Contact</button>
@@ -592,6 +627,8 @@
             </div>
         </div>
     </div>
+
+    <canvas id="video-capture-canvas" style="display:none;"></canvas>
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
@@ -620,10 +657,12 @@
         let scriptNode = null;
         let speechRecognition = null;
         let isCallActive = false;
-        let isTranslationCall = false;
+        let currentCallMode = 'voice';
         let isMuted = false;
+        let isCameraOff = false;
         let isSpeakerOn = false;
         let timerInterval = null;
+        let videoInterval = null;
         let elapsedSeconds = 0;
         let playbackTime = 0;
         let ringInterval = null;
@@ -817,20 +856,25 @@
                         partnerLivePhoto = data.user_photo || "";
                         updateUI();
                     } else if (data.type === "call_invite") {
-                        isTranslationCall = data.is_translation || false;
+                        currentCallMode = data.call_mode || 'voice';
                         if (data.caller_name) partnerLiveName = data.caller_name;
                         if (data.caller_photo) partnerLivePhoto = data.caller_photo;
                         updateUI();
-                        document.getElementById("incoming-call-type-label").innerText = isTranslationCall ? "🌐 AI Live Translation Call" : "📞 Voice Call";
+
+                        const labelMap = {
+                            'voice': '📞 Voice Call',
+                            'translate': '🌐 AI Live Translation Call',
+                            'video': '📹 Video Call'
+                        };
+                        document.getElementById("incoming-call-type-label").innerText = labelMap[currentCallMode] || 'Voice Call';
                         document.getElementById("incoming-modal").style.display = "flex";
                         startIncomingRingtone();
                     } else if (data.type === "call_accepted") {
                         stopIncomingRingtone();
-                        isTranslationCall = data.is_translation || false;
+                        currentCallMode = data.call_mode || 'voice';
                         setupActiveCallUI();
                         startCallTimer();
-                        startContinuousAudioCapture();
-                        if (isTranslationCall) startSpeechEngine();
+                        startMediaStreams();
                     } else if (data.type === "call_declined" || data.type === "call_ended") {
                         stopIncomingRingtone();
                         endCall(false);
@@ -839,6 +883,9 @@
                     } else if (data.type === "live_subtitle") {
                         document.getElementById("sub-original").innerText = `Partner: "${data.original}"`;
                         document.getElementById("sub-translated").innerText = `AI: ${data.translated}`;
+                    } else if (data.type === "video_frame") {
+                        const remoteImg = document.getElementById("remote-video-feed");
+                        if (remoteImg) remoteImg.src = data.image;
                     }
                 } else if (event.data instanceof ArrayBuffer) {
                     playRawAudio(event.data);
@@ -958,11 +1005,23 @@
         function setupActiveCallUI() {
             const langBar = document.getElementById("call-lang-bar");
             const subBox = document.getElementById("call-subtitle-box");
-            if (isTranslationCall) {
+            const videoStage = document.getElementById("video-stage");
+            const avatarStage = document.getElementById("voice-avatar-stage");
+
+            if (currentCallMode === 'video') {
+                videoStage.style.display = "block";
+                avatarStage.style.display = "none";
+                langBar.style.display = "none";
+                subBox.style.display = "none";
+            } else if (currentCallMode === 'translate') {
+                videoStage.style.display = "none";
+                avatarStage.style.display = "flex";
                 langBar.style.display = "flex";
                 subBox.style.display = "flex";
                 document.getElementById("sub-translated").innerText = "AI Live Translation Active";
             } else {
+                videoStage.style.display = "none";
+                avatarStage.style.display = "flex";
                 langBar.style.display = "none";
                 subBox.style.display = "none";
             }
@@ -972,7 +1031,7 @@
             const lang = document.getElementById("call-speak-lang").value;
             if (speechRecognition) {
                 speechRecognition.lang = lang;
-                if (isCallActive && isTranslationCall) {
+                if (isCallActive && currentCallMode === 'translate') {
                     try {
                         speechRecognition.stop();
                         setTimeout(() => { speechRecognition.start(); }, 200);
@@ -991,7 +1050,7 @@
             speechRecognition.lang = document.getElementById("call-speak-lang") ? document.getElementById("call-speak-lang").value : "ur-PK";
 
             speechRecognition.onresult = async (event) => {
-                if (!isCallActive || !isTranslationCall || isMuted) return;
+                if (!isCallActive || currentCallMode !== 'translate' || isMuted) return;
                 const lastIdx = event.results.length - 1;
                 const originalText = event.results[lastIdx][0].transcript.trim();
 
@@ -1028,19 +1087,10 @@
             };
 
             speechRecognition.onend = () => {
-                if (isCallActive && isTranslationCall && !isMuted) {
+                if (isCallActive && currentCallMode === 'translate' && !isMuted) {
                     try { speechRecognition.start(); } catch (e) {}
                 }
             };
-        }
-
-        function startSpeechEngine() {
-            if (speechRecognition && isCallActive) {
-                try {
-                    speechRecognition.lang = document.getElementById("call-speak-lang").value;
-                    speechRecognition.start();
-                } catch (e) {}
-            }
         }
 
         async function ensureAudioContext() {
@@ -1054,12 +1104,14 @@
             if (audioContext.state === "suspended") await audioContext.resume();
         }
 
-        async function startContinuousAudioCapture() {
+        async function startMediaStreams() {
             await ensureAudioContext();
+            const isVideoMode = (currentCallMode === 'video');
+
             try {
                 mediaStream = await navigator.mediaDevices.getUserMedia({
                     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-                    video: false
+                    video: isVideoMode ? { facingMode: "user", width: { ideal: 480 }, height: { ideal: 640 } } : false
                 });
 
                 const source = audioContext.createMediaStreamSource(mediaStream);
@@ -1081,8 +1133,38 @@
                 silentGain.gain.value = 0;
                 scriptNode.connect(silentGain);
                 silentGain.connect(audioContext.destination);
+
+                if (isVideoMode) {
+                    const localVideo = document.getElementById("local-video-pip");
+                    localVideo.srcObject = mediaStream;
+
+                    const canvas = document.getElementById("video-capture-canvas");
+                    const ctx = canvas.getContext("2d");
+                    canvas.width = 320;
+                    canvas.height = 420;
+
+                    videoInterval = setInterval(() => {
+                        if (!isCallActive || isCameraOff || !socket || socket.readyState !== WebSocket.OPEN) return;
+                        if (localVideo.videoWidth) {
+                            ctx.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
+                            const base64Img = canvas.toDataURL("image/jpeg", 0.45);
+                            socket.send(JSON.stringify({
+                                type: "video_frame",
+                                image: base64Img
+                            }));
+                        }
+                    }, 85);
+                }
+
+                if (currentCallMode === 'translate' && speechRecognition) {
+                    try {
+                        speechRecognition.lang = document.getElementById("call-speak-lang").value;
+                        speechRecognition.start();
+                    } catch (e) {}
+                }
+
             } catch (err) {
-                alert("Microphone required: " + err.message);
+                alert("Camera/Mic permission required: " + err.message);
             }
         }
 
@@ -1105,10 +1187,10 @@
             playbackTime += audioBuf.duration;
         }
 
-        async function initiateCall(withTranslation = false) {
+        async function initiateCall(mode = 'voice') {
             await ensureAudioContext();
             isCallActive = true;
-            isTranslationCall = withTranslation;
+            currentCallMode = mode;
             setupActiveCallUI();
 
             document.getElementById("call-screen").style.display = "flex";
@@ -1117,7 +1199,7 @@
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({
                     type: "call_invite",
-                    is_translation: withTranslation,
+                    call_mode: mode,
                     caller_name: myName,
                     caller_photo: myPhoto
                 }));
@@ -1133,13 +1215,12 @@
 
             document.getElementById("call-screen").style.display = "flex";
             startCallTimer();
-            startContinuousAudioCapture();
-            if (isTranslationCall) startSpeechEngine();
+            startMediaStreams();
 
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({
                     type: "call_accepted",
-                    is_translation: isTranslationCall
+                    call_mode: currentCallMode
                 }));
             }
         }
@@ -1166,13 +1247,22 @@
         function endCall(sendSignal = true) {
             stopIncomingRingtone();
             isCallActive = false;
-            isTranslationCall = false;
             clearInterval(timerInterval);
+            if (videoInterval) clearInterval(videoInterval);
             document.getElementById("call-timer").innerText = "00:00";
 
             if (scriptNode) { scriptNode.disconnect(); scriptNode = null; }
             if (speechRecognition) { try { speechRecognition.stop(); } catch (e) {} }
-            if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(t => t.stop());
+                mediaStream = null;
+            }
+
+            const localVideo = document.getElementById("local-video-pip");
+            if (localVideo) localVideo.srcObject = null;
+            const remoteImg = document.getElementById("remote-video-feed");
+            if (remoteImg) remoteImg.src = "";
 
             playbackTime = 0;
             document.getElementById("incoming-modal").style.display = "none";
@@ -1188,6 +1278,17 @@
             const btn = document.getElementById("mute-btn");
             btn.classList.toggle("muted-state", isMuted);
             btn.innerText = isMuted ? "🔇" : "🎙️";
+        }
+
+        function toggleVideoCamera() {
+            if (mediaStream && mediaStream.getVideoTracks().length > 0) {
+                const videoTrack = mediaStream.getVideoTracks()[0];
+                videoTrack.enabled = !videoTrack.enabled;
+                isCameraOff = !videoTrack.enabled;
+                const btn = document.getElementById("video-toggle-btn");
+                btn.classList.toggle("muted-state", isCameraOff);
+                btn.innerText = isCameraOff ? "🚫" : "📷";
+            }
         }
 
         function toggleSpeaker() {
