@@ -55,7 +55,7 @@
             .app-viewport { max-height: 100vh; border: none; }
         }
 
-        /* DIRECTORY VIEW */
+        /* 1. DIRECTORY SCREEN (STRICTLY FOR HOST ONLY) */
         .view-directory {
             flex: 1;
             display: flex;
@@ -173,7 +173,7 @@
             z-index: 20;
         }
 
-        /* DIRECT CHAT VIEW */
+        /* 2. DIRECT BLANK CHAT VIEW (LANDING FOR GUEST) */
         .view-chat-screen {
             display: none;
             flex: 1;
@@ -192,7 +192,7 @@
             z-index: 10;
         }
 
-        .chat-contact-meta { display: flex; align-items: center; gap: 8px; max-width: 50%; }
+        .chat-contact-meta { display: flex; align-items: center; gap: 8px; max-width: 44%; }
         .btn-back-arrow {
             background: transparent; border: none; color: var(--text-muted);
             font-size: 20px; cursor: pointer; padding: 2px;
@@ -213,8 +213,10 @@
             background: rgba(16, 185, 129, 0.15); color: var(--online-green);
             border-color: rgba(16, 185, 129, 0.4);
         }
+        .chat-header-btn.share-link-btn {
+            background: rgba(255, 255, 255, 0.05); color: var(--text-secondary);
+        }
 
-        /* TRANSLATION BAR */
         .chat-translate-toggle-bar {
             padding: 8px 12px;
             background: rgba(245, 158, 11, 0.05);
@@ -236,7 +238,7 @@
             border-radius: 8px;
             outline: none;
             cursor: pointer;
-            max-width: 110px;
+            max-width: 115px;
         }
         .lang-dropdown-pill option { background: #18181b; color: #fff; }
 
@@ -287,7 +289,7 @@
             font-weight: 700; cursor: pointer;
         }
 
-        /* INCOMING CALL MODAL */
+        /* 3. INCOMING CALL MODAL */
         .incoming-modal-backdrop {
             position: absolute; inset: 0; background: rgba(0, 0, 0, 0.92);
             backdrop-filter: blur(14px); z-index: 200; display: none;
@@ -317,7 +319,7 @@
         .btn-accept { background: var(--online-green); color: white; box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
         .btn-decline { background: var(--danger-red); color: white; box-shadow: 0 0 15px var(--danger-glow); }
 
-        /* ACTIVE CALL SCREEN */
+        /* 4. ACTIVE CALL OVERLAY */
         .call-screen-overlay {
             position: absolute; inset: 0; background: var(--bg-obsidian); z-index: 100;
             display: none; flex-direction: column; justify-content: space-between; padding: 24px 20px;
@@ -325,12 +327,9 @@
         }
 
         .video-stage-container {
-            position: absolute; inset: 0; z-index: 1; display: none;
-            background: #000;
+            position: absolute; inset: 0; z-index: 1; display: none; background: #000;
         }
-        .remote-video-frame {
-            width: 100%; height: 100%; object-fit: cover;
-        }
+        .remote-video-frame { width: 100%; height: 100%; object-fit: cover; }
         .local-video-pip {
             position: absolute; top: 70px; right: 16px;
             width: 100px; height: 145px; border-radius: 14px;
@@ -434,7 +433,7 @@
 
     <div class="app-viewport">
         
-        <!-- 1. DIRECTORY SCREEN -->
+        <!-- 1. DIRECTORY SCREEN (FOR HOST ONLY) -->
         <div class="view-directory" id="view-dir">
             <header class="top-navbar">
                 <div class="brand-cluster">
@@ -451,25 +450,23 @@
             <button class="fab-add" onclick="openAddModal()" title="Add New Contact">＋</button>
         </div>
 
-        <!-- 2. DIRECT CHAT VIEW (3 DISTINCT CALL BUTTONS) -->
+        <!-- 2. DIRECT BLANK CHAT VIEW (AUTOMATIC LANDING FOR GUEST) -->
         <div class="view-chat-screen" id="view-chat-screen">
             <header class="chat-top-header">
                 <div class="chat-contact-meta">
                     <button class="btn-back-arrow" id="chat-back-btn" onclick="closeContactChat()">←</button>
-                    <div class="avatar-box" id="chat-header-avatar" style="width: 38px; height: 38px; font-size: 14px;" onclick="openProfileModal()" title="Tap to update Profile/DP">AF</div>
+                    <div class="avatar-box" id="chat-header-avatar" style="width: 38px; height: 38px; font-size: 14px;" onclick="openProfileModal()" title="Tap to update Profile/DP">P</div>
                     <div style="overflow: hidden;">
-                        <div style="font-size: 13px; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;" id="chat-header-title">Contact</div>
-                        <div style="font-size: 10px; color: var(--online-green);">Direct Line</div>
+                        <div style="font-size: 13px; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;" id="chat-header-title">Partner</div>
+                        <div style="font-size: 10px; color: var(--online-green);">Direct Line Active</div>
                     </div>
                 </div>
 
                 <div class="chat-action-cluster">
-                    <!-- AUDIO CALL -->
-                    <button class="chat-header-btn" onclick="initiateCall('voice')" title="Voice Call">📞 Call</button>
-                    <!-- VIDEO CALL -->
-                    <button class="chat-header-btn video-call" onclick="initiateCall('video')" title="Video Call">📹 Video</button>
-                    <!-- AI TRANSLATE CALL -->
-                    <button class="chat-header-btn translate-call" onclick="initiateCall('translate')" title="AI Live Translate">🌐 AI</button>
+                    <button class="chat-header-btn" onclick="initiateCall('voice')" title="Voice Call">📞</button>
+                    <button class="chat-header-btn video-call" onclick="initiateCall('video')" title="Video Call">📹</button>
+                    <button class="chat-header-btn translate-call" onclick="initiateCall('translate')" title="AI Live Translate">🌐</button>
+                    <button class="chat-header-btn share-link-btn" onclick="copyGuestInviteLink()" id="copy-btn" title="Copy Invite Link">📋 Link</button>
                 </div>
             </header>
 
@@ -519,7 +516,7 @@
         <!-- 3. INCOMING CALL MODAL -->
         <div class="incoming-modal-backdrop" id="incoming-modal">
             <div class="incoming-dialog">
-                <div class="incoming-avatar" id="incoming-caller-avatar">AF</div>
+                <div class="incoming-avatar" id="incoming-caller-avatar">P</div>
                 <h3 style="font-size: 21px; margin-bottom: 6px;" id="incoming-caller-name">Incoming Call...</h3>
                 <p style="font-size: 13px; color: var(--accent-amber);" id="incoming-call-type-label">Voice Line</p>
                 <div class="incoming-actions">
@@ -602,7 +599,7 @@
                     <button class="modal-close" onclick="closeAddModal()">✕</button>
                 </div>
                 <div class="input-group">
-                    <input type="text" id="modal-name-input" class="input-field" placeholder="Contact Name (e.g. Ali Khan)">
+                    <input type="text" id="modal-name-input" class="input-field" placeholder="Contact Name">
                     <input type="tel" id="modal-phone-input" class="input-field" placeholder="Mobile Number (e.g. 03001234567)">
                 </div>
                 <button class="btn-modal-save" onclick="saveContactFromModal()">Save Contact</button>
@@ -634,20 +631,21 @@
         const urlParams = new URLSearchParams(window.location.search);
         const isGuest = urlParams.get('role') === 'guest';
         const hostNameParam = urlParams.get('host_name') ? decodeURIComponent(urlParams.get('host_name')) : null;
+        const hostPhotoParam = urlParams.get('host_photo') ? decodeURIComponent(urlParams.get('host_photo')) : "";
 
         let myName = localStorage.getItem("syncora_my_name") || (isGuest ? "Guest Partner" : "Muhammad");
         let myPhoto = localStorage.getItem("syncora_my_photo") || "";
 
-        let contacts = JSON.parse(localStorage.getItem("syncora_contacts_list") || "[]");
-        if (contacts.length === 0) {
-            contacts.push({ name: "Ahmad Farman TBT", phone: "03488674051" });
-            localStorage.setItem("syncora_contacts_list", JSON.stringify(contacts));
+        // Contacts list strictly for Host; Guest will never have access to this list
+        let contacts = [];
+        if (!isGuest) {
+            contacts = JSON.parse(localStorage.getItem("syncora_contacts_list") || "[]");
         }
 
-        let activeContact = contacts[0] || { name: "Partner", phone: "03000000000" };
-        let currentRoom = urlParams.get('room') || ('room-' + activeContact.phone.replace(/[^0-9]/g, ''));
+        let activeContact = contacts.length > 0 ? contacts[0] : { name: "Direct Partner", phone: "03000000000" };
+        let currentRoom = urlParams.get('room') || ('room-' + (isGuest ? 'direct' : activeContact.phone.replace(/[^0-9]/g, '')));
 
-        let partnerLivePhoto = "";
+        let partnerLivePhoto = isGuest ? hostPhotoParam : "";
         let partnerLiveName = isGuest ? (hostNameParam || "Host Partner") : activeContact.name;
 
         const myId = "usr-" + Math.random().toString(36).substring(2, 8);
@@ -687,8 +685,15 @@
         }
 
         function renderContactList() {
+            if (isGuest) return; // Prevent rendering contacts for guests completely
+
             const container = document.getElementById("contact-list-container");
             container.innerHTML = '<div class="section-label">Contacts Directory</div>';
+
+            if (contacts.length === 0) {
+                container.innerHTML += '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No contacts saved yet.<br>Tap <b>＋ Add Contact</b> below.</div>';
+                return;
+            }
 
             contacts.forEach((c, index) => {
                 const card = document.createElement("div");
@@ -728,6 +733,7 @@
         function updateUI() {
             applyAvatar(document.getElementById("my-profile-avatar-btn"), myName, myPhoto);
 
+            // GUEST VIEW LOCK: LAND DIRECTLY ON BLANK CHAT SCREEN WITH NO BACK BUTTON
             if (isGuest) {
                 document.getElementById("view-dir").style.display = "none";
                 document.getElementById("view-chat-screen").style.display = "flex";
@@ -811,10 +817,12 @@
         }
 
         function closeContactChat() {
+            if (isGuest) return; // Guests can never exit to contact directory
             document.getElementById("view-chat-screen").style.display = "none";
             document.getElementById("view-dir").style.display = "flex";
         }
 
+        // GENERATE SECURE GUEST LINK
         function generateGuestShareUrl() {
             const origin = window.location.origin;
             const path = window.location.pathname;
@@ -822,7 +830,19 @@
             params.set("room", currentRoom);
             params.set("role", "guest");
             params.set("host_name", myName);
+            if (myPhoto && myPhoto.startsWith("http")) {
+                params.set("host_photo", myPhoto);
+            }
             return `${origin}${path}?${params.toString()}`;
+        }
+
+        function copyGuestInviteLink() {
+            const shareUrl = generateGuestShareUrl();
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                const btn = document.getElementById("copy-btn");
+                btn.innerText = "✅ Done";
+                setTimeout(() => { btn.innerText = "📋 Link"; }, 1500);
+            });
         }
 
         function openDirectWhatsAppFromModal() {
@@ -834,7 +854,7 @@
             if (num.startsWith("03")) num = "92" + num.substring(1);
 
             const shareUrl = generateGuestShareUrl();
-            const msg = encodeURIComponent(`Assalam o Alaikum ${nameInput}! Please join my secure line on Syncora: ${shareUrl}`);
+            const msg = encodeURIComponent(`Assalam o Alaikum ${nameInput}! Please join my secure direct line on Syncora: ${shareUrl}`);
 
             window.location.href = `whatsapp://send?phone=${num}&text=${msg}`;
         }
