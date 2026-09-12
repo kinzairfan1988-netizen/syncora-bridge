@@ -84,12 +84,67 @@
             cursor: pointer; font-size: 12px; font-weight: 600;
         }
 
-        .directory-container { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-        .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); }
+        /* NAVIGATION TABS */
+        .tab-segmented-bar {
+            display: flex;
+            padding: 10px 20px 0 20px;
+            gap: 8px;
+            background: var(--bg-obsidian);
+        }
+
+        .tab-pill {
+            flex: 1;
+            padding: 8px 0;
+            background: var(--surface-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .tab-pill.active {
+            background: var(--accent-amber-dim);
+            color: var(--accent-amber);
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        /* SCREEN VIEWS */
+        .content-view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .directory-container {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow-y: auto;
+        }
+
+        .section-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+        }
 
         .contact-card {
-            background: var(--surface-card); border: 1px solid var(--border-graphite);
-            border-radius: 14px; padding: 16px; display: flex; align-items: center; justify-content: space-between;
+            background: var(--surface-card);
+            border: 1px solid var(--border-graphite);
+            border-radius: 14px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
         .user-identity { display: flex; align-items: center; gap: 14px; }
         .avatar-box {
@@ -107,7 +162,85 @@
             display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer;
         }
 
-        /* INCOMING CALL MODAL (RINGTONE ALERT) */
+        /* FULL MAIN CHAT VIEW */
+        .chat-view-container {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg-obsidian);
+        }
+
+        .chat-messages-area {
+            flex: 1;
+            padding: 16px 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .chat-bubble {
+            max-width: 80%;
+            padding: 10px 14px;
+            border-radius: 14px;
+            font-size: 13px;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .chat-bubble.sent {
+            align-self: flex-end;
+            background: var(--accent-amber);
+            color: #000;
+            font-weight: 500;
+            border-bottom-right-radius: 4px;
+        }
+
+        .chat-bubble.received {
+            align-self: flex-start;
+            background: var(--surface-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border-graphite);
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-input-bar {
+            padding: 12px 20px 20px 20px;
+            display: flex;
+            gap: 8px;
+            background: var(--bg-obsidian);
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .chat-input {
+            flex: 1;
+            background: var(--surface-card);
+            border: 1px solid var(--border-graphite);
+            color: var(--text-primary);
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 13px;
+            outline: none;
+        }
+        .chat-input:focus { border-color: var(--accent-amber); }
+
+        .chat-send-btn {
+            background: var(--accent-amber);
+            border: none;
+            color: #000;
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        /* INCOMING CALL MODAL */
         .incoming-modal-backdrop {
             position: absolute; inset: 0; background: rgba(0, 0, 0, 0.9);
             backdrop-filter: blur(12px); z-index: 200; display: none;
@@ -175,14 +308,14 @@
 
         .subtitles-box {
             background: var(--surface-card); border: 1px solid var(--border-graphite);
-            border-radius: 14px; padding: 14px; min-height: 80px; display: flex;
+            border-radius: 14px; padding: 14px; min-height: 70px; display: flex;
             flex-direction: column; justify-content: center; gap: 4px; font-size: 13px; text-align: center;
         }
         .sub-text { color: var(--online-green); font-weight: 600; }
 
         .call-controls-row { display: flex; align-items: center; justify-content: space-around; }
         .ctrl-btn-circle {
-            width: 54px; height: 54px; border-radius: 50%; border: 1px solid var(--border-graphite);
+            width: 50px; height: 50px; border-radius: 50%; border: 1px solid var(--border-graphite);
             background: var(--surface-card); color: var(--text-primary); font-size: 18px;
             cursor: pointer; display: flex; align-items: center; justify-content: center;
             transition: all 0.2s ease;
@@ -190,11 +323,47 @@
         .ctrl-btn-circle.active { background: var(--accent-amber); color: #000; border-color: var(--accent-amber); }
         .ctrl-btn-circle.muted-state { background: var(--text-primary); color: #000; }
         .ctrl-btn-circle.hangup { background: var(--danger-red); border-color: var(--danger-red); color: white; }
+
+        /* IN-CALL SLIDE-UP CHAT DRAWER */
+        .in-call-chat-drawer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60%;
+            background: rgba(18, 18, 21, 0.96);
+            backdrop-filter: blur(16px);
+            border-top: 1px solid var(--border-graphite);
+            border-radius: 24px 24px 0 0;
+            display: none;
+            flex-direction: column;
+            z-index: 150;
+            animation: slideDrawer 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideDrawer {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .drawer-header {
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .drawer-header span { font-size: 14px; font-weight: 700; color: var(--accent-amber); }
+        .drawer-close-btn {
+            background: transparent; border: none; color: var(--text-muted);
+            font-size: 18px; cursor: pointer;
+        }
     </style>
 </head>
 <body>
 
     <div class="app-viewport">
+        <!-- TOP NAV -->
         <header class="top-navbar">
             <div class="brand-cluster">
                 <div class="brand-title">Syncora <span>Terminal</span></div>
@@ -206,20 +375,40 @@
             <button class="icon-btn" onclick="copyInviteLink()" id="copy-btn">📋 Share Link</button>
         </header>
 
-        <main class="directory-container">
-            <div class="section-label">Direct Voice Line</div>
+        <!-- MAIN TABS -->
+        <div class="tab-segmented-bar">
+            <div class="tab-pill active" id="tab-call" onclick="switchView('call')">Voice Line</div>
+            <div class="tab-pill" id="tab-chat" onclick="switchView('chat')">Chat Box</div>
+        </div>
 
-            <div class="contact-card">
-                <div class="user-identity">
-                    <div class="avatar-box">P2</div>
-                    <div class="user-meta">
-                        <div class="contact-name">Direct Voice Partner</div>
-                        <div class="contact-sub" id="room-sub">Room: Syncing...</div>
+        <!-- VIEW 1: DIRECTORY / CALL LAUNCH -->
+        <div class="content-view" id="view-call">
+            <main class="directory-container">
+                <div class="section-label">Direct Voice Line</div>
+
+                <div class="contact-card">
+                    <div class="user-identity">
+                        <div class="avatar-box">P2</div>
+                        <div class="user-meta">
+                            <div class="contact-name">Direct Voice Partner</div>
+                            <div class="contact-sub" id="room-sub">Room: Syncing...</div>
+                        </div>
                     </div>
+                    <button class="call-trigger-btn" onclick="initiateCall()" title="Call">📞</button>
                 </div>
-                <button class="call-trigger-btn" onclick="initiateCall()" title="Call">📞</button>
+            </main>
+        </div>
+
+        <!-- VIEW 2: FULL MAIN CHAT BOX -->
+        <div class="content-view chat-view-container" id="view-chat">
+            <div class="chat-messages-area" id="main-chat-msgs">
+                <div class="chat-bubble received">Encrypted Syncora Line connected. Send messages or start voice call anytime.</div>
             </div>
-        </main>
+            <div class="chat-input-bar">
+                <input type="text" class="chat-input" id="main-chat-input" placeholder="Type a message..." onkeypress="handleEnter(event, 'main')">
+                <button class="chat-send-btn" onclick="sendChatMessage('main')">➤</button>
+            </div>
+        </div>
 
         <!-- INCOMING CALL MODAL -->
         <div class="incoming-modal-backdrop" id="incoming-modal">
@@ -254,7 +443,21 @@
             <div class="call-controls-row">
                 <button class="ctrl-btn-circle" id="mute-btn" onclick="toggleMute()" title="Mute Mic">🎙️</button>
                 <button class="ctrl-btn-circle" id="speaker-btn" onclick="toggleSpeaker()" title="Loudspeaker">🔊</button>
+                <button class="ctrl-btn-circle" onclick="toggleCallDrawer()" title="In-Call Chat">💬</button>
                 <button class="ctrl-btn-circle hangup" onclick="endCall(true)" title="End Call">🛑</button>
+            </div>
+
+            <!-- IN-CALL SLIDE-UP CHAT DRAWER -->
+            <div class="in-call-chat-drawer" id="call-drawer">
+                <div class="drawer-header">
+                    <span>Live Conversation & Subtitles</span>
+                    <button class="drawer-close-btn" onclick="toggleCallDrawer()">✕</button>
+                </div>
+                <div class="chat-messages-area" id="drawer-chat-msgs"></div>
+                <div class="chat-input-bar">
+                    <input type="text" class="chat-input" id="drawer-chat-input" placeholder="Type inside call..." onkeypress="handleEnter(event, 'drawer')">
+                    <button class="chat-send-btn" onclick="sendChatMessage('drawer')">➤</button>
+                </div>
             </div>
         </section>
     </div>
@@ -267,6 +470,7 @@
         }
         document.getElementById("room-sub").innerText = `Room: ${roomId}`;
 
+        const myId = "usr-" + Math.random().toString(36).substring(2, 8);
         let socket = null;
         let audioContext = null;
         let mediaStream = null;
@@ -288,10 +492,16 @@
             });
         }
 
+        function switchView(view) {
+            document.getElementById("tab-call").classList.toggle("active", view === 'call');
+            document.getElementById("tab-chat").classList.toggle("active", view === 'chat');
+            document.getElementById("view-call").style.display = (view === 'call') ? 'flex' : 'none';
+            document.getElementById("view-chat").style.display = (view === 'chat') ? 'flex' : 'none';
+        }
+
         // --- RINGTONE & VIBRATION ALERT SYSTEM ---
         function startIncomingRingtone() {
             stopIncomingRingtone();
-
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             const ringCtx = new AudioCtx();
 
@@ -299,16 +509,14 @@
                 if (!document.getElementById("incoming-modal").style.display || document.getElementById("incoming-modal").style.display === "none") {
                     return;
                 }
-
-                // Standard WhatsApp / Phone melody chord
                 const osc1 = ringCtx.createOscillator();
                 const osc2 = ringCtx.createOscillator();
                 const gain = ringCtx.createGain();
 
                 osc1.type = "sine";
                 osc2.type = "sine";
-                osc1.frequency.setValueAtTime(440, ringCtx.currentTime); // A4
-                osc2.frequency.setValueAtTime(480, ringCtx.currentTime); // Tone B
+                osc1.frequency.setValueAtTime(440, ringCtx.currentTime);
+                osc2.frequency.setValueAtTime(480, ringCtx.currentTime);
 
                 gain.gain.setValueAtTime(0.3, ringCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, ringCtx.currentTime + 1.8);
@@ -322,7 +530,6 @@
                 osc1.stop(ringCtx.currentTime + 1.8);
                 osc2.stop(ringCtx.currentTime + 1.8);
 
-                // Phone Vibration
                 if (navigator.vibrate) {
                     navigator.vibrate([400, 200, 400, 1000]);
                 }
@@ -367,6 +574,8 @@
                     } else if (data.type === "call_declined" || data.type === "call_ended") {
                         stopIncomingRingtone();
                         endCall(false);
+                    } else if (data.type === "text_message") {
+                        appendChatMessage(data.text, 'received');
                     }
                 } else if (event.data instanceof ArrayBuffer) {
                     playRawAudio(event.data);
@@ -380,6 +589,53 @@
             };
         }
 
+        // --- CHAT SYSTEM SYNC ---
+        function sendChatMessage(source) {
+            const inputEl = document.getElementById(source === 'drawer' ? "drawer-chat-input" : "main-chat-input");
+            const text = inputEl.value.trim();
+            if (!text || !socket || socket.readyState !== WebSocket.OPEN) return;
+
+            // Broadcast text
+            socket.send(JSON.stringify({
+                type: "text_message",
+                text: text,
+                sender: myId
+            }));
+
+            appendChatMessage(text, 'sent');
+            inputEl.value = "";
+        }
+
+        function handleEnter(e, source) {
+            if (e.key === 'Enter') {
+                sendChatMessage(source);
+            }
+        }
+
+        function appendChatMessage(text, type) {
+            const createBubble = () => {
+                const bubble = document.createElement("div");
+                bubble.className = `chat-bubble ${type}`;
+                bubble.innerText = text;
+                return bubble;
+            };
+
+            const mainBox = document.getElementById("main-chat-msgs");
+            const drawerBox = document.getElementById("drawer-chat-msgs");
+
+            mainBox.appendChild(createBubble());
+            drawerBox.appendChild(createBubble());
+
+            mainBox.scrollTop = mainBox.scrollHeight;
+            drawerBox.scrollTop = drawerBox.scrollHeight;
+        }
+
+        function toggleCallDrawer() {
+            const drawer = document.getElementById("call-drawer");
+            drawer.style.display = (drawer.style.display === "flex") ? "none" : "flex";
+        }
+
+        // --- AUDIO ENGINE ---
         async function ensureAudioContext() {
             if (!audioContext || audioContext.state === "closed") {
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -523,6 +779,7 @@
             playbackTime = 0;
             document.getElementById("incoming-modal").style.display = "none";
             document.getElementById("call-screen").style.display = "none";
+            document.getElementById("call-drawer").style.display = "none";
 
             if (sendSignal && socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ type: "call_ended" }));
@@ -541,16 +798,15 @@
             }
         }
 
-        // --- LOUDSPEAKER TOGGLE ---
         function toggleSpeaker() {
             isSpeakerOn = !isSpeakerOn;
             const btn = document.getElementById("speaker-btn");
             if (isSpeakerOn) {
                 btn.classList.add("active");
-                if (gainNode) gainNode.gain.value = 2.5; // Boosted volume for loudspeaker mode
+                if (gainNode) gainNode.gain.value = 2.5;
             } else {
                 btn.classList.remove("active");
-                if (gainNode) gainNode.gain.value = 1.0; // Normal earpiece volume
+                if (gainNode) gainNode.gain.value = 1.0;
             }
         }
 
