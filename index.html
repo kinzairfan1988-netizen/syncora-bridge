@@ -21,12 +21,7 @@
             --text-muted: #94a3b8;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            -webkit-tap-highlight-color: transparent;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -50,367 +45,150 @@
             gap: 10px;
         }
 
-        .brand-cluster {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
+        .brand-cluster { display: flex; align-items: center; gap: 10px; }
         .brand-logo {
-            width: 28px;
-            height: 28px;
+            width: 28px; height: 28px;
             background: linear-gradient(135deg, #38bdf8, #2563eb);
             border-radius: 7px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            color: white;
-            font-size: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; color: white; font-size: 14px;
         }
+        .brand-title { font-size: 15px; font-weight: 600; }
 
-        .brand-title {
-            font-size: 15px;
-            font-weight: 600;
-            letter-spacing: -0.3px;
-        }
-
-        .room-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
+        .room-actions { display: flex; align-items: center; gap: 8px; }
         .room-badge {
             background: var(--surface-elevated);
             border: 1px solid var(--border-subtle);
-            padding: 5px 10px;
-            border-radius: 16px;
-            font-size: 12px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            padding: 5px 10px; border-radius: 16px;
+            font-size: 12px; display: flex; align-items: center; gap: 6px;
             color: var(--text-muted);
         }
-
         .room-badge b { color: var(--accent-primary); }
 
         .status-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 11px;
-            color: var(--text-muted);
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 11px; color: var(--text-muted);
         }
-
-        .dot-indicator {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: #64748b;
-        }
-
-        .dot-indicator.live {
-            background: var(--success-color);
-            box-shadow: 0 0 8px var(--success-color);
-        }
+        .dot-indicator { width: 7px; height: 7px; border-radius: 50%; background: #64748b; }
+        .dot-indicator.live { background: var(--success-color); box-shadow: 0 0 8px var(--success-color); }
 
         .btn-secondary {
             background: var(--surface-elevated);
             border: 1px solid var(--border-subtle);
             color: var(--text-main);
-            padding: 5px 10px;
-            border-radius: 8px;
-            font-size: 11px;
-            font-weight: 500;
-            cursor: pointer;
+            padding: 5px 10px; border-radius: 8px;
+            font-size: 11px; font-weight: 500; cursor: pointer;
         }
 
         .workspace-container {
-            max-width: 1200px;
-            width: 100%;
-            margin: 0 auto;
+            max-width: 1200px; width: 100%; margin: 0 auto;
             padding: 16px 14px 90px 14px;
-            flex: 1;
-            display: grid;
-            grid-template-columns: 1fr 380px;
-            gap: 16px;
+            flex: 1; display: grid; grid-template-columns: 1fr 380px; gap: 16px;
         }
 
         @media (max-width: 900px) {
-            .workspace-container {
-                grid-template-columns: 1fr;
-                padding-bottom: 95px;
-            }
+            .workspace-container { grid-template-columns: 1fr; padding-bottom: 95px; }
         }
 
-        .meeting-stage {
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-        }
-
-        .participant-tiles {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        @media (max-width: 480px) {
-            .participant-tiles {
-                grid-template-columns: 1fr 1fr;
-                gap: 8px;
-            }
-        }
+        .meeting-stage { display: flex; flex-direction: column; gap: 14px; }
+        .participant-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
         .tile-card {
             background: var(--surface-card);
             border: 1px solid var(--border-subtle);
-            border-radius: 14px;
-            padding: 16px 10px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 150px;
-            position: relative;
-            backdrop-filter: blur(12px);
+            border-radius: 14px; padding: 16px 10px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 150px; backdrop-filter: blur(12px);
             transition: all 0.3s ease;
         }
-
         .tile-card.speaking {
             border-color: var(--success-color);
             box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
         }
 
         .avatar-frame {
-            width: 58px;
-            height: 58px;
-            border-radius: 50%;
-            background: #1e293b;
-            border: 2px solid var(--border-subtle);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            margin-bottom: 8px;
-            transition: transform 0.2s ease;
+            width: 58px; height: 58px; border-radius: 50%;
+            background: #1e293b; border: 2px solid var(--border-subtle);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; margin-bottom: 8px;
         }
 
-        .tile-card.speaking .avatar-frame {
-            border-color: var(--success-color);
-            transform: scale(1.06);
-        }
-
-        .participant-name {
-            font-size: 13px;
-            font-weight: 600;
-            text-align: center;
-            margin-bottom: 3px;
-        }
-
+        .participant-name { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
         .participant-lang-tag {
-            font-size: 10px;
-            color: var(--accent-primary);
-            background: var(--accent-glow);
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-weight: 500;
-        }
-
-        .audio-wave {
-            display: flex;
-            align-items: center;
-            gap: 3px;
-            height: 14px;
-            margin-top: 8px;
-        }
-
-        .wave-bar {
-            width: 2.5px;
-            height: 3px;
-            background: var(--border-subtle);
-            border-radius: 2px;
-            transition: height 0.15s ease;
-        }
-
-        .tile-card.speaking .wave-bar {
-            background: var(--success-color);
-            animation: wavePulse 0.7s infinite ease-in-out;
-        }
-
-        .tile-card.speaking .wave-bar:nth-child(2) { animation-delay: 0.15s; }
-        .tile-card.speaking .wave-bar:nth-child(3) { animation-delay: 0.3s; }
-        .tile-card.speaking .wave-bar:nth-child(4) { animation-delay: 0.45s; }
-
-        @keyframes wavePulse {
-            0%, 100% { height: 3px; }
-            50% { height: 14px; }
+            font-size: 10px; color: var(--accent-primary);
+            background: var(--accent-glow); padding: 2px 8px;
+            border-radius: 10px; font-weight: 500;
         }
 
         .config-strip {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            padding: 12px;
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 8px; padding: 12px;
             background: rgba(10, 14, 23, 0.6);
-            border: 1px solid var(--border-subtle);
-            border-radius: 14px;
+            border: 1px solid var(--border-subtle); border-radius: 14px;
         }
-
         @media (max-width: 600px) {
             .config-strip { grid-template-columns: 1fr 1fr; }
         }
 
-        .config-field {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-        }
-
-        .config-field label {
-            font-size: 10px;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-        }
-
+        .config-field { display: flex; flex-direction: column; gap: 3px; }
+        .config-field label { font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
         .select-input, .text-input {
             background: var(--surface-elevated);
             border: 1px solid var(--border-subtle);
             color: var(--text-main);
-            padding: 6px 8px;
-            border-radius: 6px;
-            font-size: 12px;
-            outline: none;
-            width: 100%;
+            padding: 6px 8px; border-radius: 6px; font-size: 12px; outline: none; width: 100%;
         }
 
         .sidebar-panel {
             background: var(--surface-card);
             border: 1px solid var(--border-subtle);
-            border-radius: 14px;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            backdrop-filter: blur(12px);
+            border-radius: 14px; display: flex; flex-direction: column;
+            overflow: hidden; backdrop-filter: blur(12px);
         }
-
         .panel-header {
-            padding: 10px 14px;
-            border-bottom: 1px solid var(--border-subtle);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .panel-header h3 {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            padding: 10px 14px; border-bottom: 1px solid var(--border-subtle);
+            font-size: 11px; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.5px;
         }
 
         .transcript-feed {
-            flex: 1;
-            padding: 12px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            min-height: 250px;
-            max-height: 380px;
+            flex: 1; padding: 12px; overflow-y: auto;
+            display: flex; flex-direction: column; gap: 10px;
+            min-height: 250px; max-height: 380px;
         }
-
         @media (max-width: 900px) {
-            .transcript-feed {
-                max-height: 40vh;
-                min-height: 180px;
-            }
+            .transcript-feed { max-height: 40vh; min-height: 180px; }
         }
 
         .feed-item {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-            padding: 10px 12px;
-            border-radius: 10px;
+            display: flex; flex-direction: column; gap: 3px;
+            padding: 10px 12px; border-radius: 10px;
             background: var(--surface-elevated);
-            font-size: 12px;
-            line-height: 1.4;
-            border-left: 3px solid transparent;
+            font-size: 12px; line-height: 1.4; border-left: 3px solid transparent;
         }
-
         .feed-item.me { border-left-color: var(--accent-primary); }
         .feed-item.partner { border-left-color: var(--success-color); }
-
-        .item-author {
-            font-size: 10px;
-            font-weight: 600;
-            color: var(--text-muted);
-        }
-
+        .item-author { font-size: 10px; font-weight: 600; color: var(--text-muted); }
         .item-original { color: #cbd5e1; }
         .item-translated { color: var(--success-color); font-weight: 600; }
 
         .bottom-call-dock {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 12px 16px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 12px;
-            background: rgba(10, 14, 23, 0.95);
-            border-top: 1px solid var(--border-subtle);
-            backdrop-filter: blur(16px);
-            z-index: 100;
+            position: fixed; bottom: 0; left: 0; right: 0;
+            padding: 12px 16px; display: flex; justify-content: center; align-items: center;
+            gap: 12px; background: rgba(10, 14, 23, 0.95);
+            border-top: 1px solid var(--border-subtle); backdrop-filter: blur(16px); z-index: 100;
         }
-
         .dock-btn {
-            border: none;
-            padding: 10px 24px;
-            border-radius: 50px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            color: white;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            border: none; padding: 10px 24px; border-radius: 50px;
+            font-size: 13px; font-weight: 600; cursor: pointer;
+            display: flex; align-items: center; gap: 6px; color: white;
         }
-
-        .btn-start {
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-        }
-
-        .btn-end {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            display: none;
-        }
-
+        .btn-start { background: linear-gradient(135deg, #22c55e, #16a34a); }
+        .btn-end { background: linear-gradient(135deg, #ef4444, #dc2626); display: none; }
         .btn-mic-toggle {
-            background: var(--surface-elevated);
-            border: 1px solid var(--border-subtle);
-            color: var(--text-main);
-            border-radius: 50px;
-            padding: 10px 16px;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            display: none;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .btn-mic-toggle.muted {
-            background: rgba(239, 68, 68, 0.2);
-            border-color: var(--danger-color);
-            color: #fca5a5;
+            background: var(--surface-elevated); border: 1px solid var(--border-subtle);
+            color: var(--text-main); border-radius: 50px; padding: 10px 16px;
+            font-size: 13px; font-weight: 500; cursor: pointer; display: none;
         }
     </style>
 </head>
@@ -442,24 +220,12 @@
                     <div class="avatar-frame">🎙️</div>
                     <div class="participant-name" id="local-name-label">Ali (You)</div>
                     <div class="participant-lang-tag" id="local-lang-label">Urdu</div>
-                    <div class="audio-wave">
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                    </div>
                 </div>
 
                 <div class="tile-card" id="remote-tile">
                     <div class="avatar-frame">🔊</div>
-                    <div class="participant-name">Client / Partner</div>
+                    <div class="participant-name">Partner</div>
                     <div class="participant-lang-tag" id="remote-lang-label">English</div>
-                    <div class="audio-wave">
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                    </div>
                 </div>
             </div>
 
@@ -497,27 +263,19 @@
         </section>
 
         <aside class="sidebar-panel">
-            <div class="panel-header">
-                <h3>Interpretation Feed</h3>
-            </div>
+            <div class="panel-header">Interpretation Feed</div>
             <div class="transcript-feed" id="captions">
                 <div id="placeholder-msg" style="text-align: center; color: var(--text-muted); font-size: 12px; margin: auto;">
-                    Tap "Start Call" below to begin interpretation.
+                    Tap "Start Call" to begin speaking.
                 </div>
             </div>
         </aside>
     </main>
 
     <footer class="bottom-call-dock">
-        <button class="dock-btn btn-start" id="start-call-btn" onclick="startCall()">
-            📞 Start Call
-        </button>
-        <button class="btn-mic-toggle" id="mute-toggle-btn" onclick="toggleMute()">
-            🎙️ Mic: ON
-        </button>
-        <button class="dock-btn btn-end" id="end-call-btn" onclick="endCall()">
-            🛑 End Call
-        </button>
+        <button class="dock-btn btn-start" id="start-call-btn" onclick="startCall()">📞 Start Call</button>
+        <button class="btn-mic-toggle" id="mute-toggle-btn" onclick="toggleMute()">🎙️ Mic: ON</button>
+        <button class="dock-btn btn-end" id="end-call-btn" onclick="endCall()">🛑 End Call</button>
     </footer>
 
     <script>
@@ -534,9 +292,12 @@
         let isCallActive = false;
         let isMuted = false;
 
-        // Audio Queue System (Prevents broken / choppy audio overlap)
         const audioQueue = [];
-        let isPlayingFromQueue = false;
+        let isPlayingAudio = false;
+
+        // Debounce Buffer for speech completeness
+        let speechBuffer = "";
+        let speechTimer = null;
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -585,9 +346,9 @@
 
                 appendTranscript(data.sender_name, data.original, data.translated, isMe);
 
-                // Add to audio queue only for remote partner
                 if (!isMe && data.translated) {
-                    enqueueAudio(data.translated, data.target_lang, data.gender);
+                    audioQueue.push({ text: data.translated, lang: data.target_lang, gender: data.gender });
+                    processAudioQueue();
                 }
             };
 
@@ -614,18 +375,13 @@
             feed.scrollTop = feed.scrollHeight;
         }
 
-        function enqueueAudio(text, lang, gender) {
-            audioQueue.push({ text, lang, gender });
-            processAudioQueue();
-        }
-
         function processAudioQueue() {
-            if (isPlayingFromQueue || audioQueue.length === 0) return;
+            if (isPlayingAudio || audioQueue.length === 0) return;
 
-            isPlayingFromQueue = true;
+            isPlayingAudio = true;
             const current = audioQueue.shift();
 
-            // Mute local mic strictly while playing remote speech
+            // Mute mic strictly while listening
             if (recognition) {
                 try { recognition.abort(); } catch(e) {}
             }
@@ -637,14 +393,13 @@
             const url = `/tts?text=${encodeURIComponent(current.text)}&lang=${encodeURIComponent(cleanLang)}&gender=${encodeURIComponent(current.gender)}`;
             const audio = new Audio(url);
 
-            const onFinish = () => {
+            const finishAudio = () => {
                 remoteTile.classList.remove("speaking");
-                isPlayingFromQueue = false;
+                isPlayingAudio = false;
 
                 if (audioQueue.length > 0) {
                     processAudioQueue();
                 } else {
-                    // Buffer of 400ms before reopening mic
                     setTimeout(() => {
                         if (isCallActive && !isMuted) {
                             try {
@@ -656,53 +411,64 @@
                 }
             };
 
-            audio.onended = onFinish;
-            audio.onerror = onFinish;
-            audio.play().catch(onFinish);
+            audio.onended = finishAudio;
+            audio.onerror = finishAudio;
+            audio.play().catch(finishAudio);
+        }
+
+        function dispatchFinalSpeech(fullText) {
+            const trimmed = fullText.trim();
+            if (!trimmed || trimmed.length < 2) return;
+
+            const localTile = document.getElementById("local-tile");
+            localTile.classList.add("speaking");
+            setTimeout(() => localTile.classList.remove("speaking"), 900);
+
+            const myLangVal = document.getElementById("my-lang").value;
+            const targetLangVal = document.getElementById("target-lang").value;
+
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    sender_id: myClientId,
+                    sender_name: document.getElementById("username").value || "Ali",
+                    gender: document.getElementById("gender").value,
+                    source_lang: myLangVal,
+                    target_lang: targetLangVal,
+                    text: trimmed
+                }));
+            }
         }
 
         function setupSpeechRecognition() {
             if (!SpeechRecognition) {
-                alert("Please use Chrome or Edge browser.");
+                alert("Please open this link in Google Chrome.");
                 return;
             }
 
             recognition = new SpeechRecognition();
             recognition.continuous = true;
-            recognition.interimResults = false;
+            recognition.interimResults = true; // Collect live chunks
 
             recognition.onresult = (event) => {
-                if (!isCallActive || isPlayingFromQueue || isMuted) return;
+                if (!isCallActive || isPlayingAudio || isMuted) return;
 
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    const chunk = event.results[i][0].transcript;
                     if (event.results[i].isFinal) {
-                        const transcript = event.results[i][0].transcript.trim();
-                        // Ignore single junk clicks / noise
-                        if (!transcript || transcript.length < 2) continue;
-
-                        const localTile = document.getElementById("local-tile");
-                        localTile.classList.add("speaking");
-                        setTimeout(() => localTile.classList.remove("speaking"), 1000);
-
-                        const myLangVal = document.getElementById("my-lang").value;
-                        const targetLangVal = document.getElementById("target-lang").value;
-
-                        if (socket && socket.readyState === WebSocket.OPEN) {
-                            socket.send(JSON.stringify({
-                                sender_id: myClientId,
-                                sender_name: document.getElementById("username").value || "Ali",
-                                gender: document.getElementById("gender").value,
-                                source_lang: myLangVal,
-                                target_lang: targetLangVal,
-                                text: transcript
-                            }));
-                        }
+                        speechBuffer += " " + chunk;
+                        
+                        // Wait 500ms for user to finish full sentence before sending
+                        if (speechTimer) clearTimeout(speechTimer);
+                        speechTimer = setTimeout(() => {
+                            dispatchFinalSpeech(speechBuffer);
+                            speechBuffer = "";
+                        }, 500);
                     }
                 }
             };
 
             recognition.onend = () => {
-                if (isCallActive && !isPlayingFromQueue && !isMuted) {
+                if (isCallActive && !isPlayingAudio && !isMuted) {
                     try {
                         recognition.lang = document.getElementById("my-lang").value;
                         recognition.start();
@@ -714,18 +480,19 @@
         function startCall() {
             isCallActive = true;
             isMuted = false;
+            speechBuffer = "";
 
             document.getElementById("start-call-btn").style.display = "none";
             document.getElementById("end-call-btn").style.display = "flex";
             document.getElementById("mute-toggle-btn").style.display = "flex";
 
-            // User gesture unlocks browser audio policies
             const unlock = new Audio();
             unlock.play().catch(() => {});
 
             initSocket();
             setupSpeechRecognition();
 
+            // Strictly enforce Urdu on startup
             recognition.lang = document.getElementById("my-lang").value;
             try { recognition.start(); } catch(e) {}
         }
@@ -733,18 +500,14 @@
         function endCall() {
             isCallActive = false;
             audioQueue.length = 0;
-            isPlayingFromQueue = false;
+            isPlayingAudio = false;
 
             document.getElementById("start-call-btn").style.display = "flex";
             document.getElementById("end-call-btn").style.display = "none";
             document.getElementById("mute-toggle-btn").style.display = "none";
 
-            if (recognition) {
-                try { recognition.abort(); } catch(e) {}
-            }
-            if (socket) {
-                socket.close();
-            }
+            if (recognition) try { recognition.abort(); } catch(e) {}
+            if (socket) socket.close();
 
             document.getElementById("local-tile").classList.remove("speaking");
             document.getElementById("remote-tile").classList.remove("speaking");
@@ -756,13 +519,11 @@
             isMuted = !isMuted;
             const btn = document.getElementById("mute-toggle-btn");
             if (isMuted) {
-                btn.classList.add("muted");
                 btn.innerText = "🔇 Muted";
                 if (recognition) try { recognition.abort(); } catch(e) {}
             } else {
-                btn.classList.remove("muted");
                 btn.innerText = "🎙️ Mic: ON";
-                if (isCallActive && !isPlayingFromQueue) {
+                if (isCallActive && !isPlayingAudio) {
                     try {
                         recognition.lang = document.getElementById("my-lang").value;
                         recognition.start();
