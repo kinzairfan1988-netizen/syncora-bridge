@@ -128,7 +128,7 @@
             overflow-y: auto;
         }
 
-        /* CONTACT SETUP / DIAL CARD */
+        /* CONTACT CARD */
         .contact-setup-card {
             background: var(--surface-card);
             border: 1px solid var(--border-graphite);
@@ -139,12 +139,7 @@
             gap: 10px;
         }
 
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
+        .input-group { display: flex; flex-direction: column; gap: 6px; }
         .input-field {
             background: var(--bg-obsidian);
             border: 1px solid var(--border-graphite);
@@ -185,11 +180,6 @@
             align-items: center;
             justify-content: center;
             gap: 6px;
-            transition: all 0.2s ease;
-        }
-        .quick-wa-btn:active {
-            transform: scale(0.98);
-            background: rgba(16, 185, 129, 0.25);
         }
 
         .section-label {
@@ -350,19 +340,39 @@
         /* ACTIVE CALL SCREEN */
         .call-screen-overlay {
             position: absolute; inset: 0; background: var(--bg-obsidian); z-index: 100;
-            display: none; flex-direction: column; justify-content: space-between; padding: 40px 24px 34px 24px;
+            display: none; flex-direction: column; justify-content: space-between; padding: 30px 24px 30px 24px;
         }
         .call-header { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-        .security-badge {
-            font-size: 11px; color: var(--text-muted); background: var(--surface-card);
-            padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border-subtle);
+
+        /* LANGUAGE SELECTOR BAR */
+        .lang-switch-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--surface-card);
+            border: 1px solid var(--border-graphite);
+            padding: 4px 8px;
+            border-radius: 20px;
+            margin-bottom: 6px;
         }
+        .lang-label { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+        .lang-select {
+            background: transparent;
+            border: none;
+            color: var(--accent-amber);
+            font-size: 12px;
+            font-weight: 700;
+            outline: none;
+            cursor: pointer;
+        }
+        .lang-select option { background: #18181b; color: #fff; }
+
         .caller-title { font-size: 22px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
         .call-duration { font-size: 14px; font-weight: 600; color: var(--accent-amber); font-variant-numeric: tabular-nums; }
 
         .call-stage-center {
             display: flex; flex-direction: column; align-items: center;
-            justify-content: center; position: relative; margin: 20px 0;
+            justify-content: center; position: relative; margin: 10px 0;
         }
         .pulse-wave-ring {
             width: 140px; height: 140px; border-radius: 50%; background: var(--accent-amber-dim);
@@ -380,12 +390,14 @@
             text-transform: uppercase;
         }
 
+        /* LIVE TRANSLATION SUBTITLES BOX */
         .subtitles-box {
             background: var(--surface-card); border: 1px solid var(--border-graphite);
-            border-radius: 14px; padding: 14px; min-height: 70px; display: flex;
-            flex-direction: column; justify-content: center; gap: 4px; font-size: 13px; text-align: center;
+            border-radius: 14px; padding: 12px 14px; min-height: 80px; display: flex;
+            flex-direction: column; justify-content: center; gap: 4px; text-align: center;
         }
-        .sub-text { color: var(--online-green); font-weight: 600; }
+        .sub-original { font-size: 11px; color: var(--text-muted); }
+        .sub-translated { font-size: 14px; color: var(--online-green); font-weight: 600; }
 
         .call-controls-row { display: flex; align-items: center; justify-content: space-around; }
         .ctrl-btn-circle {
@@ -442,7 +454,6 @@
         <!-- VIEW 1: DIRECTORY / CONTACT SETUP -->
         <div class="content-view" id="view-call">
             <main class="directory-container">
-                <!-- CONTACT NAME & PHONE SETUP CARD -->
                 <div class="contact-setup-card">
                     <div style="font-size: 12px; font-weight: 700; color: var(--accent-amber);">SAVE CONTACT & DIRECT LINE</div>
                     <div class="input-group">
@@ -497,7 +508,20 @@
         <!-- ACTIVE CALL OVERLAY -->
         <section class="call-screen-overlay" id="call-screen">
             <div class="call-header">
-                <div class="security-badge">🔒 Direct Line Active</div>
+                <!-- 2-LANGUAGE TRANSLATION SELECTOR -->
+                <div class="lang-switch-box">
+                    <span class="lang-label">Speak:</span>
+                    <select class="lang-select" id="my-speak-lang" onchange="changeSpeechLanguage()">
+                        <option value="ur-PK">Urdu (اردو)</option>
+                        <option value="en-US">English</option>
+                    </select>
+                    <span class="lang-label">→ Translate:</span>
+                    <select class="lang-select" id="target-translate-lang">
+                        <option value="en">English</option>
+                        <option value="ur">Urdu (اردو)</option>
+                    </select>
+                </div>
+
                 <div class="caller-title" id="call-status-label">Direct Partner</div>
                 <div class="call-duration" id="call-timer">00:00</div>
             </div>
@@ -507,8 +531,10 @@
                 <div class="caller-large-avatar" id="active-call-avatar">P2</div>
             </div>
 
+            <!-- LIVE GEMINI TRANSLATION CAPTION BOX -->
             <div class="subtitles-box">
-                <div class="sub-text" id="sub-caption">Connecting audio...</div>
+                <div class="sub-original" id="sub-original">Speak naturally...</div>
+                <div class="sub-translated" id="sub-translated">AI Live Translation Active</div>
             </div>
 
             <div class="call-controls-row">
@@ -521,7 +547,7 @@
             <!-- IN-CALL CHAT DRAWER -->
             <div class="in-call-chat-drawer" id="call-drawer">
                 <div class="drawer-header">
-                    <span>Live In-Call Chat</span>
+                    <span>Live Conversation & Subtitles</span>
                     <button class="drawer-close-btn" onclick="toggleCallDrawer()">✕</button>
                 </div>
                 <div class="chat-messages-area" id="drawer-chat-msgs"></div>
@@ -538,7 +564,6 @@
         let phoneParam = urlParams.get('phone');
         let nameParam = urlParams.get('name') ? decodeURIComponent(urlParams.get('name')) : null;
 
-        // LocalStorage fallback for saved contact info
         let savedContactName = localStorage.getItem("syncora_contact_name") || nameParam || "Direct Partner";
         let savedPhone = localStorage.getItem("syncora_contact_phone") || phoneParam || "";
 
@@ -553,6 +578,7 @@
         let audioContext = null;
         let mediaStream = null;
         let scriptNode = null;
+        let speechRecognition = null;
         let isCallActive = false;
         let isMuted = false;
         let isSpeakerOn = false;
@@ -593,11 +619,9 @@
             const finalName = nameInput || "Direct Partner";
             const cleanPhone = phoneInput.replace(/[^0-9]/g, '');
 
-            // Save in Browser Storage
             localStorage.setItem("syncora_contact_name", finalName);
             if (cleanPhone) localStorage.setItem("syncora_contact_phone", cleanPhone);
 
-            // Redirect with Clean URL
             const targetParam = cleanPhone ? `phone=${cleanPhone}` : `room=${currentRoom}`;
             window.location.href = `${window.location.pathname}?${targetParam}&name=${encodeURIComponent(finalName)}`;
         }
@@ -606,9 +630,7 @@
             let num = document.getElementById("target-phone").value.trim().replace(/[^0-9]/g, '');
             const contactName = document.getElementById("contact-name-input").value.trim() || savedContactName;
 
-            if (num.startsWith("03")) {
-                num = "92" + num.substring(1);
-            }
+            if (num.startsWith("03")) num = "92" + num.substring(1);
 
             const shareUrl = `${window.location.origin}${window.location.pathname}?phone=${encodeURIComponent(num || 'partner')}&name=${encodeURIComponent(contactName)}`;
             const msg = encodeURIComponent(`Assalam o Alaikum ${contactName}! Please join my direct voice line on Syncora: ${shareUrl}`);
@@ -645,9 +667,7 @@
                         appendChatMessage(msg.text, type, msg.time);
                     });
                 }
-            } catch (e) {
-                console.log("No previous messages:", e);
-            }
+            } catch (e) {}
         }
 
         function startIncomingRingtone() {
@@ -701,14 +721,19 @@
                         startIncomingRingtone();
                     } else if (data.type === "call_accepted") {
                         stopIncomingRingtone();
-                        document.getElementById("sub-caption").innerText = "Call Connected • Speak Naturally";
+                        document.getElementById("sub-translated").innerText = "Call Connected • Speak in Urdu or English";
                         startCallTimer();
                         startContinuousAudioCapture();
+                        startSpeechEngine();
                     } else if (data.type === "call_declined" || data.type === "call_ended") {
                         stopIncomingRingtone();
                         endCall(false);
                     } else if (data.type === "text_message") {
                         appendChatMessage(data.text, 'received', data.time);
+                    } else if (data.type === "live_subtitle") {
+                        // Partner ki live translated subtitles show karein
+                        document.getElementById("sub-original").innerText = `Partner said: "${data.original}"`;
+                        document.getElementById("sub-translated").innerText = `AI: ${data.translated}`;
                     }
                 } else if (event.data instanceof ArrayBuffer) {
                     playRawAudio(event.data);
@@ -720,6 +745,91 @@
                 document.getElementById("conn-status").innerText = "Offline";
                 setTimeout(initSocket, 1500);
             };
+        }
+
+        // --- GEMINI LIVE SPEECH TRANSLATION ---
+        function initSpeechEngine() {
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRec) return;
+
+            speechRecognition = new SpeechRec();
+            speechRecognition.continuous = true;
+            speechRecognition.interimResults = false;
+            speechRecognition.lang = document.getElementById("my-speak-lang").value;
+
+            speechRecognition.onresult = async (event) => {
+                if (!isCallActive || isMuted) return;
+                const lastIdx = event.results.length - 1;
+                const originalText = event.results[lastIdx][0].transcript.trim();
+
+                if (originalText.length > 0) {
+                    document.getElementById("sub-original").innerText = `You said: "${originalText}"`;
+                    document.getElementById("sub-translated").innerText = "Translating via Gemini...";
+
+                    const sourceLang = document.getElementById("my-speak-lang").value.split("-")[0];
+                    const targetLang = document.getElementById("target-translate-lang").value;
+
+                    // Send to backend Gemini API
+                    try {
+                        const res = await fetch("/translate", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                text: originalText,
+                                source_lang: sourceLang,
+                                target_lang: targetLang
+                            })
+                        });
+                        const data = await res.json();
+                        const translatedText = data.translated_text || originalText;
+
+                        document.getElementById("sub-translated").innerText = `AI: ${translatedText}`;
+
+                        // Broadcast live subtitle to partner over websocket
+                        if (socket && socket.readyState === WebSocket.OPEN) {
+                            socket.send(JSON.stringify({
+                                type: "live_subtitle",
+                                original: originalText,
+                                translated: translatedText
+                            }));
+                        }
+                    } catch (err) {
+                        console.log("Translation error:", err);
+                    }
+                }
+            };
+
+            speechRecognition.onend = () => {
+                if (isCallActive && !isMuted) {
+                    try { speechRecognition.start(); } catch (e) {}
+                }
+            };
+        }
+
+        function startSpeechEngine() {
+            if (speechRecognition && isCallActive && !isMuted) {
+                try { speechRecognition.start(); } catch (e) {}
+            }
+        }
+
+        function changeSpeechLanguage() {
+            const selectedLang = document.getElementById("my-speak-lang").value;
+            // Auto flip target
+            if (selectedLang.startsWith("ur")) {
+                document.getElementById("target-translate-lang").value = "en";
+            } else {
+                document.getElementById("target-translate-lang").value = "ur";
+            }
+
+            if (speechRecognition) {
+                speechRecognition.lang = selectedLang;
+                if (isCallActive) {
+                    try {
+                        speechRecognition.stop();
+                        setTimeout(() => { speechRecognition.start(); }, 200);
+                    } catch (e) {}
+                }
+            }
         }
 
         function sendChatMessage(source) {
@@ -833,7 +943,7 @@
             await ensureAudioContext();
             isCallActive = true;
             document.getElementById("call-screen").style.display = "flex";
-            document.getElementById("sub-caption").innerText = "Waiting for partner to answer...";
+            document.getElementById("sub-translated").innerText = "Waiting for partner to answer...";
 
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ type: "call_invite" }));
@@ -846,10 +956,11 @@
             document.getElementById("incoming-modal").style.display = "none";
             isCallActive = true;
             document.getElementById("call-screen").style.display = "flex";
-            document.getElementById("sub-caption").innerText = "Call Connected • Speak Naturally";
+            document.getElementById("sub-translated").innerText = "Call Connected • Speak Naturally";
 
             startCallTimer();
             startContinuousAudioCapture();
+            startSpeechEngine();
 
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ type: "call_accepted" }));
@@ -882,6 +993,7 @@
             document.getElementById("call-timer").innerText = "00:00";
 
             if (scriptNode) { scriptNode.disconnect(); scriptNode = null; }
+            if (speechRecognition) { try { speechRecognition.stop(); } catch (e) {} }
             if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
 
             playbackTime = 0;
@@ -911,6 +1023,7 @@
         window.onload = () => {
             updateUIForCurrentContact();
             initSocket();
+            initSpeechEngine();
             fetchOfflineHistory();
         };
     </script>
