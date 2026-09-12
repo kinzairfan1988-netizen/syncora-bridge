@@ -38,7 +38,6 @@
             overflow-x: hidden;
         }
 
-        /* Responsive Top Bar */
         .navbar {
             display: flex;
             align-items: center;
@@ -127,12 +126,11 @@
             cursor: pointer;
         }
 
-        /* Workspace Grid */
         .workspace-container {
             max-width: 1200px;
             width: 100%;
             margin: 0 auto;
-            padding: 16px 14px 90px 14px; /* Bottom padding for mobile dock */
+            padding: 16px 14px 90px 14px;
             flex: 1;
             display: grid;
             grid-template-columns: 1fr 380px;
@@ -250,7 +248,6 @@
             50% { height: 14px; }
         }
 
-        /* Config Grid */
         .config-strip {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -262,9 +259,7 @@
         }
 
         @media (max-width: 600px) {
-            .config-strip {
-                grid-template-columns: 1fr 1fr;
-            }
+            .config-strip { grid-template-columns: 1fr 1fr; }
         }
 
         .config-field {
@@ -291,7 +286,6 @@
             width: 100%;
         }
 
-        /* Subtitles Panel */
         .sidebar-panel {
             background: var(--surface-card);
             border: 1px solid var(--border-subtle);
@@ -360,7 +354,6 @@
         .item-original { color: #cbd5e1; }
         .item-translated { color: var(--success-color); font-weight: 600; }
 
-        /* Floating Bottom Dock (Mobile Friendly) */
         .bottom-call-dock {
             position: fixed;
             bottom: 0;
@@ -489,7 +482,6 @@
                         <option value="en-US">🇬🇧 English</option>
                         <option value="ms-MY">🇲🇾 Malay</option>
                         <option value="zh-CN">🇨🇳 Chinese</option>
-                        <option value="ar-SA">🇸🇦 Arabic</option>
                     </select>
                 </div>
                 <div class="config-field">
@@ -499,7 +491,6 @@
                         <option value="ms-MY">🇲🇾 Malay</option>
                         <option value="ur-PK">🇵🇰 Urdu</option>
                         <option value="zh-CN">🇨🇳 Chinese</option>
-                        <option value="ar-SA">🇸🇦 Arabic</option>
                     </select>
                 </div>
             </div>
@@ -540,10 +531,12 @@
         const myClientId = 'user_' + Math.random().toString(36).substring(2, 9);
         let socket = null;
         let recognition = null;
-        let currentAudio = null;
         let isCallActive = false;
-        let isPartnerSpeaking = false;
         let isMuted = false;
+
+        // Audio Queue System (Prevents broken / choppy audio overlap)
+        const audioQueue = [];
+        let isPlayingFromQueue = false;
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -592,8 +585,9 @@
 
                 appendTranscript(data.sender_name, data.original, data.translated, isMe);
 
-                if (!isMe) {
-                    playPartnerAudio(data.translated, data.target_lang, data.gender);
+                // Add to audio queue only for remote partner
+                if (!isMe && data.translated) {
+                    enqueueAudio(data.translated, data.target_lang, data.gender);
                 }
             };
 
@@ -620,47 +614,51 @@
             feed.scrollTop = feed.scrollHeight;
         }
 
-        function playPartnerAudio(text, lang, gender) {
-            if (!text || text.startsWith("[")) return;
+        function enqueueAudio(text, lang, gender) {
+            audioQueue.push({ text, lang, gender });
+            processAudioQueue();
+        }
 
-            isPartnerSpeaking = true;
+        function processAudioQueue() {
+            if (isPlayingFromQueue || audioQueue.length === 0) return;
+
+            isPlayingFromQueue = true;
+            const current = audioQueue.shift();
+
+            // Mute local mic strictly while playing remote speech
             if (recognition) {
                 try { recognition.abort(); } catch(e) {}
-            }
-
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio = null;
             }
 
             const remoteTile = document.getElementById("remote-tile");
             remoteTile.classList.add("speaking");
 
-            const cleanLang = (lang || "en").split("-")[0].toLowerCase();
-            const url = `/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(cleanLang)}&gender=${encodeURIComponent(gender)}`;
-            currentAudio = new Audio(url);
+            const cleanLang = (current.lang || "en").split("-")[0].toLowerCase();
+            const url = `/tts?text=${encodeURIComponent(current.text)}&lang=${encodeURIComponent(cleanLang)}&gender=${encodeURIComponent(current.gender)}`;
+            const audio = new Audio(url);
 
-            const unlockMic = () => {
+            const onFinish = () => {
                 remoteTile.classList.remove("speaking");
-                currentAudio = null;
-                setTimeout(() => {
-                    isPartnerSpeaking = false;
-                    restartMic();
-                }, 400);
+                isPlayingFromQueue = false;
+
+                if (audioQueue.length > 0) {
+                    processAudioQueue();
+                } else {
+                    // Buffer of 400ms before reopening mic
+                    setTimeout(() => {
+                        if (isCallActive && !isMuted) {
+                            try {
+                                recognition.lang = document.getElementById("my-lang").value;
+                                recognition.start();
+                            } catch(e) {}
+                        }
+                    }, 400);
+                }
             };
 
-            currentAudio.onended = unlockMic;
-            currentAudio.onerror = unlockMic;
-            currentAudio.play().catch(unlockMic);
-        }
-
-        function restartMic() {
-            if (recognition && isCallActive && !isPartnerSpeaking && !isMuted) {
-                try {
-                    recognition.lang = document.getElementById("my-lang").value;
-                    recognition.start();
-                } catch(e) {}
-            }
+            audio.onended = onFinish;
+            audio.onerror = onFinish;
+            audio.play().catch(onFinish);
         }
 
         function setupSpeechRecognition() {
@@ -674,12 +672,13 @@
             recognition.interimResults = false;
 
             recognition.onresult = (event) => {
-                if (!isCallActive || isPartnerSpeaking || isMuted) return;
+                if (!isCallActive || isPlayingFromQueue || isMuted) return;
 
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
                     if (event.results[i].isFinal) {
                         const transcript = event.results[i][0].transcript.trim();
-                        if (!transcript) continue;
+                        // Ignore single junk clicks / noise
+                        if (!transcript || transcript.length < 2) continue;
 
                         const localTile = document.getElementById("local-tile");
                         localTile.classList.add("speaking");
@@ -703,21 +702,24 @@
             };
 
             recognition.onend = () => {
-                if (isCallActive && !isPartnerSpeaking && !isMuted) {
-                    restartMic();
+                if (isCallActive && !isPlayingFromQueue && !isMuted) {
+                    try {
+                        recognition.lang = document.getElementById("my-lang").value;
+                        recognition.start();
+                    } catch(e) {}
                 }
             };
         }
 
         function startCall() {
             isCallActive = true;
-            isPartnerSpeaking = false;
             isMuted = false;
 
             document.getElementById("start-call-btn").style.display = "none";
             document.getElementById("end-call-btn").style.display = "flex";
             document.getElementById("mute-toggle-btn").style.display = "flex";
 
+            // User gesture unlocks browser audio policies
             const unlock = new Audio();
             unlock.play().catch(() => {});
 
@@ -730,16 +732,15 @@
 
         function endCall() {
             isCallActive = false;
+            audioQueue.length = 0;
+            isPlayingFromQueue = false;
+
             document.getElementById("start-call-btn").style.display = "flex";
             document.getElementById("end-call-btn").style.display = "none";
             document.getElementById("mute-toggle-btn").style.display = "none";
 
             if (recognition) {
                 try { recognition.abort(); } catch(e) {}
-            }
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio = null;
             }
             if (socket) {
                 socket.close();
@@ -761,7 +762,12 @@
             } else {
                 btn.classList.remove("muted");
                 btn.innerText = "🎙️ Mic: ON";
-                restartMic();
+                if (isCallActive && !isPlayingFromQueue) {
+                    try {
+                        recognition.lang = document.getElementById("my-lang").value;
+                        recognition.start();
+                    } catch(e) {}
+                }
             }
         }
 
