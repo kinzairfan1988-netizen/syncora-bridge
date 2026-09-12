@@ -169,17 +169,24 @@
         }
 
         .quick-wa-btn {
-            background: rgba(16, 185, 129, 0.12);
-            border: 1px solid rgba(16, 185, 129, 0.3);
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.4);
             color: var(--online-green);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 600;
+            padding: 11px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
             cursor: pointer;
             text-align: center;
-            text-decoration: none;
-            display: block;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+        .quick-wa-btn:active {
+            transform: scale(0.98);
+            background: rgba(16, 185, 129, 0.25);
         }
 
         .section-label {
@@ -429,14 +436,15 @@
         <!-- VIEW 1: DIRECTORY / DIAL NUMBER -->
         <div class="content-view" id="view-call">
             <main class="directory-container">
-                <!-- DIAL NUMBER SECTION -->
                 <div class="dial-bar-card">
-                    <div style="font-size: 12px; font-weight: 700; color: var(--accent-amber);">DIRECT PHONE CALL / SMS LINE</div>
+                    <div style="font-size: 12px; font-weight: 700; color: var(--accent-amber);">DIRECT PHONE LINE & WHATSAPP</div>
                     <div class="dial-input-row">
-                        <input type="tel" id="target-phone" class="dial-input" placeholder="Enter Phone (e.g. 03001234567)">
+                        <input type="tel" id="target-phone" class="dial-input" placeholder="Enter Mobile (e.g. 03001234567)">
                         <button class="btn-set-target" onclick="switchTargetNumber()">Connect</button>
                     </div>
-                    <a id="wa-invite-link" href="#" target="_blank" class="quick-wa-btn">💬 Send Invite Link on WhatsApp</a>
+                    <button class="quick-wa-btn" onclick="openDirectWhatsApp()">
+                        <span>💬</span> Open in WhatsApp App Directly
+                    </button>
                 </div>
 
                 <div class="section-label">Active Connection Target</div>
@@ -454,7 +462,7 @@
             </main>
         </div>
 
-        <!-- VIEW 2: FULL CHAT VIEW WITH PERSISTENT INBOX -->
+        <!-- VIEW 2: CHAT VIEW -->
         <div class="content-view chat-view-container" id="view-chat">
             <div class="chat-messages-area" id="main-chat-msgs"></div>
             <div class="chat-input-bar">
@@ -466,9 +474,9 @@
         <!-- INCOMING CALL MODAL -->
         <div class="incoming-modal-backdrop" id="incoming-modal">
             <div class="incoming-dialog">
-                <div class="incoming-avatar" id="incoming-caller-avatar">📞</div>
+                <div class="incoming-avatar">📞</div>
                 <h3 style="font-size: 20px; margin-bottom: 6px;">Incoming Call...</h3>
-                <p style="font-size: 13px; color: var(--text-secondary);" id="incoming-line-label">Direct Voice Channel</p>
+                <p style="font-size: 13px; color: var(--text-secondary);">Direct Voice Channel</p>
                 <div class="incoming-actions">
                     <button class="btn-call-action btn-decline" onclick="declineCall()">Decline</button>
                     <button class="btn-call-action btn-accept" onclick="acceptCall()">Accept</button>
@@ -550,11 +558,27 @@
                 document.getElementById("active-avatar-initials").innerText = "P2";
                 document.getElementById("active-call-avatar").innerText = "P2";
             }
+        }
 
-            // Setup WhatsApp invite link
-            const shareUrl = window.location.origin + window.location.pathname + `?phone=${encodeURIComponent(targetPhoneInput.value || 'partner')}`;
-            const waText = encodeURIComponent(`Assalam o Alaikum! Please click this secure link to join my direct voice call and message line on Syncora: ${shareUrl}`);
-            document.getElementById("wa-invite-link").href = `https://api.whatsapp.com/send?phone=${encodeURIComponent(targetPhoneInput.value)}&text=${waText}`;
+        // --- DIRECT WHATSAPP APPLICATION OPENER (DEEP LINK) ---
+        function openDirectWhatsApp() {
+            let num = document.getElementById("target-phone").value.trim().replace(/[^0-9]/g, '');
+            
+            // Format Pakistani Numbers: 0300 -> 92300
+            if (num.startsWith("03")) {
+                num = "92" + num.substring(1);
+            }
+
+            const shareUrl = window.location.origin + window.location.pathname + `?phone=${encodeURIComponent(num || 'partner')}`;
+            const msg = encodeURIComponent(`Assalam o Alaikum! Please join my direct voice line on Syncora: ${shareUrl}`);
+
+            if (num) {
+                // Direct WhatsApp Application Chat Open
+                window.location.href = `whatsapp://send?phone=${num}&text=${msg}`;
+            } else {
+                // If no number entered, open WhatsApp contact picker
+                window.location.href = `whatsapp://send?text=${msg}`;
+            }
         }
 
         function switchTargetNumber() {
@@ -579,7 +603,6 @@
             document.getElementById("view-chat").style.display = (view === 'chat') ? 'flex' : 'none';
         }
 
-        // --- FETCH SAVED OFFLINE MESSAGES ---
         async function fetchOfflineHistory() {
             try {
                 const res = await fetch(`/messages/${currentRoom}`);
@@ -595,7 +618,6 @@
             }
         }
 
-        // --- RINGTONE & VIBRATION ---
         function startIncomingRingtone() {
             stopIncomingRingtone();
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -668,7 +690,6 @@
             };
         }
 
-        // --- CHAT MESSAGING ---
         function sendChatMessage(source) {
             const inputEl = document.getElementById(source === 'drawer' ? "drawer-chat-input" : "main-chat-input");
             const text = inputEl.value.trim();
@@ -714,7 +735,6 @@
             drawer.style.display = (drawer.style.display === "flex") ? "none" : "flex";
         }
 
-        // --- AUDIO ENGINE ---
         async function ensureAudioContext() {
             if (!audioContext || audioContext.state === "closed") {
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
