@@ -266,7 +266,7 @@
             <div class="panel-header">Interpretation Feed</div>
             <div class="transcript-feed" id="captions">
                 <div id="placeholder-msg" style="text-align: center; color: var(--text-muted); font-size: 12px; margin: auto;">
-                    Tap "Start Call" to begin speaking.
+                    Tap "Start Call" below to activate live voice.
                 </div>
             </div>
         </aside>
@@ -294,10 +294,6 @@
 
         const audioQueue = [];
         let isPlayingAudio = false;
-
-        // Debounce Buffer for speech completeness
-        let speechBuffer = "";
-        let speechTimer = null;
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -355,7 +351,7 @@
             socket.onclose = () => {
                 document.getElementById("status-dot").classList.remove("live");
                 document.getElementById("call-status").innerText = "Disconnected";
-                if (isCallActive) setTimeout(initSocket, 2500);
+                if (isCallActive) setTimeout(initSocket, 2000);
             };
         }
 
@@ -381,7 +377,6 @@
             isPlayingAudio = true;
             const current = audioQueue.shift();
 
-            // Mute mic strictly while listening
             if (recognition) {
                 try { recognition.abort(); } catch(e) {}
             }
@@ -407,7 +402,7 @@
                                 recognition.start();
                             } catch(e) {}
                         }
-                    }, 400);
+                    }, 350);
                 }
             };
 
@@ -416,63 +411,64 @@
             audio.play().catch(finishAudio);
         }
 
-        function dispatchFinalSpeech(fullText) {
-            const trimmed = fullText.trim();
-            if (!trimmed || trimmed.length < 2) return;
-
-            const localTile = document.getElementById("local-tile");
-            localTile.classList.add("speaking");
-            setTimeout(() => localTile.classList.remove("speaking"), 900);
-
-            const myLangVal = document.getElementById("my-lang").value;
-            const targetLangVal = document.getElementById("target-lang").value;
-
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    sender_id: myClientId,
-                    sender_name: document.getElementById("username").value || "Ali",
-                    gender: document.getElementById("gender").value,
-                    source_lang: myLangVal,
-                    target_lang: targetLangVal,
-                    text: trimmed
-                }));
-            }
-        }
-
         function setupSpeechRecognition() {
             if (!SpeechRecognition) {
-                alert("Please open this link in Google Chrome.");
+                alert("Please open this link in Google Chrome or Edge.");
                 return;
             }
 
             recognition = new SpeechRecognition();
             recognition.continuous = true;
-            recognition.interimResults = true; // Collect live chunks
+            recognition.interimResults = false;
+
+            recognition.onstart = () => {
+                document.getElementById("local-tile").classList.remove("speaking");
+            };
 
             recognition.onresult = (event) => {
                 if (!isCallActive || isPlayingAudio || isMuted) return;
 
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    const chunk = event.results[i][0].transcript;
                     if (event.results[i].isFinal) {
-                        speechBuffer += " " + chunk;
-                        
-                        // Wait 500ms for user to finish full sentence before sending
-                        if (speechTimer) clearTimeout(speechTimer);
-                        speechTimer = setTimeout(() => {
-                            dispatchFinalSpeech(speechBuffer);
-                            speechBuffer = "";
-                        }, 500);
+                        const transcript = event.results[i][0].transcript.trim();
+                        if (!transcript) continue;
+
+                        const localTile = document.getElementById("local-tile");
+                        localTile.classList.add("speaking");
+                        setTimeout(() => localTile.classList.remove("speaking"), 1000);
+
+                        const myLangVal = document.getElementById("my-lang").value;
+                        const targetLangVal = document.getElementById("target-lang").value;
+
+                        if (socket && socket.readyState === WebSocket.OPEN) {
+                            socket.send(JSON.stringify({
+                                sender_id: myClientId,
+                                sender_name: document.getElementById("username").value || "Ali",
+                                gender: document.getElementById("gender").value,
+                                source_lang: myLangVal,
+                                target_lang: targetLangVal,
+                                text: transcript
+                            }));
+                        }
                     }
                 }
             };
 
+            recognition.onerror = (event) => {
+                if (event.error === 'not-allowed') {
+                    alert("Microphone permission is blocked. Please allow mic in browser settings.");
+                }
+            };
+
             recognition.onend = () => {
+                // Auto restart mic continuously
                 if (isCallActive && !isPlayingAudio && !isMuted) {
-                    try {
-                        recognition.lang = document.getElementById("my-lang").value;
-                        recognition.start();
-                    } catch(e) {}
+                    setTimeout(() => {
+                        try {
+                            recognition.lang = document.getElementById("my-lang").value;
+                            recognition.start();
+                        } catch(e) {}
+                    }, 250);
                 }
             };
         }
@@ -480,19 +476,18 @@
         function startCall() {
             isCallActive = true;
             isMuted = false;
-            speechBuffer = "";
 
             document.getElementById("start-call-btn").style.display = "none";
             document.getElementById("end-call-btn").style.display = "flex";
             document.getElementById("mute-toggle-btn").style.display = "flex";
 
+            // Audio unlock
             const unlock = new Audio();
             unlock.play().catch(() => {});
 
             initSocket();
             setupSpeechRecognition();
 
-            // Strictly enforce Urdu on startup
             recognition.lang = document.getElementById("my-lang").value;
             try { recognition.start(); } catch(e) {}
         }
