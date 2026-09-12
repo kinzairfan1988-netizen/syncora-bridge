@@ -66,140 +66,57 @@
             z-index: 10;
         }
 
-        .brand-title {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 19px;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
+        .brand-cluster { display: flex; align-items: center; gap: 8px; }
+        .brand-title { font-family: 'Space Grotesk', sans-serif; font-size: 19px; font-weight: 700; color: var(--text-primary); }
         .brand-title span { color: var(--accent-amber); }
 
         .status-pill {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 11px;
-            color: var(--text-muted);
-            background: var(--surface-card);
-            padding: 3px 8px;
-            border-radius: 12px;
-            border: 1px solid var(--border-subtle);
+            display: flex; align-items: center; gap: 5px; font-size: 11px;
+            color: var(--text-muted); background: var(--surface-card);
+            padding: 3px 8px; border-radius: 12px; border: 1px solid var(--border-subtle);
         }
-
         .dot-indicator { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
         .dot-indicator.live { background: var(--online-green); box-shadow: 0 0 6px var(--online-green); }
 
         .icon-btn {
-            background: var(--surface-card);
-            border: 1px solid var(--border-graphite);
-            color: var(--text-primary);
-            padding: 6px 12px;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: 600;
+            background: var(--surface-card); border: 1px solid var(--border-graphite);
+            color: var(--text-primary); padding: 6px 12px; border-radius: 10px;
+            cursor: pointer; font-size: 12px; font-weight: 600;
         }
 
-        .directory-container {
-            flex: 1;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .section-label {
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            color: var(--text-muted);
-        }
+        .directory-container { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+        .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); }
 
         .contact-card {
-            background: var(--surface-card);
-            border: 1px solid var(--border-graphite);
-            border-radius: 14px;
-            padding: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            background: var(--surface-card); border: 1px solid var(--border-graphite);
+            border-radius: 14px; padding: 16px; display: flex; align-items: center; justify-content: space-between;
         }
-
         .user-identity { display: flex; align-items: center; gap: 14px; }
         .avatar-box {
-            width: 44px; height: 44px; border-radius: 12px;
-            background: #1c1c21; border: 1px solid var(--border-subtle);
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 700; color: var(--accent-amber);
+            width: 44px; height: 44px; border-radius: 12px; background: #1c1c21;
+            border: 1px solid var(--border-subtle); display: flex; align-items: center;
+            justify-content: center; font-weight: 700; color: var(--accent-amber);
         }
 
         .contact-name { font-size: 14px; font-weight: 600; }
         .contact-sub { font-size: 12px; color: var(--text-muted); }
 
         .call-trigger-btn {
-            background: var(--accent-amber-dim);
-            border: 1px solid rgba(245, 158, 11, 0.3);
-            color: var(--accent-amber);
-            width: 44px; height: 44px; border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 18px; cursor: pointer;
+            background: var(--accent-amber-dim); border: 1px solid rgba(245, 158, 11, 0.3);
+            color: var(--accent-amber); width: 44px; height: 44px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer;
         }
 
-        .incoming-modal-backdrop {
-            position: absolute;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(8px);
-            z-index: 200;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 20px;
-            padding: 24px;
-        }
-
-        .incoming-dialog {
-            background: var(--surface-card);
-            border: 1px solid var(--accent-amber);
-            border-radius: 20px;
-            padding: 24px;
-            width: 100%;
-            text-align: center;
-            box-shadow: 0 0 30px var(--accent-amber-glow);
-        }
-
-        .btn-answer {
-            background: var(--online-green);
-            color: white;
-            font-weight: 700;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 30px;
-            font-size: 15px;
-            cursor: pointer;
-            margin-top: 15px;
-        }
-
+        /* IN-CALL OVERLAY */
         .call-screen-overlay {
-            position: absolute;
-            inset: 0;
-            background: var(--bg-obsidian);
-            z-index: 100;
-            display: none;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 40px 24px 34px 24px;
+            position: absolute; inset: 0; background: var(--bg-obsidian); z-index: 100;
+            display: none; flex-direction: column; justify-content: space-between; padding: 40px 24px 34px 24px;
         }
-
         .call-header { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
         .security-badge {
-            font-size: 11px; color: var(--text-muted);
-            background: var(--surface-card); padding: 4px 12px;
-            border-radius: 20px; border: 1px solid var(--border-subtle);
+            font-size: 11px; color: var(--text-muted); background: var(--surface-card);
+            padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border-subtle);
         }
-
         .caller-title { font-size: 22px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
         .call-duration { font-size: 14px; font-weight: 600; color: var(--accent-amber); font-variant-numeric: tabular-nums; }
 
@@ -207,40 +124,34 @@
             display: flex; flex-direction: column; align-items: center;
             justify-content: center; position: relative; margin: 20px 0;
         }
-
         .pulse-wave-ring {
-            width: 140px; height: 140px; border-radius: 50%;
-            background: var(--accent-amber-dim); border: 1px solid rgba(245, 158, 11, 0.2);
-            position: absolute; animation: ripple 2s infinite ease-out;
+            width: 140px; height: 140px; border-radius: 50%; background: var(--accent-amber-dim);
+            border: 1px solid rgba(245, 158, 11, 0.2); position: absolute; animation: ripple 2s infinite ease-out;
         }
-
         @keyframes ripple {
             0% { transform: scale(0.9); opacity: 0.8; }
             100% { transform: scale(1.4); opacity: 0; }
         }
-
         .caller-large-avatar {
-            width: 108px; height: 108px; border-radius: 50%;
-            background: #18181b; border: 2px solid var(--accent-amber);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 36px; font-weight: 700; color: var(--accent-amber);
+            width: 108px; height: 108px; border-radius: 50%; background: #18181b;
+            border: 2px solid var(--accent-amber); display: flex; align-items: center;
+            justify-content: center; font-size: 36px; font-weight: 700; color: var(--accent-amber);
             position: relative; z-index: 2; box-shadow: 0 0 30px var(--accent-amber-glow);
         }
 
         .subtitles-box {
             background: var(--surface-card); border: 1px solid var(--border-graphite);
-            border-radius: 14px; padding: 14px; min-height: 70px;
-            display: flex; flex-direction: column; justify-content: center;
-            gap: 4px; font-size: 13px; text-align: center;
+            border-radius: 14px; padding: 14px; min-height: 80px; display: flex;
+            flex-direction: column; justify-content: center; gap: 4px; font-size: 13px; text-align: center;
         }
+        .sub-author { font-size: 11px; font-weight: 700; color: var(--accent-amber); text-transform: uppercase; }
+        .sub-text { color: var(--text-primary); }
 
         .call-controls-row { display: flex; align-items: center; justify-content: space-around; }
-
         .ctrl-btn-circle {
-            width: 54px; height: 54px; border-radius: 50%;
-            border: 1px solid var(--border-graphite); background: var(--surface-card);
-            color: var(--text-primary); font-size: 18px; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
+            width: 54px; height: 54px; border-radius: 50%; border: 1px solid var(--border-graphite);
+            background: var(--surface-card); color: var(--text-primary); font-size: 18px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
         .ctrl-btn-circle.active { background: var(--text-primary); color: #000; }
         .ctrl-btn-circle.hangup { background: var(--danger-red); border-color: var(--danger-red); color: white; }
@@ -250,16 +161,18 @@
 
     <div class="app-viewport">
         <header class="top-navbar">
-            <div class="brand-title">Syncora <span>Terminal</span></div>
-            <div class="status-pill">
-                <span class="dot-indicator" id="status-dot"></span>
-                <span id="conn-status">Connecting</span>
+            <div class="brand-cluster">
+                <div class="brand-title">Syncora <span>Terminal</span></div>
+                <div class="status-pill">
+                    <span class="dot-indicator" id="status-dot"></span>
+                    <span id="conn-status">Connecting</span>
+                </div>
             </div>
             <button class="icon-btn" onclick="copyInviteLink()" id="copy-btn">📋 Share Link</button>
         </header>
 
         <main class="directory-container">
-            <div class="section-label">Live Call Line</div>
+            <div class="section-label">Direct Voice Line</div>
 
             <div class="contact-card">
                 <div class="user-identity">
@@ -269,22 +182,13 @@
                         <div class="contact-sub" id="room-sub">Room: Syncing...</div>
                     </div>
                 </div>
-                <button class="call-trigger-btn" onclick="startOutgoingCall()" title="Start Call">📞</button>
+                <button class="call-trigger-btn" onclick="joinCall()" title="Join Call">📞</button>
             </div>
         </main>
 
-        <div class="incoming-modal-backdrop" id="incoming-modal">
-            <div class="incoming-dialog">
-                <div style="font-size: 32px; margin-bottom: 8px;">📞</div>
-                <h3 style="font-size: 18px; margin-bottom: 4px;">Incoming Voice Call</h3>
-                <p style="font-size: 13px; color: var(--text-secondary);">Direct Audio Channel</p>
-                <button class="btn-answer" onclick="acceptIncomingCall()">Tap to Answer</button>
-            </div>
-        </div>
-
         <section class="call-screen-overlay" id="call-screen">
             <div class="call-header">
-                <div class="security-badge">🔒 Encrypted Line Active</div>
+                <div class="security-badge">🔒 Live Voice Engine Active</div>
                 <div class="caller-title">Direct Partner</div>
                 <div class="call-duration" id="call-timer">00:00</div>
             </div>
@@ -295,16 +199,15 @@
             </div>
 
             <div class="subtitles-box">
-                <div id="sub-caption" style="color: var(--online-green); font-weight: 600;">Connecting audio line...</div>
+                <div class="sub-author" id="sub-author">Status</div>
+                <div class="sub-text" id="sub-caption">Ready • Speak naturally</div>
             </div>
 
             <div class="call-controls-row">
                 <button class="ctrl-btn-circle" id="mute-btn" onclick="toggleMute()">🎙️</button>
-                <button class="ctrl-btn-circle hangup" onclick="hangupCall(true)">🛑</button>
+                <button class="ctrl-btn-circle hangup" onclick="endCall()">🛑</button>
             </div>
         </section>
-
-        <audio id="remote-audio" autoplay playsinline></audio>
     </div>
 
     <script>
@@ -315,36 +218,14 @@
         }
         document.getElementById("room-sub").innerText = `Room: ${roomId}`;
 
+        const myId = "usr-" + Math.random().toString(36).substring(2, 8);
         let socket = null;
-        let peerConnection = null;
-        let localStream = null;
+        let recognition = null;
+        let isCallActive = false;
+        let isMuted = false;
+        let isSpeakingPlayback = false;
         let timerInterval = null;
         let elapsedSeconds = 0;
-        let isMuted = false;
-        let pendingOffer = null;
-        let candidateQueue = [];
-
-        // Public Open Relay (Metered TURN) configuration
-        const rtcConfig = {
-            iceServers: [
-                { urls: "stun:stun.relay.metered.ca:80" },
-                {
-                    urls: "turn:standard.relay.metered.ca:80",
-                    username: "6a89467614d9526ee4347717",
-                    credential: "fQ0M77B3/hP+oQ3j"
-                },
-                {
-                    urls: "turn:standard.relay.metered.ca:443",
-                    username: "6a89467614d9526ee4347717",
-                    credential: "fQ0M77B3/hP+oQ3j"
-                },
-                {
-                    urls: "turn:standard.relay.metered.ca:443?transport=tcp",
-                    username: "6a89467614d9526ee4347717",
-                    credential: "fQ0M77B3/hP+oQ3j"
-                }
-            ]
-        };
 
         function copyInviteLink() {
             navigator.clipboard.writeText(window.location.href).then(() => {
@@ -354,7 +235,7 @@
             });
         }
 
-        function initSignaling() {
+        function initSocket() {
             const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
             socket = new WebSocket(`${wsProtocol}${window.location.host}/ws/${roomId}`);
 
@@ -363,132 +244,93 @@
                 document.getElementById("conn-status").innerText = "Online";
             };
 
-            socket.onmessage = async (event) => {
+            socket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-
-                if (data.type === "offer") {
-                    pendingOffer = data.offer;
-                    document.getElementById("incoming-modal").style.display = "flex";
-                } else if (data.type === "answer") {
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-                    await drainCandidates();
-                    document.getElementById("sub-caption").innerText = "Call Connected • Speak Now";
-                    startTimer();
-                } else if (data.type === "candidate") {
-                    if (peerConnection && peerConnection.remoteDescription) {
-                        try {
-                            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-                        } catch (e) {}
-                    } else {
-                        candidateQueue.push(data.candidate);
-                    }
-                } else if (data.type === "hangup") {
-                    hangupCall(false);
+                if (data.sender_id !== myId) {
+                    handleIncomingAudio(data.text);
                 }
             };
 
             socket.onclose = () => {
                 document.getElementById("status-dot").classList.remove("live");
                 document.getElementById("conn-status").innerText = "Offline";
-                setTimeout(initSignaling, 2000);
+                setTimeout(initSocket, 1500);
             };
         }
 
-        async function drainCandidates() {
-            while (candidateQueue.length > 0) {
-                const cand = candidateQueue.shift();
-                try {
-                    await peerConnection.addIceCandidate(new RTCIceCandidate(cand));
-                } catch (e) {}
+        function initRecognition() {
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRec) {
+                alert("Please open this link in Google Chrome for voice support.");
+                return;
             }
-        }
 
-        async function setupMedia() {
-            if (!localStream) {
-                localStream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
-                    },
-                    video: false
-                });
-            }
-        }
+            recognition = new SpeechRec();
+            recognition.continuous = true;
+            recognition.interimResults = false;
+            recognition.lang = "ur-PK";
 
-        function createPeerConnection() {
-            peerConnection = new RTCPeerConnection(rtcConfig);
+            recognition.onresult = (event) => {
+                // Agar samne wale ki aawaz chal rahi ho ya user mute ho to apni aawaz mat bhejo
+                if (isSpeakingPlayback || isMuted) return;
 
-            localStream.getTracks().forEach(track => {
-                peerConnection.addTrack(track, localStream);
-            });
+                const lastIdx = event.results.length - 1;
+                const transcript = event.results[lastIdx][0].transcript.trim();
 
-            peerConnection.ontrack = (event) => {
-                const audioEl = document.getElementById("remote-audio");
-                if (event.streams && event.streams[0]) {
-                    audioEl.srcObject = event.streams[0];
-                    audioEl.play().catch(e => console.log("Audio play error:", e));
-                }
-            };
+                if (transcript.length > 0 && socket && socket.readyState === WebSocket.OPEN) {
+                    document.getElementById("sub-author").innerText = "You";
+                    document.getElementById("sub-caption").innerText = transcript;
 
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate && socket && socket.readyState === WebSocket.OPEN) {
                     socket.send(JSON.stringify({
-                        type: "candidate",
-                        candidate: event.candidate
+                        sender_id: myId,
+                        text: transcript
                     }));
                 }
             };
 
-            peerConnection.onconnectionstatechange = () => {
-                if (peerConnection.connectionState === "connected") {
-                    document.getElementById("sub-caption").innerText = "Call Connected • Speak Now";
+            recognition.onend = () => {
+                if (isCallActive && !isSpeakingPlayback) {
+                    try { recognition.start(); } catch (e) {}
                 }
             };
         }
 
-        async function startOutgoingCall() {
-            try {
-                await setupMedia();
-                createPeerConnection();
+        function handleIncomingAudio(text) {
+            document.getElementById("sub-author").innerText = "Partner";
+            document.getElementById("sub-caption").innerText = text;
 
-                document.getElementById("call-screen").style.display = "flex";
-                document.getElementById("sub-caption").innerText = "Ringing peer...";
-
-                const offer = await peerConnection.createOffer();
-                await peerConnection.setLocalDescription(offer);
-
-                socket.send(JSON.stringify({
-                    type: "offer",
-                    offer: offer
-                }));
-            } catch (err) {
-                alert("Microphone permission required: " + err.message);
+            // STRICT ECHO LOCK: Pause Mic while audio plays to prevent loops
+            isSpeakingPlayback = true;
+            if (recognition) {
+                try { recognition.stop(); } catch (e) {}
             }
+
+            const audioUrl = `/tts?text=${encodeURIComponent(text)}&lang=ur&gender=male`;
+            const audio = new Audio(audioUrl);
+
+            const resumeMic = () => {
+                isSpeakingPlayback = false;
+                if (isCallActive && !isMuted) {
+                    try { recognition.start(); } catch (e) {}
+                }
+            };
+
+            audio.onended = resumeMic;
+            audio.onerror = resumeMic;
+            audio.play().catch(resumeMic);
         }
 
-        async function acceptIncomingCall() {
-            document.getElementById("incoming-modal").style.display = "none";
-            try {
-                await setupMedia();
-                createPeerConnection();
+        function joinCall() {
+            isCallActive = true;
+            document.getElementById("call-screen").style.display = "flex";
+            startTimer();
 
-                document.getElementById("call-screen").style.display = "flex";
-                document.getElementById("sub-caption").innerText = "Call Connected • Speak Now";
-                startTimer();
+            // Unlock audio playback on mobile
+            const unlock = new Audio();
+            unlock.play().catch(() => {});
 
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(pendingOffer));
-                await drainCandidates();
-
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-
-                socket.send(JSON.stringify({
-                    type: "answer",
-                    answer: answer
-                }));
-            } catch (err) {
-                alert("Error connecting call: " + err.message);
+            if (recognition) {
+                try { recognition.start(); } catch (e) {}
             }
         }
 
@@ -503,37 +345,18 @@
             }, 1000);
         }
 
-        function hangupCall(sendSignal = true) {
+        function endCall() {
+            isCallActive = false;
             clearInterval(timerInterval);
             document.getElementById("call-timer").innerText = "00:00";
-            document.getElementById("incoming-modal").style.display = "none";
-            candidateQueue = [];
-
-            if (sendSignal && socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type: "hangup" }));
+            if (recognition) {
+                try { recognition.stop(); } catch (e) {}
             }
-
-            if (peerConnection) {
-                peerConnection.close();
-                peerConnection = null;
-            }
-
-            if (localStream) {
-                localStream.getTracks().forEach(t => t.stop());
-                localStream = null;
-            }
-
-            document.getElementById("remote-audio").srcObject = null;
             document.getElementById("call-screen").style.display = "none";
         }
 
         function toggleMute() {
-            if (!localStream) return;
             isMuted = !isMuted;
-            localStream.getAudioTracks().forEach(track => {
-                track.enabled = !isMuted;
-            });
-
             const btn = document.getElementById("mute-btn");
             if (isMuted) {
                 btn.classList.add("active");
@@ -545,7 +368,8 @@
         }
 
         window.onload = () => {
-            initSignaling();
+            initSocket();
+            initRecognition();
         };
     </script>
 </body>
