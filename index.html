@@ -424,6 +424,44 @@
             color: white;
             box-shadow: 0 0 20px var(--danger-glow);
         }
+
+        /* Incoming Call Dialog for Friend */
+        .incoming-modal-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 200;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 24px;
+        }
+
+        .incoming-dialog {
+            background: var(--surface-card);
+            border: 1px solid var(--accent-amber);
+            border-radius: 20px;
+            padding: 24px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 0 30px var(--accent-amber-glow);
+        }
+
+        .btn-answer {
+            background: var(--online-green);
+            color: white;
+            font-weight: 700;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 15px;
+            cursor: pointer;
+            margin-top: 15px;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+        }
     </style>
 </head>
 <body>
@@ -467,6 +505,16 @@
             </div>
         </main>
 
+        <!-- INCOMING CALL POPUP FOR FRIEND -->
+        <div class="incoming-modal-backdrop" id="incoming-modal">
+            <div class="incoming-dialog">
+                <div style="font-size: 32px; margin-bottom: 8px;">📞</div>
+                <h3 style="font-size: 18px; margin-bottom: 4px;">Incoming Voice Call</h3>
+                <p style="font-size: 13px; color: var(--text-secondary);">Direct WebRTC Encrypted Line</p>
+                <button class="btn-answer" onclick="acceptIncomingCall()">Tap to Answer</button>
+            </div>
+        </div>
+
         <!-- SCREEN 2: IN-CALL OVERLAY -->
         <section class="call-screen-overlay" id="call-screen">
             <div class="call-header">
@@ -483,7 +531,7 @@
 
             <div class="subtitles-box">
                 <div class="sub-speaker">Audio Protocol</div>
-                <div class="sub-text" id="sub-caption">Establishing direct peer connection...</div>
+                <div class="sub-text" id="sub-caption">Connecting audio streams...</div>
             </div>
 
             <div class="call-controls-row">
@@ -492,12 +540,11 @@
             </div>
         </section>
 
-        <!-- Hidden Audio Element for Peer Stream -->
+        <!-- Audio element with direct attributes -->
         <audio id="peer-audio" autoplay playsinline></audio>
     </div>
 
     <script>
-        // Room Management
         const urlParams = new URLSearchParams(window.location.search);
         let roomId = urlParams.get('room') || ('call-' + Math.random().toString(36).substring(2, 7));
         if (!urlParams.get('room')) {
@@ -511,12 +558,18 @@
         let timerInterval = null;
         let elapsedSeconds = 0;
         let isMuted = false;
+        let pendingOffer = null;
 
+        // Expanded STUN servers to bypass 4G/Mobile data carrier firewalls
         const rtcConfig = {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun1.l.google.com:19302" }
-            ]
+                { urls: "stun:stun1.l.google.com:19302" },
+                { urls: "stun:stun2.l.google.com:19302" },
+                { urls: "stun:stun3.l.google.com:19302" },
+                { urls: "stun:stun4.l.google.com:19302" }
+            ],
+            iceCandidatePoolSize: 10
         };
 
         function copyInviteLink() {
@@ -525,6 +578,11 @@
                 btn.innerText = "✅ Done";
                 setTimeout(() => { btn.innerText = "📋 Share"; }, 1500);
             });
+        }
+
+        function unlockAudioDriver() {
+            const remoteAudio = document.getElementById("peer-audio");
+            remoteAudio.play().catch(() => {});
         }
 
         function initSignaling() {
@@ -540,15 +598,18 @@
                 const data = JSON.parse(event.data);
 
                 if (data.type === "offer") {
-                    handleIncomingOffer(data.offer);
+                    pendingOffer = data.offer;
+                    document.getElementById("incoming-modal").style.display = "flex";
                 } else if (data.type === "answer") {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
                     document.getElementById("active-call-status").innerText = "Connected";
                     document.getElementById("sub-caption").innerText = "Normal 2-Way Voice Active (Single Language).";
                     startTimer();
                 } else if (data.type === "candidate") {
-                    if (peerConnection) {
-                        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    if (peerConnection && peerConnection.remoteDescription) {
+                        try {
+                            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                        } catch (e) {}
                     }
                 } else if (data.type === "hangup") {
                     hangupCall(false);
@@ -578,15 +639,16 @@
         function createPeerConnection() {
             peerConnection = new RTCPeerConnection(rtcConfig);
 
-            // Local mic audio peer connection mein add karein
             localStream.getTracks().forEach(track => {
                 peerConnection.addTrack(track, localStream);
             });
 
-            // Samne wale ki aawaz receive karna
             peerConnection.ontrack = (event) => {
                 const remoteAudio = document.getElementById("peer-audio");
-                remoteAudio.srcObject = event.streams[0];
+                if (event.streams && event.streams[0]) {
+                    remoteAudio.srcObject = event.streams[0];
+                    remoteAudio.play().catch(() => {});
+                }
             };
 
             peerConnection.onicecandidate = (event) => {
@@ -597,9 +659,17 @@
                     }));
                 }
             };
+
+            peerConnection.oniceconnectionstatechange = () => {
+                if (peerConnection.iceConnectionState === "connected") {
+                    document.getElementById("active-call-status").innerText = "Connected";
+                    document.getElementById("sub-caption").innerText = "Crystal Clear Audio Active";
+                }
+            };
         }
 
         async function startOutgoingCall() {
+            unlockAudioDriver();
             try {
                 await setupMedia();
                 createPeerConnection();
@@ -616,21 +686,23 @@
                     offer: offer
                 }));
             } catch (err) {
-                alert("Microphone permission required for voice calls: " + err.message);
+                alert("Microphone permission required: " + err.message);
             }
         }
 
-        async function handleIncomingOffer(offer) {
+        async function acceptIncomingCall() {
+            unlockAudioDriver();
+            document.getElementById("incoming-modal").style.display = "none";
             try {
                 await setupMedia();
                 createPeerConnection();
 
                 document.getElementById("call-screen").style.display = "flex";
                 document.getElementById("active-call-status").innerText = "Connected";
-                document.getElementById("sub-caption").innerText = "Normal 2-Way Voice Active (Single Language).";
+                document.getElementById("sub-caption").innerText = "Normal 2-Way Voice Active.";
                 startTimer();
 
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(pendingOffer));
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
 
@@ -639,7 +711,7 @@
                     answer: answer
                 }));
             } catch (err) {
-                console.error("Error answering call:", err);
+                alert("Error connecting call: " + err.message);
             }
         }
 
@@ -657,6 +729,7 @@
         function hangupCall(sendSignal = true) {
             clearInterval(timerInterval);
             document.getElementById("call-timer").innerText = "00:00";
+            document.getElementById("incoming-modal").style.display = "none";
 
             if (sendSignal && socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ type: "hangup" }));
