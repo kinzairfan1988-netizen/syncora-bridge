@@ -85,6 +85,7 @@
             display: flex; align-items: center; justify-content: center;
             font-size: 13px; font-weight: 700; color: var(--accent-amber);
             cursor: pointer; overflow: hidden; background-size: cover; background-position: center;
+            flex-shrink: 0;
         }
 
         .btn-add-contact {
@@ -392,11 +393,11 @@
 
     <div class="app-viewport">
         
-        <!-- 1. DIRECTORY SCREEN (MULTIPLE CONTACTS) -->
+        <!-- 1. DIRECTORY SCREEN (FOR HOST) -->
         <div class="view-directory" id="view-dir">
             <header class="top-navbar">
                 <div class="brand-cluster">
-                    <div class="my-profile-badge" id="my-profile-avatar-btn" onclick="openProfileModal()" title="Edit My Profile">U</div>
+                    <div class="my-profile-badge" id="my-profile-avatar-btn" onclick="openProfileModal()" title="Edit My Profile & DP">U</div>
                     <div class="brand-title">Syncora <span>Terminal</span></div>
                 </div>
                 <button class="btn-add-contact" onclick="openAddModal()">＋ Add Contact</button>
@@ -404,18 +405,18 @@
 
             <main class="directory-container" id="contact-list-container">
                 <div class="section-label">Contacts Directory</div>
-                <!-- Contacts dynamically render here -->
             </main>
 
             <button class="fab-add" onclick="openAddModal()" title="Add New Contact">＋</button>
         </div>
 
-        <!-- 2. DIRECT CHAT VIEW -->
+        <!-- 2. DIRECT CHAT VIEW (FOR BOTH HOST & GUEST) -->
         <div class="view-chat-screen" id="view-chat-screen">
             <header class="chat-top-header">
                 <div class="chat-contact-meta">
                     <button class="btn-back-arrow" id="chat-back-btn" onclick="closeContactChat()">←</button>
-                    <div class="avatar-box" id="chat-header-avatar" style="width: 40px; height: 40px; font-size: 14px;">AF</div>
+                    <!-- Tapping this avatar also allows Guest to set their DP -->
+                    <div class="avatar-box" id="chat-header-avatar" style="width: 40px; height: 40px; font-size: 14px;" onclick="openProfileModal()" title="Tap to update your Profile/DP">AF</div>
                     <div>
                         <div style="font-size: 14px; font-weight: 700;" id="chat-header-title">Contact</div>
                         <div style="font-size: 11px; color: var(--online-green);">Direct Line Active</div>
@@ -498,20 +499,20 @@
             </div>
         </div>
 
-        <!-- MY PROFILE MODAL -->
+        <!-- PROFILE & DP SETUP MODAL (FOR BOTH HOST & GUEST) -->
         <div class="modal-backdrop" id="profile-modal">
             <div class="modal-card">
                 <div class="modal-header">
-                    <div class="modal-title">My Profile</div>
+                    <div class="modal-title">Edit Profile & DP</div>
                     <button class="modal-close" onclick="closeProfileModal()">✕</button>
                 </div>
                 <div class="input-group">
-                    <label style="font-size: 12px; color: var(--text-muted);">Your Name:</label>
-                    <input type="text" id="my-name-input" class="input-field" placeholder="Your Full Name">
-                    <label style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">Profile Photo:</label>
+                    <label style="font-size: 12px; color: var(--text-muted);">Your Display Name:</label>
+                    <input type="text" id="my-name-input" class="input-field" placeholder="Your Name">
+                    <label style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Choose Profile Picture (DP):</label>
                     <input type="file" id="my-photo-input" accept="image/*" class="input-field" style="padding: 8px;">
                 </div>
-                <button class="btn-modal-save" onclick="saveMyProfile()">Save My Profile</button>
+                <button class="btn-modal-save" onclick="saveMyProfile()">Save & Update DP</button>
             </div>
         </div>
     </div>
@@ -521,19 +522,21 @@
         const isGuest = urlParams.get('role') === 'guest';
         const hostNameParam = urlParams.get('host_name') ? decodeURIComponent(urlParams.get('host_name')) : null;
 
-        let myName = localStorage.getItem("syncora_my_name") || "Muhammad";
+        let myName = localStorage.getItem("syncora_my_name") || (isGuest ? "Guest Partner" : "Muhammad");
         let myPhoto = localStorage.getItem("syncora_my_photo") || "";
 
-        // MULTIPLE CONTACTS STORAGE
         let contacts = JSON.parse(localStorage.getItem("syncora_contacts_list") || "[]");
         if (contacts.length === 0) {
             contacts.push({ name: "Ahmad Farman TBT", phone: "03488674051" });
             localStorage.setItem("syncora_contacts_list", JSON.stringify(contacts));
         }
 
-        // Active conversation contact
         let activeContact = contacts[0] || { name: "Partner", phone: "03000000000" };
         let currentRoom = urlParams.get('room') || ('room-' + activeContact.phone.replace(/[^0-9]/g, ''));
+
+        // Partner's live received DP & Name
+        let partnerLivePhoto = "";
+        let partnerLiveName = isGuest ? (hostNameParam || "Host Partner") : activeContact.name;
 
         const myId = "usr-" + Math.random().toString(36).substring(2, 8);
         let socket = null;
@@ -559,6 +562,7 @@
         }
 
         function applyAvatar(element, name, photoUrl) {
+            if (!element) return;
             if (photoUrl) {
                 element.style.backgroundImage = `url('${photoUrl}')`;
                 element.innerText = "";
@@ -601,6 +605,8 @@
 
         function selectContact(index) {
             activeContact = contacts[index];
+            partnerLiveName = activeContact.name;
+            partnerLivePhoto = "";
             currentRoom = 'room-' + activeContact.phone.replace(/[^0-9]/g, '');
             openContactChat();
         }
@@ -609,19 +615,17 @@
             applyAvatar(document.getElementById("my-profile-avatar-btn"), myName, myPhoto);
 
             if (isGuest) {
-                activeContact = { name: hostNameParam || "Host Partner", phone: "Direct Line" };
-                currentRoom = urlParams.get('room') || 'room-guest';
                 document.getElementById("view-dir").style.display = "none";
                 document.getElementById("view-chat-screen").style.display = "flex";
                 document.getElementById("chat-back-btn").style.display = "none";
             }
 
-            document.getElementById("chat-header-title").innerText = activeContact.name;
-            document.getElementById("call-status-label").innerText = activeContact.name;
-            applyAvatar(document.getElementById("chat-header-avatar"), activeContact.name, "");
-            applyAvatar(document.getElementById("active-call-avatar"), activeContact.name, "");
-            applyAvatar(document.getElementById("incoming-caller-avatar"), activeContact.name, "");
-            document.getElementById("incoming-caller-name").innerText = `${activeContact.name} is calling...`;
+            document.getElementById("chat-header-title").innerText = partnerLiveName;
+            document.getElementById("call-status-label").innerText = partnerLiveName;
+            applyAvatar(document.getElementById("chat-header-avatar"), partnerLiveName, partnerLivePhoto);
+            applyAvatar(document.getElementById("active-call-avatar"), partnerLiveName, partnerLivePhoto);
+            applyAvatar(document.getElementById("incoming-caller-avatar"), partnerLiveName, partnerLivePhoto);
+            document.getElementById("incoming-caller-name").innerText = `${partnerLiveName} is calling...`;
         }
 
         function openAddModal() {
@@ -635,10 +639,7 @@
         function saveContactFromModal() {
             const nameInput = document.getElementById("modal-name-input").value.trim();
             const phoneInput = document.getElementById("modal-phone-input").value.trim();
-            if (!nameInput || !phoneInput) {
-                alert("Please enter Name and Phone Number");
-                return;
-            }
+            if (!nameInput || !phoneInput) return;
 
             contacts.push({ name: nameInput, phone: phoneInput });
             localStorage.setItem("syncora_contacts_list", JSON.stringify(contacts));
@@ -654,7 +655,7 @@
             document.getElementById("profile-modal").style.display = "none";
         }
         function saveMyProfile() {
-            const name = document.getElementById("my-name-input").value.trim() || "Muhammad";
+            const name = document.getElementById("my-name-input").value.trim() || myName;
             myName = name;
             localStorage.setItem("syncora_my_name", myName);
 
@@ -665,12 +666,24 @@
                     myPhoto = e.target.result;
                     localStorage.setItem("syncora_my_photo", myPhoto);
                     updateUI();
+                    broadcastIdentity();
                     closeProfileModal();
                 };
                 reader.readAsDataURL(fileInput.files[0]);
             } else {
                 updateUI();
+                broadcastIdentity();
                 closeProfileModal();
+            }
+        }
+
+        function broadcastIdentity() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: "profile_sync",
+                    user_name: myName,
+                    user_photo: myPhoto
+                }));
             }
         }
 
@@ -701,10 +714,7 @@
         function openDirectWhatsAppFromModal() {
             const phoneInput = document.getElementById("modal-phone-input").value.trim().replace(/[^0-9]/g, '');
             const nameInput = document.getElementById("modal-name-input").value.trim() || "Friend";
-            if (!phoneInput) {
-                alert("Please enter a phone number first.");
-                return;
-            }
+            if (!phoneInput) return;
 
             let num = phoneInput;
             if (num.startsWith("03")) num = "92" + num.substring(1);
@@ -721,19 +731,22 @@
             socket.binaryType = "arraybuffer";
 
             socket.onopen = () => {
-                const statusDot = document.getElementById("status-dot");
-                if (statusDot) statusDot.classList.add("live");
+                // Announce identity to partner upon joining
+                broadcastIdentity();
             };
 
             socket.onmessage = (event) => {
                 if (typeof event.data === "string") {
                     const data = JSON.parse(event.data);
-                    if (data.type === "call_invite") {
+                    if (data.type === "profile_sync") {
+                        partnerLiveName = data.user_name || partnerLiveName;
+                        partnerLivePhoto = data.user_photo || "";
+                        updateUI();
+                    } else if (data.type === "call_invite") {
                         isTranslationCall = data.is_translation || false;
-                        if (data.caller_name) {
-                            document.getElementById("incoming-caller-name").innerText = `${data.caller_name} is calling...`;
-                            document.getElementById("call-status-label").innerText = data.caller_name;
-                        }
+                        if (data.caller_name) partnerLiveName = data.caller_name;
+                        if (data.caller_photo) partnerLivePhoto = data.caller_photo;
+                        updateUI();
                         document.getElementById("incoming-call-type-label").innerText = isTranslationCall ? "🌐 AI Live Translation Call" : "📞 Voice Call";
                         document.getElementById("incoming-modal").style.display = "flex";
                         startIncomingRingtone();
@@ -810,6 +823,7 @@
                 translated: translated,
                 sender: myId,
                 sender_name: myName,
+                sender_photo: myPhoto,
                 time: timeStr
             }));
 
@@ -1013,7 +1027,8 @@
                 socket.send(JSON.stringify({
                     type: "call_invite",
                     is_translation: withTranslation,
-                    caller_name: myName
+                    caller_name: myName,
+                    caller_photo: myPhoto
                 }));
             }
         }
@@ -1095,6 +1110,10 @@
             renderContactList();
             updateUI();
             initSpeechEngine();
+            if (isGuest) {
+                initSocket();
+                fetchOfflineHistory();
+            }
         };
     </script>
 </body>
