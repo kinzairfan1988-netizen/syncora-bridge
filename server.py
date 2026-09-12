@@ -36,7 +36,6 @@ class RoomManager:
         if room_id not in self.rooms:
             self.rooms[room_id] = []
         self.rooms[room_id].append(websocket)
-        print(f"[WS] User joined room {room_id}. Total: {len(self.rooms[room_id])}")
 
     def disconnect(self, room_id: str, websocket: WebSocket):
         if room_id in self.rooms:
@@ -44,7 +43,6 @@ class RoomManager:
                 self.rooms[room_id].remove(websocket)
             if not self.rooms[room_id]:
                 del self.rooms[room_id]
-        print(f"[WS] User left room {room_id}")
 
     async def broadcast(self, room_id: str, message: dict):
         if room_id in self.rooms:
@@ -77,8 +75,7 @@ async def text_to_speech(text: str, lang: str = "en", gender: str = "female"):
             if chunk["type"] == "audio":
                 mp3_bytes += chunk["data"]
         return Response(content=mp3_bytes, media_type="audio/mpeg")
-    except Exception as e:
-        print(f"[TTS ERR] {e}")
+    except Exception:
         return Response(content=b"", media_type="audio/mpeg")
 
 def call_gemini_api(endpoint: str, payload: dict, api_key: str):
@@ -104,18 +101,20 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
     source_lang = LANG_MAP.get(src_prefix, "Urdu")
 
     prompt = (
-        f"You are a fast verbal translator. Translate this text from {source_lang} to {target_lang}. "
-        f"Output ONLY the translated sentence in {target_lang}. Never output quotes or explanation.\n\n"
-        f"Text: {text}"
+        f"You are a professional verbal interpreter. Translate the text from {source_lang} to {target_lang}. "
+        f"Output ONLY the translated sentence in {target_lang}. Never output notes, quotes, or explanations.\n\n"
+        f"Spoken Sentence: {text}"
     )
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.0, "maxOutputTokens": 100}
+        "generationConfig": {"temperature": 0.0, "maxOutputTokens": 120}
     }
 
-    # Standard endpoints
-    models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    # gemini-3.6-flash first, then alternatives
+    models = ["gemini-3.6-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"]
+    last_err = ""
+
     for m in models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent"
         try:
@@ -130,13 +129,17 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
                     return clean
         except urllib.error.HTTPError as e:
             err_body = e.read().decode("utf-8")
-            print(f"[GEMINI FAIL {m}] {err_body}")
+            try:
+                err_json = json.loads(err_body)
+                last_err = err_json.get("error", {}).get("message", err_body)
+            except Exception:
+                last_err = err_body
             continue
         except Exception as e:
-            print(f"[GEMINI ERR {m}] {e}")
+            last_err = str(e)
             continue
 
-    return f"[Error: Translation failed]"
+    return f"[Error: {last_err}]"
 
 @app.websocket("/ws/{room_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str):
@@ -169,8 +172,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
             })
     except WebSocketDisconnect:
         manager.disconnect(room_id, websocket)
-    except Exception as e:
-        print(f"[WS ERR] {e}")
+    except Exception:
         manager.disconnect(room_id, websocket)
 
 @app.get("/")
