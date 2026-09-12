@@ -107,6 +107,31 @@
             display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer;
         }
 
+        /* INCOMING CALL DIALOG (WHATSAPP STYLE) */
+        .incoming-modal-backdrop {
+            position: absolute; inset: 0; background: rgba(0, 0, 0, 0.88);
+            backdrop-filter: blur(10px); z-index: 200; display: none;
+            flex-direction: column; align-items: center; justify-content: center; padding: 24px;
+        }
+        .incoming-dialog {
+            background: var(--surface-card); border: 1px solid var(--border-graphite);
+            border-radius: 24px; padding: 28px 24px; width: 100%; text-align: center;
+            box-shadow: 0 0 40px rgba(0,0,0,0.9);
+        }
+        .incoming-avatar {
+            width: 70px; height: 70px; border-radius: 50%; background: #18181b;
+            border: 2px solid var(--accent-amber); margin: 0 auto 16px auto;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; font-weight: 700; color: var(--accent-amber);
+        }
+        .incoming-actions { display: flex; gap: 16px; margin-top: 24px; }
+        .btn-call-action {
+            flex: 1; padding: 14px 0; border-radius: 14px; font-size: 14px;
+            font-weight: 700; border: none; cursor: pointer;
+        }
+        .btn-accept { background: var(--online-green); color: white; box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+        .btn-decline { background: var(--danger-red); color: white; box-shadow: 0 0 15px var(--danger-glow); }
+
         /* IN-CALL OVERLAY */
         .call-screen-overlay {
             position: absolute; inset: 0; background: var(--bg-obsidian); z-index: 100;
@@ -182,14 +207,28 @@
                         <div class="contact-sub" id="room-sub">Room: Syncing...</div>
                     </div>
                 </div>
-                <button class="call-trigger-btn" onclick="joinCall()" title="Join Call">📞</button>
+                <button class="call-trigger-btn" onclick="initiateCall()" title="Call">📞</button>
             </div>
         </main>
 
+        <!-- WHATSAPP INCOMING CALL MODAL -->
+        <div class="incoming-modal-backdrop" id="incoming-modal">
+            <div class="incoming-dialog">
+                <div class="incoming-avatar">P2</div>
+                <h3 style="font-size: 19px; margin-bottom: 6px;">Incoming Voice Call</h3>
+                <p style="font-size: 13px; color: var(--text-secondary);">Direct Voice Channel</p>
+                <div class="incoming-actions">
+                    <button class="btn-call-action btn-decline" onclick="declineCall()">Decline</button>
+                    <button class="btn-call-action btn-accept" onclick="acceptCall()">Accept</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SCREEN 2: IN-CALL OVERLAY -->
         <section class="call-screen-overlay" id="call-screen">
             <div class="call-header">
-                <div class="security-badge">🔒 Live Voice Engine Active</div>
-                <div class="caller-title">Direct Partner</div>
+                <div class="security-badge">🔒 Direct Line Active</div>
+                <div class="caller-title" id="call-status-label">Direct Partner</div>
                 <div class="call-duration" id="call-timer">00:00</div>
             </div>
 
@@ -200,12 +239,12 @@
 
             <div class="subtitles-box">
                 <div class="sub-author" id="sub-author">Status</div>
-                <div class="sub-text" id="sub-caption">Ready • Speak naturally</div>
+                <div class="sub-text" id="sub-caption">Connecting...</div>
             </div>
 
             <div class="call-controls-row">
                 <button class="ctrl-btn-circle" id="mute-btn" onclick="toggleMute()">🎙️</button>
-                <button class="ctrl-btn-circle hangup" onclick="endCall()">🛑</button>
+                <button class="ctrl-btn-circle hangup" onclick="endCall(true)">🛑</button>
             </div>
         </section>
     </div>
@@ -223,7 +262,8 @@
         let recognition = null;
         let isCallActive = false;
         let isMuted = false;
-        let isSpeakingPlayback = false;
+        let isAudioPlaying = false;
+        let currentAudio = null;
         let timerInterval = null;
         let elapsedSeconds = 0;
 
@@ -246,8 +286,17 @@
 
             socket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                if (data.sender_id !== myId) {
-                    handleIncomingAudio(data.text);
+
+                if (data.type === "call_invite") {
+                    document.getElementById("incoming-modal").style.display = "flex";
+                } else if (data.type === "call_accepted") {
+                    document.getElementById("sub-caption").innerText = "Connected • Speak naturally";
+                    startCallTimer();
+                    startSpeechRecognition();
+                } else if (data.type === "call_declined" || data.type === "call_ended") {
+                    endCall(false);
+                } else if (data.type === "speech" && isCallActive) {
+                    playIncomingSpeech(data.text);
                 }
             };
 
@@ -258,12 +307,9 @@
             };
         }
 
-        function initRecognition() {
+        function initSpeechEngine() {
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRec) {
-                alert("Please open this link in Google Chrome for voice support.");
-                return;
-            }
+            if (!SpeechRec) return;
 
             recognition = new SpeechRec();
             recognition.continuous = true;
@@ -271,8 +317,7 @@
             recognition.lang = "ur-PK";
 
             recognition.onresult = (event) => {
-                // Agar samne wale ki aawaz chal rahi ho ya user mute ho to apni aawaz mat bhejo
-                if (isSpeakingPlayback || isMuted) return;
+                if (!isCallActive || isAudioPlaying || isMuted) return;
 
                 const lastIdx = event.results.length - 1;
                 const transcript = event.results[lastIdx][0].transcript.trim();
@@ -282,59 +327,97 @@
                     document.getElementById("sub-caption").innerText = transcript;
 
                     socket.send(JSON.stringify({
-                        sender_id: myId,
+                        type: "speech",
                         text: transcript
                     }));
                 }
             };
 
             recognition.onend = () => {
-                if (isCallActive && !isSpeakingPlayback) {
+                if (isCallActive && !isAudioPlaying && !isMuted) {
                     try { recognition.start(); } catch (e) {}
                 }
             };
         }
 
-        function handleIncomingAudio(text) {
-            document.getElementById("sub-author").innerText = "Partner";
-            document.getElementById("sub-caption").innerText = text;
-
-            // STRICT ECHO LOCK: Pause Mic while audio plays to prevent loops
-            isSpeakingPlayback = true;
-            if (recognition) {
-                try { recognition.stop(); } catch (e) {}
-            }
-
-            const audioUrl = `/tts?text=${encodeURIComponent(text)}&lang=ur&gender=male`;
-            const audio = new Audio(audioUrl);
-
-            const resumeMic = () => {
-                isSpeakingPlayback = false;
-                if (isCallActive && !isMuted) {
-                    try { recognition.start(); } catch (e) {}
-                }
-            };
-
-            audio.onended = resumeMic;
-            audio.onerror = resumeMic;
-            audio.play().catch(resumeMic);
-        }
-
-        function joinCall() {
-            isCallActive = true;
-            document.getElementById("call-screen").style.display = "flex";
-            startTimer();
-
-            // Unlock audio playback on mobile
-            const unlock = new Audio();
-            unlock.play().catch(() => {});
-
-            if (recognition) {
+        function startSpeechRecognition() {
+            if (recognition && isCallActive) {
                 try { recognition.start(); } catch (e) {}
             }
         }
 
-        function startTimer() {
+        function initiateCall() {
+            isCallActive = true;
+            document.getElementById("call-screen").style.display = "flex";
+            document.getElementById("call-status-label").innerText = "Ringing...";
+            document.getElementById("sub-caption").innerText = "Waiting for partner to answer...";
+
+            // Unlock audio on iOS/Chrome
+            const dummy = new Audio();
+            dummy.play().catch(() => {});
+
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: "call_invite" }));
+            }
+        }
+
+        function acceptCall() {
+            document.getElementById("incoming-modal").style.display = "none";
+            isCallActive = true;
+            document.getElementById("call-screen").style.display = "flex";
+            document.getElementById("call-status-label").innerText = "Direct Partner";
+            document.getElementById("sub-caption").innerText = "Connected • Speak naturally";
+
+            startCallTimer();
+            startSpeechRecognition();
+
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: "call_accepted" }));
+            }
+        }
+
+        function declineCall() {
+            document.getElementById("incoming-modal").style.display = "none";
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: "call_declined" }));
+            }
+        }
+
+        function playIncomingSpeech(text) {
+            if (!isCallActive) return;
+
+            document.getElementById("sub-author").innerText = "Partner";
+            document.getElementById("sub-caption").innerText = text;
+
+            // Stop mic while audio is playing (Strict Echo Prevention)
+            isAudioPlaying = true;
+            if (recognition) {
+                try { recognition.stop(); } catch (e) {}
+            }
+
+            // Kill any prior running audio
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                currentAudio = null;
+            }
+
+            currentAudio = new Audio(`/tts?text=${encodeURIComponent(text)}`);
+
+            const donePlaying = () => {
+                isAudioPlaying = false;
+                currentAudio = null;
+                if (isCallActive && !isMuted && recognition) {
+                    try { recognition.start(); } catch (e) {}
+                }
+            };
+
+            currentAudio.onended = donePlaying;
+            currentAudio.onerror = donePlaying;
+            currentAudio.play().catch(donePlaying);
+        }
+
+        function startCallTimer() {
             elapsedSeconds = 0;
             clearInterval(timerInterval);
             timerInterval = setInterval(() => {
@@ -345,14 +428,29 @@
             }, 1000);
         }
 
-        function endCall() {
+        function endCall(sendSignal = true) {
             isCallActive = false;
             clearInterval(timerInterval);
             document.getElementById("call-timer").innerText = "00:00";
+
+            // HARD KILL AUDIO: Koi purana message call khatam hone par na bajey
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.src = "";
+                currentAudio = null;
+            }
+            isAudioPlaying = false;
+
             if (recognition) {
                 try { recognition.stop(); } catch (e) {}
             }
+
+            document.getElementById("incoming-modal").style.display = "none";
             document.getElementById("call-screen").style.display = "none";
+
+            if (sendSignal && socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: "call_ended" }));
+            }
         }
 
         function toggleMute() {
@@ -361,15 +459,17 @@
             if (isMuted) {
                 btn.classList.add("active");
                 btn.innerText = "🔇";
+                if (recognition) { try { recognition.stop(); } catch (e) {} }
             } else {
                 btn.classList.remove("active");
                 btn.innerText = "🎙️";
+                if (isCallActive && !isAudioPlaying && recognition) { try { recognition.start(); } catch (e) {} }
             }
         }
 
         window.onload = () => {
             initSocket();
-            initRecognition();
+            initSpeechEngine();
         };
     </script>
 </body>
