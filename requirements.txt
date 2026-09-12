@@ -1,4 +1,5 @@
 fastapi
-uvicorn[standard]
+uvicorn
 websockets
+google-generativeai
 edge-tts
