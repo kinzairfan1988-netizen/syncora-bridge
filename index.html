@@ -332,14 +332,13 @@
                 });
 
                 const source = audioContext.createMediaStreamSource(mediaStream);
-                // 1024 buffer size (~64ms low latency chunks)
-                scriptNode = audioContext.createScriptProcessor(1024, 1, 1);
+                // Increased to 4096 to prevent stutter and network packet drops
+                scriptNode = audioContext.createScriptProcessor(4096, 1, 1);
 
                 scriptNode.onaudioprocess = (e) => {
                     if (!isCallActive || isMuted || !socket || socket.readyState !== WebSocket.OPEN) return;
                     const channelData = e.inputBuffer.getChannelData(0);
 
-                    // Float32 to Int16 PCM Conversion
                     const pcmData = new Int16Array(channelData.length);
                     for (let i = 0; i < channelData.length; i++) {
                         const s = Math.max(-1, Math.min(1, channelData[i]));
@@ -349,7 +348,6 @@
                 };
 
                 source.connect(scriptNode);
-                // Mute destination to prevent hearing own mic locally
                 const silentGain = audioContext.createGain();
                 silentGain.gain.value = 0;
                 scriptNode.connect(silentGain);
@@ -377,8 +375,9 @@
             source.connect(audioContext.destination);
 
             const currentTime = audioContext.currentTime;
+            // Add 40ms jitter buffer margin to eliminate choppy gaps
             if (playbackTime < currentTime) {
-                playbackTime = currentTime;
+                playbackTime = currentTime + 0.04;
             }
             source.start(playbackTime);
             playbackTime += audioBuf.duration;
