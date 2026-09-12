@@ -64,7 +64,7 @@ async def text_to_speech(text: str, lang: str = "en", gender: str = "female"):
     lang_voices = VOICE_MAP.get(prefix, VOICE_MAP["en"])
     selected_voice = lang_voices.get(gender_clean, lang_voices["female"])
     
-    print(f"[TTS DEBUG] Voice: {selected_voice} | Lang: {prefix} | Text: {text[:40]}")
+    print(f"[TTS DEBUG] Voice: {selected_voice} | Lang: {prefix} | Output: {text[:60]}")
     
     communicate = edge_tts.Communicate(
         text=text, 
@@ -80,18 +80,6 @@ async def text_to_speech(text: str, lang: str = "en", gender: str = "female"):
             
     return Response(content=mp3_bytes, media_type="audio/mpeg")
 
-def extract_clean_translation(raw: str) -> str:
-    text = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL)
-    if "thinking process" in text.lower() or "analyze user input" in text.lower():
-        lines = [l.strip() for l in text.splitlines() if l.strip()]
-        for l in reversed(lines):
-            if not any(l.lower().startswith(x) for x in ["-", "*", "1", "2", "3", "4", "here", "step", "input", "task", "rule", "literal"]):
-                clean = re.sub(r'^(Translation:|Output:|"|\')', "", l, flags=re.IGNORECASE).strip().strip('"')
-                if clean:
-                    return clean
-    clean = re.sub(r'^(Translation:|Output:|"|\')', "", text.strip(), flags=re.IGNORECASE).strip().strip('"')
-    return clean
-
 async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
     raw_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
     clean_key = raw_key.strip().strip("'").strip('"')
@@ -105,42 +93,54 @@ async def pure_translate(text: str, src_code: str, tgt_code: str) -> str:
     target_lang = LANG_MAP.get(tgt_prefix, "English")
     source_lang = LANG_MAP.get(src_prefix, "Urdu")
 
-    print(f"[TRANS DEBUG] Input: '{text}' | Source: {source_lang} ({src_code}) -> Target: {target_lang} ({tgt_code})")
-
     groq_client = AsyncOpenAI(
         base_url="https://api.groq.com/openai/v1",
         api_key=clean_key
     )
 
-    candidate_models = ["llama-3.3-70b-versatile", "llama3-8b-8192"]
+    # Bulletproof prompt with JSON lockdown to eliminate Arabic leakage
+    system_instruction = (
+        f"You are a professional machine translator. "
+        f"Translate the user text from {source_lang} to {target_lang}. "
+        f"Return ONLY a valid JSON object in this format: {{\"translated_text\": \"<text in {target_lang}>\"}}. "
+        f"CRITICAL: The value of 'translated_text' MUST be in {target_lang} only. "
+        f"Under NO circumstances should you output Arabic characters unless target is Arabic."
+    )
 
-    for model_name in candidate_models:
+    try:
+        response = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": text}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.0,
+            max_tokens=150
+        )
+        raw_json = response.choices[0].message.content
+        data = json.loads(raw_json)
+        translated = data.get("translated_text", "").strip()
+        if translated:
+            print(f"[TRANS RESULT] Success: '{translated}'")
+            return translated
+    except Exception as e:
+        print(f"[TRANS ERROR] Primary failed: {e}")
+        # Fallback to secondary model if json format fails
         try:
-            response = await groq_client.chat.completions.create(
-                model=model_name,
+            fb_response = await groq_client.chat.completions.create(
+                model="llama3-8b-8192",
                 messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            f"You are a strict bilingual translator from {source_lang} to {target_lang}. "
-                            f"Your output MUST be exclusively in {target_lang}. "
-                            f"NEVER use Arabic characters or words unless target is Arabic. "
-                            "Output ONLY the translated sentence. No explanations, no quotes."
-                        )
-                    },
+                    {"role": "system", "content": f"Translate this text into {target_lang} only. Do not speak Arabic."},
                     {"role": "user", "content": text}
                 ],
                 temperature=0.0,
-                max_tokens=120
+                max_tokens=100
             )
-            content = response.choices[0].message.content
-            if content and content.strip():
-                clean = extract_clean_translation(content)
-                print(f"[TRANS RESULT] Success: '{clean}'")
-                return clean
-        except Exception as e:
-            print(f"[TRANS ERROR] Model {model_name} failed: {e}")
-            continue
+            content = fb_response.choices[0].message.content.strip()
+            return content.strip('"')
+        except Exception:
+            pass
 
     return text
 
