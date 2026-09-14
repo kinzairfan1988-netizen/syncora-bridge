@@ -77,7 +77,6 @@ class SystemHub:
 hub = SystemHub()
 
 def direct_translate(text: str, sl: str, tl: str) -> str:
-    """Bullet-proof instant translator that never throws 404"""
     try:
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={sl}&tl={tl}&dt=t&q=" + urllib.parse.quote(text)
         req_obj = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -96,18 +95,18 @@ async def translate_text(req: TranslationPayload):
     if not clean_text:
         return {"translated_text": ""}
 
-    # 1. Pehle fast direct translate se result le lo (zero failure rate)
+    # 1. Bulletproof Direct Translation (Zero Latency & No 404)
     translated = direct_translate(clean_text, req.source_lang, req.target_lang)
     if translated and translated.lower() != clean_text.lower():
         return {"translated_text": translated}
 
-    # 2. Agar deep conversational LLM translation chahiye aur key mojood hai
+    # 2. Gemini Fallback if available
     if GEMINI_KEY:
         prompt = (
             f"Translate this spoken sentence from language code '{req.source_lang}' "
             f"to language code '{req.target_lang}'. Return ONLY the direct translation:\n\n{clean_text}"
         )
-        for m_name in ["gemini-2.0-flash", "gemini-1.5-flash-8b"]:
+        for m_name in ["gemini-2.0-flash", "gemini-1.5-flash-8b", "gemini-1.5-flash"]:
             try:
                 model = genai.GenerativeModel(m_name)
                 response = model.generate_content(prompt)
