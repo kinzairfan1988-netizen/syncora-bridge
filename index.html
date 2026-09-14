@@ -37,24 +37,46 @@
             overflow: hidden;
         }
 
-        /* 1. AUTH OVERLAY */
+        /* 1. WHATSAPP STYLE OTP AUTH OVERLAY */
         .auth-overlay {
-            position: fixed; inset: 0; background: rgba(9, 9, 11, 0.95);
-            z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px;
+            position: fixed; inset: 0; background: rgba(9, 9, 11, 0.96);
+            backdrop-filter: blur(12px); z-index: 999; display: flex;
+            align-items: center; justify-content: center; padding: 20px;
         }
         .auth-card {
             background: var(--surface-panel); border: 1px solid var(--border-graphite);
-            border-radius: 20px; padding: 32px 24px; width: 100%; max-width: 380px; text-align: center;
+            border-radius: 24px; padding: 36px 28px; width: 100%; max-width: 400px; text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
         }
-        .auth-title { font-family: 'Space Grotesk', sans-serif; font-size: 22px; color: var(--accent-amber); margin-bottom: 6px; }
+        .auth-badge {
+            width: 60px; height: 60px; border-radius: 18px; background: var(--accent-amber-dim);
+            border: 2px solid var(--accent-amber); display: flex; align-items: center; justify-content: center;
+            font-size: 24px; color: var(--accent-amber); margin: 0 auto 16px auto; font-family: 'Space Grotesk', sans-serif;
+            box-shadow: 0 0 25px var(--accent-amber-glow);
+        }
+        .auth-title { font-family: 'Space Grotesk', sans-serif; font-size: 22px; color: var(--text-primary); margin-bottom: 6px; }
+        .auth-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.4; }
+        
         .auth-input {
             width: 100%; background: var(--surface-card); border: 1px solid var(--border-graphite);
-            padding: 12px 14px; border-radius: 12px; color: #fff; font-size: 14px; margin: 16px 0 10px 0; outline: none;
+            padding: 14px 16px; border-radius: 12px; color: #fff; font-size: 15px; margin-bottom: 12px; outline: none;
+            letter-spacing: 0.5px;
         }
         .auth-input:focus { border-color: var(--accent-amber); }
+        .otp-boxes {
+            display: flex; gap: 8px; justify-content: center; margin: 16px 0;
+        }
+        .otp-input {
+            width: 50px; height: 55px; background: var(--surface-card); border: 1px solid var(--border-graphite);
+            border-radius: 12px; color: var(--accent-amber); font-size: 22px; font-weight: 700; text-align: center;
+            outline: none; font-family: 'Space Grotesk', monospace;
+        }
+        .otp-input:focus { border-color: var(--accent-amber); box-shadow: 0 0 15px var(--accent-amber-glow); }
+        
         .btn-auth {
             width: 100%; background: var(--accent-amber); color: #000; font-weight: 700;
-            border: none; padding: 12px; border-radius: 12px; cursor: pointer;
+            border: none; padding: 14px; border-radius: 12px; cursor: pointer; font-size: 14px;
+            margin-top: 6px; box-shadow: 0 4px 20px var(--accent-amber-glow);
         }
 
         /* 2. WORKSPACE 2-PANEL */
@@ -124,7 +146,7 @@
         .bubble.received .bubble-translation { border-top-color: var(--border-graphite); color: var(--online-green); }
         .bubble-time { font-size: 9px; opacity: 0.6; margin-top: 4px; text-align: right; }
 
-        /* WHATSAPP STYLE DYNAMIC INPUT & VOICE BAR */
+        /* INPUT BAR & VOICE DOCK */
         .stage-input-bar {
             padding: 10px 16px; background: var(--surface-panel);
             border-top: 1px solid var(--border-graphite); display: flex; align-items: center; gap: 8px; position: relative;
@@ -139,28 +161,20 @@
             color: var(--text-primary); font-size: 14px; padding: 10px 4px;
         }
 
-        /* RECORDING ACTIVE BAR (WHATSAPP REPLICA) */
         .recording-bar {
             flex: 1; background: var(--surface-card); border: 1px solid rgba(239, 68, 68, 0.4);
-            border-radius: 24px; display: none; align-items: center; justify-content: space-between;
-            padding: 8px 16px;
+            border-radius: 24px; display: none; align-items: center; justify-content: space-between; padding: 8px 16px;
         }
-        .rec-indicator {
-            display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
-        }
-        .rec-dot {
-            width: 10px; height: 10px; border-radius: 50%; background: var(--danger-red);
-            animation: blink 1s infinite;
-        }
+        .rec-indicator { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+        .rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger-red); animation: blink 1s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
 
         .btn-circle-action {
             width: 44px; height: 44px; border-radius: 50%; background: var(--accent-amber);
             color: #000; border: none; font-size: 18px; cursor: pointer; flex-shrink: 0;
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 2px 10px var(--accent-amber-glow); transition: transform 0.1s;
+            box-shadow: 0 2px 10px var(--accent-amber-glow);
         }
-        .btn-circle-action:active { transform: scale(0.92); }
         .btn-circle-action.recording { background: var(--danger-red); color: #fff; }
 
         .icon-btn {
@@ -169,7 +183,6 @@
         }
         .icon-btn:hover { color: var(--accent-amber); }
 
-        /* ATTACHMENT MENU POPUP */
         .attach-popup-menu {
             position: absolute; bottom: 65px; left: 18px;
             background: var(--surface-card); border: 1px solid var(--border-graphite);
@@ -182,7 +195,7 @@
         }
         .attach-menu-item:hover { background: var(--surface-hover); color: var(--accent-amber); }
 
-        /* SEND OPTION MODAL (ORIGINAL VS TRANSLATION) */
+        /* SEND OPTION MODAL */
         .send-modal-backdrop {
             position: fixed; inset: 0; background: rgba(0,0,0,0.85);
             z-index: 999; display: none; align-items: center; justify-content: center; padding: 20px;
@@ -198,11 +211,8 @@
             justify-content: center; gap: 8px;
         }
         .btn-choice-orig { background: var(--surface-card); color: var(--text-primary); }
-        .btn-choice-orig:hover { border-color: var(--accent-amber); }
         .btn-choice-trans { background: var(--accent-amber); color: #000; border: none; }
-        .lang-options-drawer {
-            display: none; flex-direction: column; gap: 8px; margin-top: 6px; text-align: left;
-        }
+        .lang-options-drawer { display: none; flex-direction: column; gap: 8px; margin-top: 6px; text-align: left; }
         .lang-dropdown {
             width: 100%; background: var(--surface-card); border: 1px solid var(--border-graphite);
             padding: 10px 12px; border-radius: 10px; color: #fff; font-size: 13px; outline: none;
@@ -218,17 +228,34 @@
 </head>
 <body>
 
-    <!-- AUTH OVERLAY -->
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
-            <h2 class="auth-title">Syncora Terminal</h2>
-            <p style="font-size: 13px; color: var(--text-muted);">Apna phone number register karein</p>
-            <input type="tel" id="my-phone-input" class="auth-input" placeholder="Mobile Number (e.g. 03001234567)">
-            <button class="btn-auth" onclick="authenticate()">Start Terminal</button>
+            <div class="auth-badge">IA</div>
+            <h2 class="auth-title">Verify Phone Number</h2>
+            <p class="auth-desc" id="auth-desc">Syncora Terminal mein enter hone ke liye apna mobile number enter karein.</p>
+
+            <div id="auth-step-phone">
+                <input type="tel" id="my-phone-input" class="auth-input" placeholder="Mobile Number (e.g. 03001234567)">
+                <button class="btn-auth" onclick="requestOTP()">Send OTP SMS</button>
+            </div>
+
+            <div id="auth-step-otp" style="display: none;">
+                <div class="otp-boxes">
+                    <input type="text" maxlength="1" class="otp-input" id="otp-1" oninput="focusNext(this, 'otp-2')">
+                    <input type="text" maxlength="1" class="otp-input" id="otp-2" oninput="focusNext(this, 'otp-3')">
+                    <input type="text" maxlength="1" class="otp-input" id="otp-3" oninput="focusNext(this, 'otp-4')">
+                    <input type="text" maxlength="1" class="otp-input" id="otp-4">
+                </div>
+                <button class="btn-auth" onclick="verifyOTPCode()">Verify & Connect</button>
+                <div style="margin-top: 12px;">
+                    <button onclick="backToPhoneStep()" style="background:transparent; border:none; color:var(--accent-amber); font-size:12px; cursor:pointer;">
+                        ← Change Number
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- SEND CONFIRMATION MODAL -->
     <div class="send-modal-backdrop" id="send-modal">
         <div class="send-modal-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Dispatch Mode</h3>
@@ -263,14 +290,15 @@
         </div>
     </div>
 
-    <!-- 2-PANEL WORKSPACE -->
     <div class="workspace">
         
-        <!-- SIDEBAR -->
         <aside class="sidebar-panel">
             <div class="sidebar-header">
                 <span class="app-brand">SYNCORA CORE</span>
-                <span style="font-size: 12px; color: var(--online-green);" id="my-status-label">● Online</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button onclick="copyMyInviteLink()" style="background: var(--accent-amber-dim); border: 1px solid rgba(245,158,11,0.4); color: var(--accent-amber); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Copy Invite Link for Friends">📋 Invite Link</button>
+                    <span style="font-size: 12px; color: var(--online-green);" id="my-status-label">● Online</span>
+                </div>
             </div>
             <div class="sidebar-search">
                 <input type="tel" id="target-phone-input" class="search-input" placeholder="Direct Number (e.g. 0301...)">
@@ -279,7 +307,6 @@
             <div class="chat-list" id="chat-list"></div>
         </aside>
 
-        <!-- ACTIVE STAGE -->
         <main class="stage-panel" id="stage-panel">
             <header class="stage-header">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -294,7 +321,6 @@
 
             <div class="messages-container" id="messages-container"></div>
 
-            <!-- ATTACHMENT MENU POPUP -->
             <div class="attach-popup-menu" id="attach-menu">
                 <div class="attach-menu-item" onclick="document.getElementById('file-picker-media').click()">
                     <span>🖼️</span> Photos / Videos
@@ -310,16 +336,13 @@
             <input type="file" id="file-picker-media" accept="image/*,video/*" style="display:none;" onchange="uploadAttachment(event, 'media')">
             <input type="file" id="file-picker-doc" accept="*/*" style="display:none;" onchange="uploadAttachment(event, 'document')">
 
-            <!-- DYNAMIC INPUT & WHATSAPP VOICE DOCK -->
             <footer class="stage-input-bar">
                 
-                <!-- STANDARD TYPING BOX -->
                 <div class="input-shell" id="input-shell">
                     <button class="icon-btn" onclick="toggleAttachMenu()" title="Attach Link">📎</button>
                     <input type="text" id="text-input" class="main-text-input" placeholder="Message" oninput="handleInputTyping(this)" onkeypress="if(event.key==='Enter') stageMessageForDispatch()">
                 </div>
 
-                <!-- WHATSAPP VOICE RECORDING BAR -->
                 <div class="recording-bar" id="recording-bar">
                     <div class="rec-indicator">
                         <div class="rec-dot"></div>
@@ -331,7 +354,6 @@
                     </div>
                 </div>
 
-                <!-- DYNAMIC BUTTON: MIC OR SEND ARROW -->
                 <button class="btn-circle-action" id="action-btn" onclick="handleActionButton()">
                     🎙️
                 </button>
@@ -341,6 +363,9 @@
     </div>
 
     <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        let inviteHost = urlParams.get('invite') || "";
+        
         let myPhone = localStorage.getItem("syncora_user_phone") || "";
         let activePartner = "";
         let socket = null;
@@ -358,27 +383,97 @@
                 document.getElementById("my-status-label").innerText = `● ${myPhone}`;
                 initSocket();
                 loadRecentChats();
+                
+                // Agar invite link se aaya hai toh direct us bande ki chat open ho jaye
+                if (inviteHost && inviteHost !== myPhone) {
+                    selectChat(inviteHost);
+                }
             }
         };
 
-        async function authenticate() {
+        /* --- OTP FLOW --- */
+        async function requestOTP() {
             const input = document.getElementById("my-phone-input").value.trim();
-            if (!input) return;
-            const res = await fetch("/api/register", {
+            if (!input || input.length < 10) {
+                alert("Please valid mobile number enter karein.");
+                return;
+            }
+
+            const res = await fetch("/api/otp/send", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ phone: input })
             });
+            const data = await res.json();
             if (res.ok) {
-                myPhone = input;
+                document.getElementById("auth-step-phone").style.display = "none";
+                document.getElementById("auth-step-otp").style.display = "block";
+                document.getElementById("auth-desc").innerText = `4-digit OTP aapke number ${input} par send kar diya gaya hai.`;
+
+                // Alert notification for demo / SIM preview
+                alert(`[SMS Gateway] Your Syncora verification code is: ${data.otp_preview}`);
+                document.getElementById("otp-1").focus();
+            } else {
+                alert("OTP send fail: " + data.error);
+            }
+        }
+
+        function focusNext(current, nextId) {
+            if (current.value.length >= 1) {
+                document.getElementById(nextId).focus();
+            }
+        }
+
+        async function verifyOTPCode() {
+            const o1 = document.getElementById("otp-1").value;
+            const o2 = document.getElementById("otp-2").value;
+            const o3 = document.getElementById("otp-3").value;
+            const o4 = document.getElementById("otp-4").value;
+            const fullOtp = `${o1}${o2}${o3}${o4}`;
+            const phone = document.getElementById("my-phone-input").value.trim();
+
+            if (fullOtp.length !== 4) {
+                alert("Poora 4-digit code enter karein.");
+                return;
+            }
+
+            const res = await fetch("/api/otp/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: phone, otp: fullOtp })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                myPhone = phone;
                 localStorage.setItem("syncora_user_phone", myPhone);
                 document.getElementById("auth-overlay").style.display = "none";
                 document.getElementById("my-status-label").innerText = `● ${myPhone}`;
                 initSocket();
                 loadRecentChats();
+
+                if (inviteHost && inviteHost !== myPhone) {
+                    selectChat(inviteHost);
+                }
+            } else {
+                alert(data.error || "Verification failed");
             }
         }
 
+        function backToPhoneStep() {
+            document.getElementById("auth-step-otp").style.display = "none";
+            document.getElementById("auth-step-phone").style.display = "block";
+            document.getElementById("auth-desc").innerText = "Syncora Terminal mein enter hone ke liye apna mobile number enter karein.";
+        }
+
+        function copyMyInviteLink() {
+            const origin = window.location.origin;
+            const inviteUrl = `${origin}/?invite=${encodeURIComponent(myPhone)}`;
+            navigator.clipboard.writeText(inviteUrl).then(() => {
+                alert("Invite link copy ho gaya hai! Dost ko bheinjein, wo OTP se register hotay hi seedha aapki chat mein open hoga.");
+            });
+        }
+
+        /* --- WEBSOCKET & CHAT --- */
         function initSocket() {
             const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
             socket = new WebSocket(`${proto}${window.location.host}/ws/${myPhone}`);
@@ -445,7 +540,7 @@
             document.body.classList.remove("in-chat");
         }
 
-        /* ATTACHMENT MENU TOGGLE */
+        /* ATTACHMENT POPUP */
         function toggleAttachMenu() {
             const menu = document.getElementById("attach-menu");
             menu.style.display = menu.style.display === "flex" ? "none" : "flex";
@@ -458,7 +553,7 @@
             }
         });
 
-        /* DYNAMIC WHATSAPP INPUT / MIC SWITCH */
+        /* DYNAMIC MIC / SEND SWITCH */
         function handleInputTyping(el) {
             const btn = document.getElementById("action-btn");
             if (el.value.trim().length > 0) {
@@ -481,7 +576,7 @@
             }
         }
 
-        /* WHATSAPP VOICE RECORDING IMPLEMENTATION */
+        /* VOICE RECORDING */
         async function startVoiceRecording() {
             if (!activePartner) {
                 alert("Pehle koi chat select karein.");
@@ -514,7 +609,6 @@
                 mediaRecorder.start();
                 isRecording = true;
 
-                // Toggle UI to WhatsApp Recording Bar
                 document.getElementById("input-shell").style.display = "none";
                 document.getElementById("recording-bar").style.display = "flex";
                 const btn = document.getElementById("action-btn");
@@ -531,22 +625,18 @@
                 }, 1000);
 
             } catch (err) {
-                alert("Microphone permission required for voice notes: " + err.message);
+                alert("Microphone permission required: " + err.message);
             }
         }
 
         function stopAndFinishRecording() {
-            if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                mediaRecorder.stop();
-            }
+            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
             resetRecordingUI();
         }
 
         function cancelRecording() {
             recordedChunks = [];
-            if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                mediaRecorder.stop();
-            }
+            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
             resetRecordingUI();
         }
 
@@ -560,7 +650,7 @@
             btn.innerText = "🎙️";
         }
 
-        /* DISPATCH MODAL (ORIGINAL VS TRANSLATION) */
+        /* DISPATCH MODAL */
         function stageMessageForDispatch() {
             const input = document.getElementById("text-input");
             const text = input.value.trim();
@@ -664,7 +754,6 @@
             box.scrollTop = box.scrollHeight;
         }
 
-        /* ATTACHMENT UPLOAD & LOCATION */
         async function uploadAttachment(e, type) {
             document.getElementById("attach-menu").style.display = "none";
             const file = e.target.files[0];
