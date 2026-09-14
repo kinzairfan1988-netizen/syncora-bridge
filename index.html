@@ -1,40 +1,793 @@
-async function confirmDispatchTranslation() {
-    if (!pendingPayload || !socket) return;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Syncora Terminal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-obsidian: #09090b;
+            --surface-panel: #111114;
+            --surface-card: #18181c;
+            --surface-hover: #222228;
+            --border-graphite: #27272a;
+            --border-subtle: rgba(255, 255, 255, 0.05);
+            --accent-amber: #f59e0b;
+            --accent-amber-dim: rgba(245, 158, 11, 0.12);
+            --accent-amber-glow: rgba(245, 158, 11, 0.25);
+            --danger-red: #ef4444;
+            --text-primary: #fafafa;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --online-green: #10b981;
+        }
 
-    // Dropdown se selected language ki sahi value read karein
-    const langSelect = document.getElementById("modal-target-lang");
-    const targetLang = langSelect ? langSelect.value : "ur";
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-    const btn = document.getElementById("btn-modal-confirm-trans");
-    const origText = btn.innerText;
-    btn.innerText = "Translating...";
-    btn.disabled = true;
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            background-color: var(--bg-obsidian);
+            color: var(--text-primary);
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            overflow: hidden;
+        }
 
-    let translated = "";
+        /* 1. AUTH OVERLAY */
+        .auth-overlay {
+            position: fixed; inset: 0; background: rgba(9, 9, 11, 0.96);
+            backdrop-filter: blur(12px); z-index: 999; display: flex;
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .auth-card {
+            background: var(--surface-panel); border: 1px solid var(--border-graphite);
+            border-radius: 24px; padding: 36px 28px; width: 100%; max-width: 400px; text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+        }
+        .auth-badge {
+            width: 60px; height: 60px; border-radius: 18px; background: var(--accent-amber-dim);
+            border: 2px solid var(--accent-amber); display: flex; align-items: center; justify-content: center;
+            font-size: 24px; color: var(--accent-amber); margin: 0 auto 16px auto; font-family: 'Space Grotesk', sans-serif;
+            box-shadow: 0 0 25px var(--accent-amber-glow);
+        }
+        .auth-title { font-family: 'Space Grotesk', sans-serif; font-size: 22px; color: var(--text-primary); margin-bottom: 6px; }
+        .auth-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.4; }
+        
+        .auth-input {
+            width: 100%; background: var(--surface-card); border: 1px solid var(--border-graphite);
+            padding: 14px 16px; border-radius: 12px; color: #fff; font-size: 15px; margin-bottom: 12px; outline: none;
+            letter-spacing: 0.5px;
+        }
+        .auth-input:focus { border-color: var(--accent-amber); }
+        .otp-boxes { display: flex; gap: 8px; justify-content: center; margin: 16px 0; }
+        .otp-input {
+            width: 50px; height: 55px; background: var(--surface-card); border: 1px solid var(--border-graphite);
+            border-radius: 12px; color: var(--accent-amber); font-size: 22px; font-weight: 700; text-align: center;
+            outline: none; font-family: 'Space Grotesk', monospace;
+        }
+        .otp-input:focus { border-color: var(--accent-amber); box-shadow: 0 0 15px var(--accent-amber-glow); }
+        
+        .btn-auth {
+            width: 100%; background: var(--accent-amber); color: #000; font-weight: 700;
+            border: none; padding: 14px; border-radius: 12px; cursor: pointer; font-size: 14px;
+            margin-top: 6px; box-shadow: 0 4px 20px var(--accent-amber-glow);
+        }
 
-    try {
-        const res = await fetch("/translate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                text: pendingPayload.content,
-                target_lang: targetLang
-            })
+        /* 2. WORKSPACE 2-PANEL */
+        .workspace { display: flex; width: 100%; height: 100%; }
+
+        /* LEFT SIDEBAR */
+        .sidebar-panel {
+            width: 380px; border-right: 1px solid var(--border-graphite);
+            background: var(--surface-panel); display: flex; flex-direction: column; flex-shrink: 0;
+        }
+        .sidebar-header {
+            padding: 14px 18px; border-bottom: 1px solid var(--border-subtle);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .app-brand { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 700; color: var(--accent-amber); }
+        .sidebar-search {
+            padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); display: flex; gap: 8px;
+        }
+        .search-input {
+            flex: 1; background: var(--surface-card); border: 1px solid var(--border-graphite);
+            padding: 8px 12px; border-radius: 10px; color: #fff; font-size: 13px; outline: none;
+        }
+        .btn-new-chat {
+            background: var(--accent-amber-dim); border: 1px solid rgba(245, 158, 11, 0.3);
+            color: var(--accent-amber); padding: 8px 12px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer;
+        }
+        .chat-list { flex: 1; overflow-y: auto; }
+        .chat-item {
+            padding: 12px 18px; border-bottom: 1px solid var(--border-subtle);
+            display: flex; align-items: center; gap: 12px; cursor: pointer; transition: background 0.15s;
+        }
+        .chat-item:hover, .chat-item.active { background: var(--surface-hover); }
+        .chat-avatar {
+            width: 44px; height: 44px; border-radius: 50%; background: #1f1f24;
+            border: 1px solid var(--border-graphite); display: flex; align-items: center;
+            justify-content: center; font-weight: 700; color: var(--accent-amber); flex-shrink: 0;
+        }
+        .chat-info { flex: 1; overflow: hidden; }
+        .chat-title { font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+        .chat-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+        /* RIGHT STAGE */
+        .stage-panel {
+            flex: 1; display: flex; flex-direction: column; background: var(--bg-obsidian); position: relative;
+        }
+        .stage-header {
+            padding: 12px 18px; background: var(--surface-panel);
+            border-bottom: 1px solid var(--border-graphite);
+            display: flex; align-items: center; justify-content: space-between; z-index: 10;
+        }
+        .messages-container {
+            flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+        }
+        .bubble {
+            max-width: 65%; padding: 10px 14px; border-radius: 14px; font-size: 13px; line-height: 1.4; word-break: break-word;
+        }
+        .bubble.sent {
+            align-self: flex-end; background: var(--accent-amber); color: #000; font-weight: 500; border-bottom-right-radius: 2px;
+        }
+        .bubble.received {
+            align-self: flex-start; background: var(--surface-card); color: var(--text-primary);
+            border: 1px solid var(--border-graphite); border-bottom-left-radius: 2px;
+        }
+        
+        .bubble-translation {
+            font-size: 12px; margin-top: 5px; padding-top: 5px; font-weight: 600;
+            border-top: 1px dashed rgba(0, 0, 0, 0.25); color: #1e293b;
+        }
+        .bubble.received .bubble-translation {
+            border-top: 1px dashed var(--border-graphite); color: var(--online-green);
+        }
+        .bubble-time { font-size: 9px; opacity: 0.6; margin-top: 4px; text-align: right; }
+
+        /* INPUT BAR & VOICE DOCK */
+        .stage-input-bar {
+            padding: 10px 16px; background: var(--surface-panel);
+            border-top: 1px solid var(--border-graphite); display: flex; align-items: center; gap: 8px; position: relative;
+        }
+        .input-shell {
+            flex: 1; background: var(--surface-card); border: 1px solid var(--border-graphite);
+            border-radius: 24px; display: flex; align-items: center; padding: 2px 8px 2px 12px; gap: 6px;
+        }
+        .input-shell:focus-within { border-color: var(--accent-amber); }
+        .main-text-input {
+            flex: 1; background: transparent; border: none; outline: none;
+            color: var(--text-primary); font-size: 14px; padding: 10px 4px;
+        }
+
+        .btn-inside-mic {
+            background: transparent; border: none; font-size: 18px; color: var(--accent-amber);
+            cursor: pointer; padding: 6px 8px; border-radius: 50%; display: flex; align-items: center;
+            justify-content: center;
+        }
+        .btn-inside-mic:hover { background: var(--accent-amber-dim); }
+
+        .recording-bar {
+            flex: 1; background: var(--surface-card); border: 1px solid rgba(239, 68, 68, 0.4);
+            border-radius: 24px; display: none; align-items: center; justify-content: space-between; padding: 8px 16px;
+        }
+        .rec-indicator { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+        .rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger-red); animation: blink 1s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+        .btn-send-permanent {
+            width: 44px; height: 44px; border-radius: 50%; background: var(--accent-amber);
+            color: #000; border: none; font-size: 18px; cursor: pointer; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 10px var(--accent-amber-glow); z-index: 5;
+        }
+        .btn-send-permanent:active { transform: scale(0.92); }
+
+        .icon-btn {
+            background: transparent; border: none; color: var(--text-secondary);
+            font-size: 19px; cursor: pointer; padding: 4px; border-radius: 8px;
+        }
+        .icon-btn:hover { color: var(--accent-amber); }
+
+        .attach-popup-menu {
+            position: absolute; bottom: 65px; left: 18px;
+            background: var(--surface-card); border: 1px solid var(--border-graphite);
+            border-radius: 16px; padding: 8px; display: none; flex-direction: column; gap: 4px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 50; width: 170px;
+        }
+        .attach-menu-item {
+            display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+            border-radius: 10px; color: var(--text-primary); cursor: pointer; font-size: 13px;
+        }
+        .attach-menu-item:hover { background: var(--surface-hover); color: var(--accent-amber); }
+
+        /* SEND OPTION MODAL */
+        .send-modal-backdrop {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+            z-index: 999; display: none; align-items: center; justify-content: center; padding: 20px;
+        }
+        .send-modal-card {
+            background: var(--surface-panel); border: 1px solid var(--border-graphite);
+            border-radius: 20px; padding: 24px; width: 100%; max-width: 360px;
+            display: flex; flex-direction: column; gap: 14px; text-align: center;
+        }
+        .modal-btn-choice {
+            padding: 12px; border-radius: 12px; border: 1px solid var(--border-graphite);
+            font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center;
+            justify-content: center; gap: 8px;
+        }
+        .btn-choice-orig { background: var(--surface-card); color: var(--text-primary); }
+        .btn-choice-orig:hover { border-color: var(--accent-amber); }
+        .btn-choice-trans { background: var(--accent-amber); color: #000; border: none; }
+        .lang-options-drawer { display: none; flex-direction: column; gap: 8px; margin-top: 6px; text-align: left; }
+        .lang-dropdown {
+            width: 100%; background: var(--surface-card); border: 1px solid var(--border-graphite);
+            padding: 10px 12px; border-radius: 10px; color: #fff; font-size: 13px; outline: none;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar-panel { width: 100%; }
+            .stage-panel { display: none; }
+            body.in-chat .sidebar-panel { display: none; }
+            body.in-chat .stage-panel { display: flex; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- AUTH OVERLAY -->
+    <div class="auth-overlay" id="auth-overlay">
+        <div class="auth-card">
+            <div class="auth-badge">IA</div>
+            <h2 class="auth-title">Verify Phone Number</h2>
+            <p class="auth-desc" id="auth-desc">Syncora Terminal mein enter hone ke liye apna mobile number enter karein.</p>
+
+            <div id="auth-step-phone">
+                <input type="tel" id="my-phone-input" class="auth-input" placeholder="Mobile Number (e.g. 03001234567)">
+                <button class="btn-auth" onclick="requestOTP()">Send OTP SMS</button>
+            </div>
+
+            <div id="auth-step-otp" style="display: none;">
+                <div class="otp-boxes">
+                    <input type="text" maxlength="1" class="otp-input" id="otp-1" oninput="focusNext(this, 'otp-2')">
+                    <input type="text" maxlength="1" class="otp-input" id="otp-2" oninput="focusNext(this, 'otp-3')">
+                    <input type="text" maxlength="1" class="otp-input" id="otp-3" oninput="focusNext(this, 'otp-4')">
+                    <input type="text" maxlength="1" class="otp-input" id="otp-4">
+                </div>
+                <button class="btn-auth" onclick="verifyOTPCode()">Verify & Connect</button>
+                <div style="margin-top: 12px;">
+                    <button onclick="backToPhoneStep()" style="background:transparent; border:none; color:var(--accent-amber); font-size:12px; cursor:pointer;">
+                        ← Change Number
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SEND CONFIRMATION MODAL -->
+    <div class="send-modal-backdrop" id="send-modal">
+        <div class="send-modal-card">
+            <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Dispatch Mode</h3>
+            <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Choose how to deliver your message</p>
+
+            <button class="modal-btn-choice btn-choice-orig" onclick="confirmDispatchOriginal()">
+                ✉️ Send Original
+            </button>
+            <button class="modal-btn-choice btn-choice-trans" onclick="toggleLanguageDrawer()">
+                🌐 Translate & Send
+            </button>
+
+            <div class="lang-options-drawer" id="lang-drawer">
+                <label style="font-size: 11px; color: var(--text-muted);">Select Target Language:</label>
+                <select class="lang-dropdown" id="modal-target-lang">
+                    <option value="ur">Urdu (اردو)</option>
+                    <option value="en">English (US)</option>
+                    <option value="ar">Arabic (العربية)</option>
+                    <option value="de">German (Deutsch)</option>
+                    <option value="fr">French (Français)</option>
+                    <option value="es">Spanish (Español)</option>
+                    <option value="zh">Chinese (中文)</option>
+                </select>
+                <button class="btn-auth" id="btn-modal-confirm-trans" style="margin-top: 4px;" onclick="confirmDispatchTranslation()">
+                    Confirm & Send Translation
+                </button>
+            </div>
+
+            <button onclick="cancelDispatch()" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer;">
+                Cancel
+            </button>
+        </div>
+    </div>
+
+    <!-- 2-PANEL WORKSPACE -->
+    <div class="workspace">
+        
+        <!-- SIDEBAR -->
+        <aside class="sidebar-panel">
+            <div class="sidebar-header">
+                <span class="app-brand">SYNCORA CORE</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button onclick="copyMyInviteLink()" style="background: var(--accent-amber-dim); border: 1px solid rgba(245,158,11,0.4); color: var(--accent-amber); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Copy Invite Link for Friends">📋 Invite Link</button>
+                    <span style="font-size: 12px; color: var(--online-green);" id="my-status-label">● Online</span>
+                </div>
+            </div>
+            <div class="sidebar-search">
+                <input type="tel" id="target-phone-input" class="search-input" placeholder="Direct Number (e.g. 0301...)">
+                <button class="btn-new-chat" onclick="openDirectChat()">Chat</button>
+            </div>
+            <div class="chat-list" id="chat-list"></div>
+        </aside>
+
+        <!-- ACTIVE STAGE -->
+        <main class="stage-panel" id="stage-panel">
+            <header class="stage-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button class="icon-btn" onclick="backToSidebar()" style="display: none;" id="mobile-back-btn">←</button>
+                    <div class="chat-avatar" id="active-avatar">--</div>
+                    <div>
+                        <div style="font-size: 14px; font-weight: 700;" id="active-partner-label">Select a conversation</div>
+                        <div style="font-size: 11px; color: var(--online-green);">Direct Line Active</div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="messages-container" id="messages-container"></div>
+
+            <!-- ATTACHMENT MENU POPUP -->
+            <div class="attach-popup-menu" id="attach-menu">
+                <div class="attach-menu-item" onclick="document.getElementById('file-picker-media').click()">
+                    <span>🖼️</span> Photos / Videos
+                </div>
+                <div class="attach-menu-item" onclick="shareLocation()">
+                    <span>📍</span> Location
+                </div>
+                <div class="attach-menu-item" onclick="document.getElementById('file-picker-doc').click()">
+                    <span>📄</span> Document
+                </div>
+            </div>
+
+            <input type="file" id="file-picker-media" accept="image/*,video/*" style="display:none;" onchange="uploadAttachment(event, 'media')">
+            <input type="file" id="file-picker-doc" accept="*/*" style="display:none;" onchange="uploadAttachment(event, 'document')">
+
+            <!-- DYNAMIC INPUT & VOICE DOCK -->
+            <footer class="stage-input-bar">
+                
+                <div class="input-shell" id="input-shell">
+                    <button class="icon-btn" type="button" onclick="toggleAttachMenu()" title="Attach Link">📎</button>
+                    <input type="text" id="text-input" class="main-text-input" placeholder="Message" onkeydown="if(event.key==='Enter'){ event.preventDefault(); stageMessageForDispatch(); }">
+                    <button class="btn-inside-mic" id="inside-mic-btn" type="button" onclick="toggleVoiceRecording()" title="Record Voice Note">🎙️</button>
+                </div>
+
+                <div class="recording-bar" id="recording-bar">
+                    <div class="rec-indicator">
+                        <div class="rec-dot"></div>
+                        <span id="rec-timer">0:00</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <button class="icon-btn" type="button" onclick="cancelRecording()" style="color: var(--danger-red);" title="Delete Recording">🗑️</button>
+                        <button class="icon-btn" type="button" onclick="stopAndFinishRecording()" style="color: var(--online-green);" title="Done & Send">✓</button>
+                    </div>
+                </div>
+
+                <button class="btn-send-permanent" id="send-arrow-btn" type="button" onclick="stageMessageForDispatch()" title="Send Message">
+                    ➤
+                </button>
+            </footer>
+        </main>
+
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        let inviteHost = urlParams.get('invite') || "";
+        
+        let myPhone = localStorage.getItem("syncora_user_phone") || "";
+        let activePartner = "";
+        let socket = null;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
+        let recordingSeconds = 0;
+        let recordingTimerInterval = null;
+
+        let pendingPayload = null;
+
+        window.onload = () => {
+            if (myPhone) {
+                document.getElementById("auth-overlay").style.display = "none";
+                document.getElementById("my-status-label").innerText = `● ${myPhone}`;
+                initSocket();
+                loadRecentChats();
+                
+                if (inviteHost && inviteHost !== myPhone) {
+                    selectChat(inviteHost);
+                }
+            }
+        };
+
+        async function requestOTP() {
+            const input = document.getElementById("my-phone-input").value.trim();
+            if (!input || input.length < 10) {
+                alert("Please valid mobile number enter karein.");
+                return;
+            }
+
+            const res = await fetch("/api/otp/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: input })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById("auth-step-phone").style.display = "none";
+                document.getElementById("auth-step-otp").style.display = "block";
+                document.getElementById("auth-desc").innerText = `4-digit OTP aapke number ${input} par send kar diya gaya hai.`;
+                alert(`[SMS Gateway] Your Syncora verification code is: ${data.otp_preview}`);
+                document.getElementById("otp-1").focus();
+            } else {
+                alert("OTP send fail: " + data.error);
+            }
+        }
+
+        function focusNext(current, nextId) {
+            if (current.value.length >= 1) {
+                document.getElementById(nextId).focus();
+            }
+        }
+
+        async function verifyOTPCode() {
+            const o1 = document.getElementById("otp-1").value;
+            const o2 = document.getElementById("otp-2").value;
+            const o3 = document.getElementById("otp-3").value;
+            const o4 = document.getElementById("otp-4").value;
+            const fullOtp = `${o1}${o2}${o3}${o4}`;
+            const phone = document.getElementById("my-phone-input").value.trim();
+
+            if (fullOtp.length !== 4) {
+                alert("Poora 4-digit code enter karein.");
+                return;
+            }
+
+            const res = await fetch("/api/otp/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: phone, otp: fullOtp })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                myPhone = phone;
+                localStorage.setItem("syncora_user_phone", myPhone);
+                document.getElementById("auth-overlay").style.display = "none";
+                document.getElementById("my-status-label").innerText = `● ${myPhone}`;
+                initSocket();
+                loadRecentChats();
+
+                if (inviteHost && inviteHost !== myPhone) {
+                    selectChat(inviteHost);
+                }
+            } else {
+                alert(data.error || "Verification failed");
+            }
+        }
+
+        function backToPhoneStep() {
+            document.getElementById("auth-step-otp").style.display = "none";
+            document.getElementById("auth-step-phone").style.display = "block";
+            document.getElementById("auth-desc").innerText = "Syncora Terminal mein enter hone ke liye apna mobile number enter karein.";
+        }
+
+        function copyMyInviteLink() {
+            const origin = window.location.origin;
+            const inviteUrl = `${origin}/?invite=${encodeURIComponent(myPhone)}`;
+            navigator.clipboard.writeText(inviteUrl).then(() => {
+                alert("Invite link copy ho gaya hai! Dost ko bheinjein, wo OTP se register hotay hi seedha aapki chat mein open hoga.");
+            });
+        }
+
+        function initSocket() {
+            const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
+            socket = new WebSocket(`${proto}${window.location.host}/ws/${myPhone}`);
+
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.action === "new_message") {
+                    if (data.sender === activePartner) {
+                        appendBubble(data.content, "received", data.translated, data.msg_type, data.time);
+                    }
+                    loadRecentChats();
+                }
+            };
+
+            socket.onclose = () => { setTimeout(initSocket, 2000); };
+        }
+
+        async function loadRecentChats() {
+            if (!myPhone) return;
+            const res = await fetch(`/api/chats/${myPhone}`);
+            const data = await res.json();
+            const list = document.getElementById("chat-list");
+            list.innerHTML = "";
+            data.chats.forEach(partner => {
+                const item = document.createElement("div");
+                item.className = `chat-item ${partner === activePartner ? 'active' : ''}`;
+                item.onclick = () => selectChat(partner);
+                item.innerHTML = `
+                    <div class="chat-avatar">${partner.slice(-2)}</div>
+                    <div class="chat-info">
+                        <div class="chat-title">${partner}</div>
+                        <div class="chat-subtitle">Direct line active</div>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function openDirectChat() {
+            const partner = document.getElementById("target-phone-input").value.trim();
+            if (!partner || partner === myPhone) return;
+            selectChat(partner);
+        }
+
+        async function selectChat(partner) {
+            activePartner = partner;
+            document.body.classList.add("in-chat");
+            document.getElementById("active-partner-label").innerText = partner;
+            document.getElementById("active-avatar").innerText = partner.slice(-2);
+            document.getElementById("mobile-back-btn").style.display = "inline-block";
+
+            const res = await fetch(`/api/messages/${myPhone}/${partner}`);
+            const data = await res.json();
+            const box = document.getElementById("messages-container");
+            box.innerHTML = "";
+            data.messages.forEach(m => {
+                const type = m.sender === myPhone ? "sent" : "received";
+                appendBubble(m.content, type, m.translated_content, m.msg_type, m.time);
+            });
+            loadRecentChats();
+        }
+
+        function backToSidebar() {
+            document.body.classList.remove("in-chat");
+        }
+
+        function toggleAttachMenu() {
+            const menu = document.getElementById("attach-menu");
+            menu.style.display = menu.style.display === "flex" ? "none" : "flex";
+        }
+
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById("attach-menu");
+            if (menu && menu.style.display === "flex") {
+                if (!e.target.closest('#attach-menu') && !e.target.closest('button[title="Attach Link"]')) {
+                    menu.style.display = "none";
+                }
+            }
         });
-        const data = await res.json();
-        translated = data.translated_text || "";
-    } catch (e) {
-        console.error("Translation request error:", e);
-    }
 
-    btn.innerText = origText;
-    btn.disabled = false;
+        function toggleVoiceRecording() {
+            if (!isRecording) {
+                startVoiceRecording();
+            } else {
+                stopAndFinishRecording();
+            }
+        }
 
-    // Agar translation empty ho toh fallback
-    if (!translated || translated.trim() === "") {
-        translated = pendingPayload.content;
-    }
+        async function startVoiceRecording() {
+            if (!activePartner) {
+                alert("Pehle left side se kisi contact ya number par click karein!");
+                return;
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                recordedChunks = [];
 
-    executeDispatch(pendingPayload.content, translated, pendingPayload.type);
-    cancelDispatch();
-}
+                mediaRecorder.ondataavailable = e => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    if (recordedChunks.length === 0) return;
+                    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                    const form = new FormData();
+                    form.append("file", blob, "voice.webm");
+                    const res = await fetch("/api/upload", { method: "POST", body: form });
+                    const data = await res.json();
+                    
+                    pendingPayload = {
+                        type: "voice",
+                        content: data.url
+                    };
+                    openSendModal("Voice Note Ready");
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+
+                document.getElementById("input-shell").style.display = "none";
+                document.getElementById("recording-bar").style.display = "flex";
+
+                recordingSeconds = 0;
+                document.getElementById("rec-timer").innerText = "0:00";
+                recordingTimerInterval = setInterval(() => {
+                    recordingSeconds++;
+                    const m = Math.floor(recordingSeconds / 60);
+                    const s = String(recordingSeconds % 60).padStart(2, '0');
+                    document.getElementById("rec-timer").innerText = `${m}:${s}`;
+                }, 1000);
+
+            } catch (err) {
+                alert("Microphone permission required for voice notes: " + err.message);
+            }
+        }
+
+        function stopAndFinishRecording() {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+            }
+            resetRecordingUI();
+        }
+
+        function cancelRecording() {
+            recordedChunks = [];
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+            }
+            resetRecordingUI();
+        }
+
+        function resetRecordingUI() {
+            isRecording = false;
+            clearInterval(recordingTimerInterval);
+            document.getElementById("recording-bar").style.display = "none";
+            document.getElementById("input-shell").style.display = "flex";
+        }
+
+        function stageMessageForDispatch() {
+            const input = document.getElementById("text-input");
+            const text = input.value.trim();
+            if (!text) return;
+            if (!activePartner) {
+                alert("Pehle left panel se kisi chat par click karein!");
+                return;
+            }
+
+            pendingPayload = {
+                type: "text",
+                content: text
+            };
+            openSendModal(`"${text.substring(0, 30)}"`);
+        }
+
+        function openSendModal(preview) {
+            document.getElementById("send-modal-preview").innerText = preview;
+            document.getElementById("lang-drawer").style.display = "none";
+            document.getElementById("send-modal").style.display = "flex";
+        }
+
+        function toggleLanguageDrawer() {
+            const drawer = document.getElementById("lang-drawer");
+            drawer.style.display = drawer.style.display === "flex" ? "none" : "flex";
+        }
+
+        function cancelDispatch() {
+            pendingPayload = null;
+            document.getElementById("send-modal").style.display = "none";
+        }
+
+        function confirmDispatchOriginal() {
+            if (!pendingPayload || !socket) return;
+            executeDispatch(pendingPayload.content, "", pendingPayload.type);
+            cancelDispatch();
+        }
+
+        async function confirmDispatchTranslation() {
+            if (!pendingPayload || !socket) return;
+            const langSelect = document.getElementById("modal-target-lang");
+            const targetLang = langSelect ? langSelect.value : "ur";
+
+            const btn = document.getElementById("btn-modal-confirm-trans");
+            const origText = btn.innerText;
+            btn.innerText = "Translating...";
+            btn.disabled = true;
+
+            let translated = "";
+
+            if (pendingPayload.type === "text") {
+                try {
+                    const res = await fetch("/translate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            text: pendingPayload.content,
+                            target_lang: targetLang
+                        })
+                    });
+                    const data = await res.json();
+                    translated = data.translated_text || "";
+                } catch (e) {
+                    console.error("Translation error:", e);
+                }
+            }
+
+            btn.innerText = origText;
+            btn.disabled = false;
+
+            if (!translated || translated.trim() === "") {
+                translated = pendingPayload.content;
+            }
+
+            executeDispatch(pendingPayload.content, translated, pendingPayload.type);
+            cancelDispatch();
+        }
+
+        function executeDispatch(content, translated, msgType) {
+            const payload = {
+                action: "chat_message",
+                receiver: activePartner,
+                msg_type: msgType,
+                content: content,
+                translated: translated
+            };
+            socket.send(JSON.stringify(payload));
+            appendBubble(content, "sent", translated, msgType, "now");
+            document.getElementById("text-input").value = "";
+            loadRecentChats();
+        }
+
+        function appendBubble(content, dir, translated, type, time) {
+            const box = document.getElementById("messages-container");
+            const bubble = document.createElement("div");
+            bubble.className = `bubble ${dir}`;
+
+            let body = `<div>${content}</div>`;
+            if (type === "media") {
+                body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
+            } else if (type === "voice") {
+                body = `
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>🎙️ Voice Note</span>
+                        <audio controls src="${content}" style="max-width:200px; height:32px;"></audio>
+                    </div>
+                `;
+            } else if (type === "location") {
+                body = `<a href="${content}" target="_blank" style="color:inherit; font-weight:700;">📍 Shared Location (Open Map)</a>`;
+            } else if (type === "document") {
+                body = `<a href="${content}" target="_blank" style="color:inherit; text-decoration:underline;">📄 Document File</a>`;
+            }
+
+            if (translated && translated.trim() !== "") {
+                body += `<div class="bubble-translation">AI: ${translated}</div>`;
+            }
+
+            body += `<div class="bubble-time">${time}</div>`;
+            bubble.innerHTML = body;
+            box.appendChild(bubble);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function uploadAttachment(e, type) {
+            document.getElementById("attach-menu").style.display = "none";
+            const file = e.target.files[0];
+            if (!file || !activePartner) return;
+            const form = new FormData();
+            form.append("file", file);
+            const res = await fetch("/api/upload", { method: "POST", body: form });
+            const data = await res.json();
+            executeDispatch(data.url, "", type);
+        }
+
+        function shareLocation() {
+            document.getElementById("attach-menu").style.display = "none";
+            if (!navigator.geolocation || !activePartner) return;
+            navigator.geolocation.getCurrentPosition(pos => {
+                const mapLink = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
+                executeDispatch(mapLink, "", "location");
+            });
+        }
+    </script>
+</body>
+</html>
