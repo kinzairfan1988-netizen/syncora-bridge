@@ -687,6 +687,7 @@
         let playbackTime = 0;
         let ringInterval = null;
         let gainNode = null;
+        let lastProcessedText = "";
 
         function getInitials(name) {
             if (!name) return "IA";
@@ -1082,8 +1083,12 @@
                 const lastIdx = event.results.length - 1;
                 const originalText = event.results[lastIdx][0].transcript.trim();
 
-                // Kisi single character ya glitch par translation na bhejien
+                // Chota noise ya single harf ignore karein
                 if (originalText.length < 2) return;
+
+                // Echo Prevention: Same jumla dobara execute na karein
+                if (originalText.toLowerCase() === lastProcessedText.toLowerCase()) return;
+                lastProcessedText = originalText;
 
                 document.getElementById("sub-original").innerText = `You: "${originalText}"`;
                 document.getElementById("sub-translated").innerText = "Translating...";
@@ -1141,7 +1146,11 @@
 
             try {
                 mediaStream = await navigator.mediaDevices.getUserMedia({
-                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+                    audio: {
+                        echoCancellation: { ideal: true },
+                        noiseSuppression: { ideal: true },
+                        autoGainControl: { ideal: true }
+                    },
                     video: isVideoMode ? { facingMode: "user", width: { ideal: 480 }, height: { ideal: 640 } } : false
                 });
 
@@ -1222,6 +1231,7 @@
             await ensureAudioContext();
             isCallActive = true;
             currentCallMode = mode;
+            lastProcessedText = "";
             setupActiveCallUI();
 
             document.getElementById("call-screen").style.display = "flex";
@@ -1242,6 +1252,7 @@
             await ensureAudioContext();
             document.getElementById("incoming-modal").style.display = "none";
             isCallActive = true;
+            lastProcessedText = "";
             setupActiveCallUI();
 
             document.getElementById("call-screen").style.display = "flex";
@@ -1278,6 +1289,7 @@
         function endCall(sendSignal = true) {
             stopIncomingRingtone();
             isCallActive = false;
+            lastProcessedText = "";
             clearInterval(timerInterval);
             if (videoInterval) clearInterval(videoInterval);
             document.getElementById("call-timer").innerText = "00:00";
