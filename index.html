@@ -37,7 +37,7 @@
             overflow: hidden;
         }
 
-        /* LOGIN POPUP */
+        /* 1. AUTH OVERLAY */
         .auth-overlay {
             position: fixed; inset: 0; background: rgba(9, 9, 11, 0.95);
             z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px;
@@ -57,7 +57,7 @@
             border: none; padding: 12px; border-radius: 12px; cursor: pointer;
         }
 
-        /* 2-PANEL LAYOUT */
+        /* 2. WORKSPACE 2-PANEL */
         .workspace { display: flex; width: 100%; height: 100%; }
 
         /* LEFT SIDEBAR */
@@ -96,7 +96,7 @@
         .chat-title { font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
         .chat-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
-        /* RIGHT CONVERSATION STAGE */
+        /* RIGHT STAGE */
         .stage-panel {
             flex: 1; display: flex; flex-direction: column; background: var(--bg-obsidian); position: relative;
         }
@@ -105,17 +105,6 @@
             border-bottom: 1px solid var(--border-graphite);
             display: flex; align-items: center; justify-content: space-between; z-index: 10;
         }
-        .action-dock { display: flex; align-items: center; gap: 6px; }
-        .btn-action {
-            background: var(--surface-card); border: 1px solid var(--border-graphite);
-            color: var(--text-primary); padding: 8px 12px; border-radius: 10px;
-            font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;
-        }
-        .btn-action.translate {
-            background: var(--accent-amber-dim); color: var(--accent-amber);
-            border-color: rgba(245, 158, 11, 0.4);
-        }
-
         .messages-container {
             flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
         }
@@ -135,10 +124,10 @@
         .bubble.received .bubble-translation { border-top-color: var(--border-graphite); color: var(--online-green); }
         .bubble-time { font-size: 9px; opacity: 0.6; margin-top: 4px; text-align: right; }
 
-        /* INPUT BAR */
+        /* INPUT AREA & ATTACHMENT MENU */
         .stage-input-bar {
             padding: 12px 18px; background: var(--surface-panel);
-            border-top: 1px solid var(--border-graphite); display: flex; align-items: center; gap: 8px;
+            border-top: 1px solid var(--border-graphite); display: flex; align-items: center; gap: 8px; position: relative;
         }
         .input-box {
             flex: 1; background: var(--surface-card); border: 1px solid var(--border-graphite);
@@ -147,14 +136,55 @@
         .input-box:focus { border-color: var(--accent-amber); }
         .icon-btn {
             background: transparent; border: none; color: var(--text-secondary);
-            font-size: 18px; cursor: pointer; padding: 6px; border-radius: 8px;
+            font-size: 19px; cursor: pointer; padding: 6px; border-radius: 8px;
         }
         .icon-btn:hover { color: var(--accent-amber); }
         .btn-send {
             width: 44px; height: 44px; border-radius: 12px; background: var(--accent-amber);
             color: #000; border: none; font-size: 16px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
         }
         .btn-send.recording { background: var(--danger-red); color: #fff; }
+
+        /* WHATSAPP-STYLE ATTACHMENT POPUP */
+        .attach-popup-menu {
+            position: absolute; bottom: 70px; left: 18px;
+            background: var(--surface-card); border: 1px solid var(--border-graphite);
+            border-radius: 16px; padding: 10px; display: none; flex-direction: column; gap: 6px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7); z-index: 50; width: 170px;
+        }
+        .attach-menu-item {
+            display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+            border-radius: 10px; color: var(--text-primary); cursor: pointer; font-size: 13px;
+            transition: background 0.15s;
+        }
+        .attach-menu-item:hover { background: var(--surface-hover); color: var(--accent-amber); }
+
+        /* SEND OPTION MODAL (ORIGINAL VS TRANSLATE) */
+        .send-modal-backdrop {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+            z-index: 999; display: none; align-items: center; justify-content: center; padding: 20px;
+        }
+        .send-modal-card {
+            background: var(--surface-panel); border: 1px solid var(--border-graphite);
+            border-radius: 20px; padding: 24px; width: 100%; max-width: 360px;
+            display: flex; flex-direction: column; gap: 14px; text-align: center;
+        }
+        .modal-btn-choice {
+            padding: 12px; border-radius: 12px; border: 1px solid var(--border-graphite);
+            font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center;
+            justify-content: center; gap: 8px; transition: all 0.2s;
+        }
+        .btn-choice-orig { background: var(--surface-card); color: var(--text-primary); }
+        .btn-choice-orig:hover { border-color: var(--accent-amber); }
+        .btn-choice-trans { background: var(--accent-amber); color: #000; border: none; }
+        .lang-options-drawer {
+            display: none; flex-direction: column; gap: 8px; margin-top: 6px; text-align: left;
+        }
+        .lang-dropdown {
+            width: 100%; background: var(--surface-card); border: 1px solid var(--border-graphite);
+            padding: 10px 12px; border-radius: 10px; color: #fff; font-size: 13px; outline: none;
+        }
 
         @media (max-width: 768px) {
             .sidebar-panel { width: 100%; }
@@ -176,7 +206,42 @@
         </div>
     </div>
 
-    <!-- MAIN TWO-PANEL WORKSPACE -->
+    <!-- SEND CONFIRMATION MODAL -->
+    <div class="send-modal-backdrop" id="send-modal">
+        <div class="send-modal-card">
+            <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Select Sending Mode</h3>
+            <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Choose how to deliver your message</p>
+
+            <button class="modal-btn-choice btn-choice-orig" onclick="confirmDispatchOriginal()">
+                ✉️ Send Original
+            </button>
+            <button class="modal-btn-choice btn-choice-trans" onclick="toggleLanguageDrawer()">
+                🌐 Translate & Send
+            </button>
+
+            <div class="lang-options-drawer" id="lang-drawer">
+                <label style="font-size: 11px; color: var(--text-muted);">Select Target Language:</label>
+                <select class="lang-dropdown" id="modal-target-lang">
+                    <option value="en">English (US)</option>
+                    <option value="ur">Urdu (اردو)</option>
+                    <option value="ar">Arabic (العربية)</option>
+                    <option value="de">German (Deutsch)</option>
+                    <option value="fr">French (Français)</option>
+                    <option value="es">Spanish (Español)</option>
+                    <option value="zh">Chinese (中文)</option>
+                </select>
+                <button class="btn-auth" style="margin-top: 4px;" onclick="confirmDispatchTranslation()">
+                    Confirm & Send Translation
+                </button>
+            </div>
+
+            <button onclick="cancelDispatch()" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer;">
+                Cancel
+            </button>
+        </div>
+    </div>
+
+    <!-- 2-PANEL WORKSPACE -->
     <div class="workspace">
         
         <!-- SIDEBAR -->
@@ -189,12 +254,10 @@
                 <input type="tel" id="target-phone-input" class="search-input" placeholder="Direct Number (e.g. 0301...)">
                 <button class="btn-new-chat" onclick="openDirectChat()">Chat</button>
             </div>
-            <div class="chat-list" id="chat-list">
-                <!-- Recent Chats Injected Here -->
-            </div>
+            <div class="chat-list" id="chat-list"></div>
         </aside>
 
-        <!-- ACTIVE CHAT STAGE -->
+        <!-- ACTIVE STAGE -->
         <main class="stage-panel" id="stage-panel">
             <header class="stage-header">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -202,21 +265,32 @@
                     <div class="chat-avatar" id="active-avatar">--</div>
                     <div>
                         <div style="font-size: 14px; font-weight: 700;" id="active-partner-label">Select a conversation</div>
-                        <div style="font-size: 11px; color: var(--online-green);">Encrypted Channel</div>
+                        <div style="font-size: 11px; color: var(--online-green);">Direct Line Active</div>
                     </div>
-                </div>
-                <div class="action-dock">
-                    <button class="btn-action translate" onclick="alert('Translation toggle ready')">🌐 Translate: Urdu ➔ Eng</button>
                 </div>
             </header>
 
             <div class="messages-container" id="messages-container"></div>
 
+            <!-- ATTACHMENT MENU POPUP -->
+            <div class="attach-popup-menu" id="attach-menu">
+                <div class="attach-menu-item" onclick="document.getElementById('file-picker-media').click()">
+                    <span>🖼️</span> Photos / Videos
+                </div>
+                <div class="attach-menu-item" onclick="shareLocation()">
+                    <span>📍</span> Location
+                </div>
+                <div class="attach-menu-item" onclick="document.getElementById('file-picker-doc').click()">
+                    <span>📄</span> Document
+                </div>
+            </div>
+
+            <input type="file" id="file-picker-media" accept="image/*,video/*" style="display:none;" onchange="uploadAttachment(event, 'media')">
+            <input type="file" id="file-picker-doc" accept="*/*" style="display:none;" onchange="uploadAttachment(event, 'document')">
+
             <footer class="stage-input-bar">
-                <input type="text" id="text-input" class="input-box" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendText()">
-                <button class="icon-btn" onclick="document.getElementById('file-picker').click()" title="Send Media">📎</button>
-                <button class="icon-btn" onclick="shareLocation()" title="Send Location">📍</button>
-                <input type="file" id="file-picker" style="display:none;" onchange="uploadFile(event)">
+                <button class="icon-btn" onclick="toggleAttachMenu()" title="Attach Link">📎</button>
+                <input type="text" id="text-input" class="input-box" placeholder="Type a message..." onkeypress="if(event.key==='Enter') stageMessageForDispatch()">
                 <button class="btn-send" id="mic-send-btn" onclick="handleMicOrSend()">➤</button>
             </footer>
         </main>
@@ -230,6 +304,9 @@
         let mediaRecorder = null;
         let recordedChunks = [];
         let isRecording = false;
+
+        // Pending dispatch queue for modal selection
+        let pendingPayload = null;
 
         window.onload = () => {
             if (myPhone) {
@@ -324,33 +401,89 @@
             document.body.classList.remove("in-chat");
         }
 
-        async function sendText() {
+        /* ATTACHMENT MENU TOGGLE */
+        function toggleAttachMenu() {
+            const menu = document.getElementById("attach-menu");
+            menu.style.display = menu.style.display === "flex" ? "none" : "flex";
+        }
+
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById("attach-menu");
+            if (!e.target.closest('.stage-input-bar') && !e.target.closest('.attach-popup-menu')) {
+                menu.style.display = "none";
+            }
+        });
+
+        /* DISPATCH MODAL LOGIC (ORIGINAL VS TRANSLATION) */
+        function stageMessageForDispatch() {
             const input = document.getElementById("text-input");
             const text = input.value.trim();
-            if (!text || !activePartner || !socket) return;
+            if (!text || !activePartner) return;
 
-            // Auto translation bridge
+            pendingPayload = {
+                type: "text",
+                content: text
+            };
+            openSendModal(`Message: "${text.substring(0, 25)}..."`);
+        }
+
+        function openSendModal(preview) {
+            document.getElementById("send-modal-preview").innerText = preview;
+            document.getElementById("lang-drawer").style.display = "none";
+            document.getElementById("send-modal").style.display = "flex";
+        }
+
+        function toggleLanguageDrawer() {
+            const drawer = document.getElementById("lang-drawer");
+            drawer.style.display = drawer.style.display === "flex" ? "none" : "flex";
+        }
+
+        function cancelDispatch() {
+            pendingPayload = null;
+            document.getElementById("send-modal").style.display = "none";
+        }
+
+        function confirmDispatchOriginal() {
+            if (!pendingPayload || !socket) return;
+            executeDispatch(pendingPayload.content, "", pendingPayload.type);
+            cancelDispatch();
+        }
+
+        async function confirmDispatchTranslation() {
+            if (!pendingPayload || !socket) return;
+            const targetLang = document.getElementById("modal-target-lang").value;
             let translated = "";
-            try {
-                const tRes = await fetch("/translate", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ text: text, source_lang: "ur", target_lang: "en" })
-                });
-                const tData = await tRes.json();
-                translated = tData.translated_text || "";
-            } catch (e) {}
 
+            if (pendingPayload.type === "text") {
+                try {
+                    const res = await fetch("/translate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            text: pendingPayload.content,
+                            target_lang: targetLang
+                        })
+                    });
+                    const data = await res.json();
+                    translated = data.translated_text || "";
+                } catch (e) {}
+            }
+
+            executeDispatch(pendingPayload.content, translated, pendingPayload.type);
+            cancelDispatch();
+        }
+
+        function executeDispatch(content, translated, msgType) {
             const payload = {
                 action: "chat_message",
                 receiver: activePartner,
-                msg_type: "text",
-                content: text,
+                msg_type: msgType,
+                content: content,
                 translated: translated
             };
             socket.send(JSON.stringify(payload));
-            appendBubble(text, "sent", translated, "text", "now");
-            input.value = "";
+            appendBubble(content, "sent", translated, msgType, "now");
+            document.getElementById("text-input").value = "";
             loadRecentChats();
         }
 
@@ -365,7 +498,9 @@
             } else if (type === "voice") {
                 body = `<audio controls src="${content}" style="max-width:200px; height:32px;"></audio>`;
             } else if (type === "location") {
-                body = `<a href="${content}" target="_blank" style="color:inherit; font-weight:700;">📍 View Location</a>`;
+                body = `<a href="${content}" target="_blank" style="color:inherit; font-weight:700;">📍 Shared Location (Open Map)</a>`;
+            } else if (type === "document") {
+                body = `<a href="${content}" target="_blank" style="color:inherit; text-decoration:underline;">📄 Document File</a>`;
             }
 
             if (translated && translated !== content) {
@@ -381,7 +516,7 @@
         async function handleMicOrSend() {
             const text = document.getElementById("text-input").value.trim();
             if (text) {
-                sendText();
+                stageMessageForDispatch();
                 return;
             }
             if (!isRecording) {
@@ -403,13 +538,12 @@
                     form.append("file", blob, "voice.webm");
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
-                    socket.send(JSON.stringify({
-                        action: "chat_message",
-                        receiver: activePartner,
-                        msg_type: "voice",
+                    
+                    pendingPayload = {
+                        type: "voice",
                         content: data.url
-                    }));
-                    appendBubble(data.url, "sent", "", "voice", "now");
+                    };
+                    openSendModal("Voice Note Ready");
                 };
                 mediaRecorder.start();
                 isRecording = true;
@@ -425,34 +559,24 @@
             document.getElementById("mic-send-btn").classList.remove("recording");
         }
 
-        /* MEDIA & LOCATION */
-        async function uploadFile(e) {
+        /* ATTACHMENT UPLOAD & LOCATION */
+        async function uploadAttachment(e, type) {
+            document.getElementById("attach-menu").style.display = "none";
             const file = e.target.files[0];
             if (!file || !activePartner) return;
             const form = new FormData();
             form.append("file", file);
             const res = await fetch("/api/upload", { method: "POST", body: form });
             const data = await res.json();
-            socket.send(JSON.stringify({
-                action: "chat_message",
-                receiver: activePartner,
-                msg_type: "media",
-                content: data.url
-            }));
-            appendBubble(data.url, "sent", "", "media", "now");
+            executeDispatch(data.url, "", type);
         }
 
         function shareLocation() {
+            document.getElementById("attach-menu").style.display = "none";
             if (!navigator.geolocation || !activePartner) return;
             navigator.geolocation.getCurrentPosition(pos => {
                 const mapLink = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
-                socket.send(JSON.stringify({
-                    action: "chat_message",
-                    receiver: activePartner,
-                    msg_type: "location",
-                    content: mapLink
-                }));
-                appendBubble(mapLink, "sent", "", "location", "now");
+                executeDispatch(mapLink, "", "location");
             });
         }
     </script>
