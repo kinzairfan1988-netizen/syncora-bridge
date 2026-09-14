@@ -458,7 +458,7 @@
                 </div>
                 <div class="header-actions">
                     <button class="btn-header-action" onclick="copyMyPersonalDirectLink()" id="main-copy-btn">📋 My Link</button>
-                    <button class="btn-add-contact" onclick="openAddModal()">＋ Add</button>
+                    <button class="btn-header-action" onclick="openAddModal()">＋ Add</button>
                 </div>
             </header>
 
@@ -469,7 +469,7 @@
             <button class="fab-add" onclick="openAddModal()" title="Add New Contact">＋</button>
         </div>
 
-        <!-- 2. DIRECT BLANK CHAT VIEW (AUTOMATIC LANDING FOR GUEST) -->
+        <!-- 2. DIRECT CHAT VIEW -->
         <div class="view-chat-screen" id="view-chat-screen">
             <header class="chat-top-header">
                 <div class="chat-contact-meta">
@@ -651,7 +651,6 @@
         const hostNameParam = urlParams.get('host_name') ? decodeURIComponent(urlParams.get('host_name')) : null;
         const hostPhotoParam = urlParams.get('host_photo') ? decodeURIComponent(urlParams.get('host_photo')) : "";
 
-        // Default name set to Irfan Anees
         let myName = localStorage.getItem("syncora_my_name") || (isGuest ? "Guest" : "Irfan Anees");
         let myPhoto = localStorage.getItem("syncora_my_photo") || "";
 
@@ -661,7 +660,7 @@
             localStorage.setItem("syncora_personal_room", myPersonalRoomId);
         }
 
-        let currentRoom = urlParams.get('room') || (isGuest ? myPersonalRoomId : myPersonalRoomId);
+        let currentRoom = urlParams.get('room') || myPersonalRoomId;
 
         let contacts = [];
         if (!isGuest) {
@@ -963,7 +962,9 @@
                     });
                     const data = await res.json();
                     translated = data.translated_text || "";
-                } catch (e) {}
+                } catch (e) {
+                    console.error("Chat translation failed:", e);
+                }
             }
 
             socket.send(JSON.stringify({
@@ -1081,35 +1082,38 @@
                 const lastIdx = event.results.length - 1;
                 const originalText = event.results[lastIdx][0].transcript.trim();
 
-                if (originalText.length > 0) {
-                    document.getElementById("sub-original").innerText = `You: "${originalText}"`;
-                    document.getElementById("sub-translated").innerText = "Translating...";
+                // Kisi single character ya glitch par translation na bhejien
+                if (originalText.length < 2) return;
 
-                    const src = document.getElementById("call-speak-lang").value.split("-")[0];
-                    const tgt = document.getElementById("call-target-lang").value;
+                document.getElementById("sub-original").innerText = `You: "${originalText}"`;
+                document.getElementById("sub-translated").innerText = "Translating...";
 
-                    try {
-                        const res = await fetch("/translate", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                text: originalText,
-                                source_lang: src,
-                                target_lang: tgt
-                            })
-                        });
-                        const data = await res.json();
-                        const translatedText = data.translated_text || originalText;
-                        document.getElementById("sub-translated").innerText = `AI: ${translatedText}`;
+                const src = document.getElementById("call-speak-lang").value.split("-")[0];
+                const tgt = document.getElementById("call-target-lang").value;
 
-                        if (socket && socket.readyState === WebSocket.OPEN) {
-                            socket.send(JSON.stringify({
-                                type: "live_subtitle",
-                                original: originalText,
-                                translated: translatedText
-                            }));
-                        }
-                    } catch (e) {}
+                try {
+                    const res = await fetch("/translate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            text: originalText,
+                            source_lang: src,
+                            target_lang: tgt
+                        })
+                    });
+                    const data = await res.json();
+                    const translatedText = data.translated_text || originalText;
+                    document.getElementById("sub-translated").innerText = `AI: ${translatedText}`;
+
+                    if (socket && socket.readyState === WebSocket.OPEN) {
+                        socket.send(JSON.stringify({
+                            type: "live_subtitle",
+                            original: originalText,
+                            translated: translatedText
+                        }));
+                    }
+                } catch (e) {
+                    console.error("Live translation call failed:", e);
                 }
             };
 
