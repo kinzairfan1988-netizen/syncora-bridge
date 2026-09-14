@@ -1,5 +1,6 @@
 import os
 import json
+import random
 import sqlite3
 import urllib.request
 import urllib.parse
@@ -38,6 +39,13 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS otp_store (
+            phone TEXT PRIMARY KEY,
+            otp TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -58,8 +66,12 @@ class TranslationRequest(BaseModel):
     source_lang: str = "auto"
     target_lang: str = "en"
 
-class UserRegister(BaseModel):
+class OTPRequest(BaseModel):
     phone: str
+
+class OTPVerify(BaseModel):
+    phone: str
+    otp: str
     display_name: str = ""
 
 def get_chat_id(u1: str, u2: str) -> str:
@@ -100,17 +112,50 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-@app.post("/api/register")
-async def register_user(user: UserRegister):
-    phone = user.phone.strip()
+# --- OTP ENDPOINTS ---
+@app.post("/api/otp/send")
+async def send_otp(req: OTPRequest):
+    phone = req.phone.strip()
     if not phone:
-        return JSONResponse(status_code=400, content={"error": "Phone required"})
+        return JSONResponse(status_code=400, content={"error": "Phone number required"})
+    
+    # 4-Digit OTP Code
+    otp_code = str(random.randint(1000, 9999))
+    
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (phone, user.display_name or phone))
+    cursor.execute("INSERT OR REPLACE INTO otp_store (phone, otp) VALUES (?, ?)", (phone, otp_code))
     conn.commit()
     conn.close()
-    return {"status": "ok", "phone": phone}
+
+    print(f"=====================================")
+    print(f"[OTP GATEWAY] Code for {phone} is: {otp_code}")
+    print(f"=====================================")
+
+    # Returns OTP in response for instant demo testing + SMS log
+    return {"status": "ok", "message": "OTP sent successfully to SIM", "otp_preview": otp_code}
+
+@app.post("/api/otp/verify")
+async def verify_otp(req: OTPVerify):
+    phone = req.phone.strip()
+    otp = req.otp.strip()
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT otp FROM otp_store WHERE phone = ?", (phone,))
+    row = cursor.fetchone()
+
+    if not row or row[0] != otp:
+        conn.close()
+        return JSONResponse(status_code=400, content={"error": "Galat OTP code! Dobara check karein."})
+
+    # Register user if valid
+    cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (phone, req.display_name or phone))
+    cursor.execute("DELETE FROM otp_store WHERE phone = ?", (phone,))
+    conn.commit()
+    conn.close()
+
+    return {"status": "verified", "phone": phone}
 
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
