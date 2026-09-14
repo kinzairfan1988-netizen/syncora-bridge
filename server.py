@@ -15,7 +15,7 @@ if GEMINI_KEY:
     except Exception as e:
         print(f"[Gemini Config Error]: {e}")
 
-app = FastAPI(title="Syncora Multi-Language & Video Terminal")
+app = FastAPI(title="Syncora WhatsApp Replica")
 
 class TranslationPayload(BaseModel):
     text: str
@@ -53,15 +53,12 @@ class SystemHub:
                 self.disconnect(room_id, d)
 
     async def broadcast_text(self, room_id: str, sender: WebSocket, payload: dict):
-        if payload.get("type") == "text_message":
+        # Chat messages, voice notes, media, aur location ko history mein store karna
+        msg_type = payload.get("type")
+        if msg_type in ["text_message", "voice_note", "media_message", "location_message"]:
             if room_id not in self.offline_messages:
                 self.offline_messages[room_id] = []
-            self.offline_messages[room_id].append({
-                "sender": payload.get("sender"),
-                "text": payload.get("text"),
-                "translated": payload.get("translated", ""),
-                "time": payload.get("time", "")
-            })
+            self.offline_messages[room_id].append(payload)
 
         if room_id in self.rooms:
             dead = []
@@ -95,12 +92,12 @@ async def translate_text(req: TranslationPayload):
     if not clean_text:
         return {"translated_text": ""}
 
-    # 1. Bulletproof Direct Translation (Zero Latency & No 404)
+    # 1. Fast direct translation (instant fallback)
     translated = direct_translate(clean_text, req.source_lang, req.target_lang)
     if translated and translated.lower() != clean_text.lower():
         return {"translated_text": translated}
 
-    # 2. Gemini Fallback if available
+    # 2. Gemini fallback
     if GEMINI_KEY:
         prompt = (
             f"Translate this spoken sentence from language code '{req.source_lang}' "
