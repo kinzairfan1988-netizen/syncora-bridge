@@ -3,337 +3,332 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WhatsApp Direct</title>
+    <title>Syncora Terminal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --wa-bg: #0b141a;
-            --wa-header: #202c33;
-            --wa-card: #111b21;
-            --wa-green: #00a884;
-            --wa-green-bubble: #005c4b;
-            --wa-received-bubble: #202c33;
-            --text-primary: #e9edef;
-            --text-secondary: #8696a0;
-            --border-color: rgba(134, 150, 160, 0.15);
-            --danger-red: #ea4335;
+            --bg-obsidian: #09090b;
+            --surface-card: #121215;
+            --surface-hover: #18181b;
+            --border-graphite: #27272a;
+            --border-subtle: rgba(255, 255, 255, 0.05);
+            --accent-amber: #f59e0b;
+            --accent-amber-dim: rgba(245, 158, 11, 0.12);
+            --accent-amber-glow: rgba(245, 158, 11, 0.25);
+            --danger-red: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.25);
+            --text-primary: #fafafa;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --online-green: #10b981;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
         body {
             font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
-            background-color: #0c1317;
+            background-color: var(--bg-obsidian);
             color: var(--text-primary);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
+            overflow-x: hidden;
         }
 
-        .app-container {
+        .app-viewport {
             width: 100%;
             max-width: 480px;
             height: 100vh;
             max-height: 920px;
-            background-color: var(--wa-bg);
+            background-color: var(--bg-obsidian);
+            border: 1px solid var(--border-graphite);
             position: relative;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            border: 1px solid var(--border-color);
         }
 
         @media (max-width: 480px) {
-            .app-container { max-height: 100vh; border: none; }
+            .app-viewport { max-height: 100vh; border: none; }
         }
 
-        /* 1. NUMBER ENTRY SCREEN */
+        /* 1. FRONT SCREEN: DIRECT NUMBER ACCESS */
         .landing-screen {
             flex: 1;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            padding: 30px 24px;
+            padding: 32px 24px;
             text-align: center;
-            background: var(--wa-card);
+            background: var(--bg-obsidian);
         }
-        .landing-logo {
-            width: 64px; height: 64px; border-radius: 50%;
-            background: var(--wa-green); display: flex;
-            align-items: center; justify-content: center;
-            font-size: 32px; margin-bottom: 20px;
-            box-shadow: 0 4px 20px rgba(0, 168, 132, 0.3);
+        .syncora-badge {
+            width: 68px; height: 68px; border-radius: 20px;
+            background: var(--accent-amber-dim);
+            border: 2px solid var(--accent-amber);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 26px; font-weight: 700; color: var(--accent-amber);
+            margin-bottom: 20px;
+            box-shadow: 0 0 30px var(--accent-amber-glow);
+            font-family: 'Space Grotesk', sans-serif;
         }
-        .landing-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
-        .landing-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 24px; }
-        .phone-input-box {
-            width: 100%;
-            background: #2a3942;
-            border: 1px solid transparent;
-            border-radius: 12px;
-            padding: 14px 16px;
-            color: var(--text-primary);
-            font-size: 15px;
-            outline: none;
-            margin-bottom: 12px;
+        .brand-title {
+            font-size: 24px; font-weight: 700;
+            font-family: 'Space Grotesk', sans-serif;
+            letter-spacing: -0.5px; margin-bottom: 6px;
         }
-        .phone-input-box:focus { border-color: var(--wa-green); }
-        .btn-start-chat {
-            width: 100%;
-            background: var(--wa-green);
-            color: #111b21;
-            border: none;
-            border-radius: 12px;
-            padding: 14px;
-            font-size: 15px;
-            font-weight: 700;
-            cursor: pointer;
-            margin-top: 6px;
+        .brand-subtitle {
+            font-size: 13px; color: var(--text-muted);
+            margin-bottom: 28px;
         }
+        .input-cluster {
+            width: 100%; display: flex; flex-direction: column; gap: 12px;
+        }
+        .terminal-input {
+            width: 100%; background: var(--surface-card);
+            border: 1px solid var(--border-graphite);
+            border-radius: 14px; padding: 14px 16px;
+            color: var(--text-primary); font-size: 14px;
+            outline: none; transition: border-color 0.2s ease;
+        }
+        .terminal-input:focus { border-color: var(--accent-amber); }
+        .btn-launch-terminal {
+            width: 100%; background: var(--accent-amber);
+            color: #000; border: none; border-radius: 14px;
+            padding: 14px; font-size: 14px; font-weight: 700;
+            cursor: pointer; margin-top: 6px;
+            box-shadow: 0 4px 20px var(--accent-amber-glow);
+            transition: transform 0.1s ease;
+        }
+        .btn-launch-terminal:active { transform: scale(0.98); }
 
-        /* 2. CHAT SCREEN */
+        /* 2. DIRECT CHAT TERMINAL */
         .chat-view {
             display: none;
             flex: 1;
             flex-direction: column;
             height: 100%;
-            background: #0b141a;
+            background: var(--bg-obsidian);
             position: relative;
         }
 
         .chat-header {
-            background: var(--wa-header);
+            background: rgba(18, 18, 21, 0.96);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-graphite);
             padding: 10px 14px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            display: flex; align-items: center; justify-content: space-between;
             z-index: 10;
         }
-        .chat-user-meta { display: flex; align-items: center; gap: 10px; }
-        .chat-avatar {
-            width: 40px; height: 40px; border-radius: 50%;
-            background: #6b7c85; display: flex; align-items: center;
-            justify-content: center; font-weight: 700; font-size: 14px;
+        .header-meta { display: flex; align-items: center; gap: 10px; }
+        .chat-avatar-pill {
+            width: 38px; height: 38px; border-radius: 50%;
+            background: #1c1c21; border: 1px solid var(--accent-amber);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 13px; color: var(--accent-amber);
         }
-        .chat-header-actions { display: flex; align-items: center; gap: 8px; }
         .icon-btn {
             background: transparent; border: none;
-            color: var(--text-secondary); font-size: 19px;
-            cursor: pointer; padding: 6px; border-radius: 50%;
+            color: var(--text-secondary); font-size: 18px;
+            cursor: pointer; padding: 6px; border-radius: 8px;
+            transition: color 0.2s;
         }
-        .icon-btn:hover { color: var(--text-primary); }
+        .icon-btn:hover { color: var(--accent-amber); }
+        .call-btn-cluster { display: flex; align-items: center; gap: 4px; }
+        .btn-terminal-call {
+            background: var(--surface-card); border: 1px solid var(--border-graphite);
+            color: var(--text-primary); padding: 6px 9px; border-radius: 10px;
+            font-size: 12px; font-weight: 700; cursor: pointer;
+        }
+        .btn-terminal-call.translate {
+            background: var(--accent-amber-dim); color: var(--accent-amber);
+            border-color: rgba(245, 158, 11, 0.4);
+        }
 
         .chat-translate-bar {
-            background: #182229;
-            padding: 6px 12px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 12px;
-            color: var(--text-secondary);
-            border-bottom: 1px solid var(--border-color);
+            padding: 6px 14px;
+            background: rgba(245, 158, 11, 0.04);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 11px; color: var(--text-muted);
         }
-        .lang-select {
-            background: #202c33; color: var(--wa-green);
-            border: 1px solid var(--border-color); border-radius: 6px;
-            padding: 3px 6px; font-size: 11px; outline: none;
+        .lang-pill {
+            background: var(--surface-card); color: var(--accent-amber);
+            border: 1px solid var(--border-graphite); border-radius: 8px;
+            padding: 2px 6px; font-size: 11px; outline: none;
         }
 
         .chat-messages-container {
-            flex: 1;
-            padding: 14px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0);
-            background-size: 20px 20px;
+            flex: 1; padding: 16px; overflow-y: auto;
+            display: flex; flex-direction: column; gap: 10px;
         }
 
         .msg-bubble {
-            max-width: 80%;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            line-height: 1.4;
-            word-break: break-word;
-            position: relative;
+            max-width: 82%; padding: 10px 14px; border-radius: 14px;
+            font-size: 13px; line-height: 1.4; word-break: break-word;
         }
         .msg-bubble.sent {
-            align-self: flex-end;
-            background: var(--wa-green-bubble);
-            color: var(--text-primary);
-            border-top-right-radius: 0;
+            align-self: flex-end; background: var(--accent-amber);
+            color: #000; font-weight: 500; border-bottom-right-radius: 4px;
         }
         .msg-bubble.received {
-            align-self: flex-start;
-            background: var(--wa-received-bubble);
-            color: var(--text-primary);
-            border-top-left-radius: 0;
+            align-self: flex-start; background: var(--surface-card);
+            color: var(--text-primary); border: 1px solid var(--border-graphite);
+            border-bottom-left-radius: 4px;
         }
         .msg-time {
-            font-size: 10px; color: rgba(255, 255, 255, 0.5);
-            margin-top: 4px; text-align: right;
+            font-size: 9px; opacity: 0.6; margin-top: 4px; text-align: right;
         }
         .msg-translation {
-            font-size: 12px; color: #70e6c7;
-            border-top: 1px dashed rgba(255, 255, 255, 0.15);
-            margin-top: 4px; padding-top: 4px;
+            font-size: 11px; margin-top: 4px; padding-top: 4px;
+            border-top: 1px dashed rgba(0, 0, 0, 0.2); font-style: italic;
+        }
+        .msg-bubble.received .msg-translation {
+            border-top-color: var(--border-graphite); color: var(--online-green);
         }
         .msg-media-img {
-            max-width: 100%; border-radius: 6px;
-            margin-top: 4px; display: block;
+            max-width: 100%; border-radius: 8px; margin-top: 4px; display: block;
         }
         .msg-location-link {
-            display: flex; align-items: center; gap: 6px;
-            color: #53bdeb; text-decoration: none; font-weight: 600;
+            color: inherit; text-decoration: underline; font-weight: 700;
         }
 
         /* BOTTOM INPUT BAR */
         .chat-input-bar {
-            background: var(--wa-header);
-            padding: 8px 10px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            padding: 10px 14px 16px 14px;
+            background: var(--bg-obsidian);
+            border-top: 1px solid var(--border-subtle);
+            display: flex; align-items: center; gap: 8px;
         }
-        .input-pill {
-            flex: 1;
-            background: #2a3942;
-            border-radius: 24px;
-            display: flex;
-            align-items: center;
-            padding: 4px 12px;
+        .input-shell {
+            flex: 1; background: var(--surface-card);
+            border: 1px solid var(--border-graphite);
+            border-radius: 14px; display: flex; align-items: center;
+            padding: 2px 10px;
         }
+        .input-shell:focus-within { border-color: var(--accent-amber); }
         .main-text-input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            outline: none;
-            color: var(--text-primary);
-            font-size: 14px;
-            padding: 8px 4px;
+            flex: 1; background: transparent; border: none;
+            outline: none; color: var(--text-primary);
+            font-size: 13px; padding: 10px 6px;
         }
-        .btn-circle-action {
-            width: 42px; height: 42px; border-radius: 50%;
-            background: var(--wa-green); border: none;
-            color: #111b21; display: flex; align-items: center;
-            justify-content: center; font-size: 18px;
+        .btn-action-circle {
+            width: 44px; height: 44px; border-radius: 14px;
+            background: var(--accent-amber); border: none;
+            color: #000; display: flex; align-items: center;
+            justify-content: center; font-size: 16px; font-weight: 700;
             cursor: pointer; flex-shrink: 0;
+            box-shadow: 0 4px 15px var(--accent-amber-glow);
         }
-        .btn-circle-action.recording {
-            background: var(--danger-red);
-            animation: pulseRecord 1s infinite alternate;
+        .btn-action-circle.recording {
+            background: var(--danger-red); color: #fff;
+            animation: ringPulse 1s infinite alternate;
         }
-        @keyframes pulseRecord { from { transform: scale(1); } to { transform: scale(1.1); } }
+        @keyframes ringPulse { from { transform: scale(1); } to { transform: scale(1.08); } }
 
-        /* ACTIVE CALL MODAL */
+        /* ACTIVE CALL OVERLAY */
         .call-overlay {
-            position: absolute; inset: 0; background: #111b21;
+            position: absolute; inset: 0; background: var(--bg-obsidian);
             z-index: 100; display: none; flex-direction: column;
-            justify-content: space-between; padding: 30px 20px;
+            justify-content: space-between; padding: 36px 20px;
         }
-        .call-top { text-align: center; }
-        .call-contact-name { font-size: 22px; font-weight: 700; margin-top: 10px; }
-        .call-status { font-size: 13px; color: var(--wa-green); margin-top: 4px; }
-        .call-sub-box {
-            background: rgba(0, 0, 0, 0.4);
-            border-radius: 12px; padding: 14px; text-align: center;
-        }
-        .call-actions {
-            display: flex; justify-content: center; gap: 20px;
+        .caller-display-card { text-align: center; }
+        .caller-title { font-size: 22px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
+        .call-timer { font-size: 14px; color: var(--accent-amber); margin-top: 4px; }
+        .call-subtitle-panel {
+            background: var(--surface-card); border: 1px solid var(--border-graphite);
+            border-radius: 14px; padding: 14px; text-align: center;
         }
         .btn-hangup {
             width: 56px; height: 56px; border-radius: 50%;
-            background: var(--danger-red); border: none;
-            color: white; font-size: 22px; cursor: pointer;
+            background: var(--danger-red); border: none; color: white;
+            font-size: 22px; cursor: pointer; margin: 0 auto; display: block;
+            box-shadow: 0 4px 20px var(--danger-glow);
         }
     </style>
 </head>
 <body>
 
-    <div class="app-container">
+    <div class="app-viewport">
         
-        <!-- 1. DIRECT NUMBER LOGIN / LANDING SCREEN -->
+        <!-- 1. DIRECT NUMBER LOGIN SCREEN -->
         <div class="landing-screen" id="landing-screen">
-            <div class="landing-logo">💬</div>
-            <h2 class="landing-title">WhatsApp Direct</h2>
-            <p class="landing-desc">Direct chat & call bina kisi contact ko save kiye</p>
+            <div class="syncora-badge">IA</div>
+            <h1 class="brand-title">Syncora Terminal</h1>
+            <p class="brand-subtitle">Direct line calling & live translation bina number save kiye</p>
 
-            <input type="tel" class="phone-input-box" id="my-phone-input" placeholder="Aapka Mobile Number (e.g. 03001234567)">
-            <input type="tel" class="phone-input-box" id="target-phone-input" placeholder="Jisse baat karni hai uska Number">
-
-            <button class="btn-start-chat" onclick="startDirectChat()">Start Chat</button>
+            <div class="input-cluster">
+                <input type="tel" class="terminal-input" id="my-phone-input" placeholder="Aapka Mobile Number (e.g. 03001234567)">
+                <input type="tel" class="terminal-input" id="target-phone-input" placeholder="Jisse connect hona hai uska Number">
+                <button class="btn-launch-terminal" onclick="startDirectTerminal()">Connect Direct Line</button>
+            </div>
         </div>
 
-        <!-- 2. DIRECT CHAT VIEW -->
+        <!-- 2. DIRECT CHAT TERMINAL -->
         <div class="chat-view" id="chat-view">
             <header class="chat-header">
-                <div class="chat-user-meta">
-                    <button class="icon-btn" onclick="exitChat()" style="margin-right: -4px;">←</button>
-                    <div class="chat-avatar" id="chat-avatar">U</div>
+                <div class="header-meta">
+                    <button class="icon-btn" onclick="exitChat()">←</button>
+                    <div class="chat-avatar-pill" id="partner-avatar">IA</div>
                     <div>
-                        <div style="font-size: 14px; font-weight: 700;" id="chat-partner-title">0300...</div>
-                        <div style="font-size: 11px; color: var(--wa-green);">online</div>
+                        <div style="font-size: 14px; font-weight: 700;" id="partner-phone-label">0300...</div>
+                        <div style="font-size: 10px; color: var(--online-green);">Direct Line Active</div>
                     </div>
                 </div>
-                <div class="chat-header-actions">
-                    <button class="icon-btn" onclick="triggerCall('voice')" title="Voice Call">📞</button>
-                    <button class="icon-btn" onclick="triggerCall('video')" title="Video Call">📹</button>
-                    <button class="icon-btn" onclick="triggerCall('translate')" title="AI Translate Call">🌐</button>
+                <div class="call-btn-cluster">
+                    <button class="btn-terminal-call" onclick="triggerCall('voice')">📞</button>
+                    <button class="btn-terminal-call" onclick="triggerCall('video')">📹</button>
+                    <button class="btn-terminal-call translate" onclick="triggerCall('translate')">🌐 Translate</button>
                 </div>
             </header>
 
-            <!-- TRANSLATE BAR -->
             <div class="chat-translate-bar">
-                <span>Auto-Translate Text:</span>
-                <select class="lang-select" id="chat-source-lang">
-                    <option value="ur">Urdu</option>
+                <span>Translate:</span>
+                <select class="lang-pill" id="chat-source-lang">
+                    <option value="ur">Urdu (اردو)</option>
                     <option value="en">English</option>
                     <option value="ar">Arabic</option>
                 </select>
                 <span>➔</span>
-                <select class="lang-select" id="chat-target-lang">
+                <select class="lang-pill" id="chat-target-lang">
                     <option value="en">English</option>
-                    <option value="ur">Urdu</option>
+                    <option value="ur">Urdu (اردو)</option>
                     <option value="ar">Arabic</option>
                 </select>
-                <input type="checkbox" id="auto-translate-check" checked>
+                <input type="checkbox" id="auto-translate-check" checked title="Enable Auto-Translate">
             </div>
 
-            <!-- MESSAGES AREA -->
             <div class="chat-messages-container" id="chat-box"></div>
 
-            <!-- BOTTOM INPUT BAR -->
             <div class="chat-input-bar">
-                <div class="input-pill">
-                    <input type="text" class="main-text-input" id="text-input" placeholder="Message" onkeypress="if(event.key==='Enter') sendTextMessage()">
+                <div class="input-shell">
+                    <input type="text" class="main-text-input" id="text-input" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendTextMessage()">
                     <button class="icon-btn" onclick="document.getElementById('file-picker').click()" title="Send Image">📎</button>
-                    <button class="icon-btn" onclick="sendLiveLocation()" title="Send Live Location">📍</button>
+                    <button class="icon-btn" onclick="sendLiveLocation()" title="Share Location">📍</button>
                     <input type="file" id="file-picker" accept="image/*" style="display:none;" onchange="handleFileUpload(event)">
                 </div>
-                <button class="btn-circle-action" id="mic-send-btn" onclick="handleMicOrSend()">➤</button>
+                <button class="btn-action-circle" id="mic-send-btn" onclick="handleMicOrSend()">➤</button>
             </div>
         </div>
 
-        <!-- 3. ACTIVE CALL SCREEN -->
+        <!-- 3. ACTIVE CALL OVERLAY -->
         <div class="call-overlay" id="call-overlay">
-            <div class="call-top">
-                <div class="chat-avatar" style="width: 70px; height: 70px; margin: 0 auto; font-size: 24px;" id="call-avatar">U</div>
-                <div class="call-contact-name" id="call-contact-name">User</div>
-                <div class="call-status" id="call-status-timer">Calling...</div>
+            <div class="caller-display-card">
+                <div class="syncora-badge" style="margin: 0 auto 16px auto;" id="call-avatar">IA</div>
+                <div class="caller-title" id="call-partner-name">User</div>
+                <div class="call-timer" id="call-timer">Connected • 00:00</div>
             </div>
 
-            <div class="call-sub-box">
-                <div style="font-size: 12px; color: var(--text-secondary);" id="call-sub-original">Speak now...</div>
-                <div style="font-size: 15px; color: var(--wa-green); font-weight: 600; margin-top: 4px;" id="call-sub-translated">Translation will appear here</div>
+            <div class="call-subtitle-panel">
+                <div style="font-size: 11px; color: var(--text-muted);" id="call-sub-original">Speak naturally...</div>
+                <div style="font-size: 14px; color: var(--online-green); font-weight: 600; margin-top: 4px;" id="call-sub-translated">AI Live Translation Active</div>
             </div>
 
-            <div class="call-actions">
+            <div>
                 <button class="btn-hangup" onclick="hangupCall()">🛑</button>
             </div>
         </div>
@@ -342,7 +337,7 @@
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        let myPhone = localStorage.getItem("syncora_wa_my_phone") || "";
+        let myPhone = localStorage.getItem("syncora_my_phone") || "";
         let targetPhone = urlParams.get('chat') || "";
         let currentRoom = "";
         let socket = null;
@@ -359,7 +354,7 @@
             if (myPhone) document.getElementById("my-phone-input").value = myPhone;
             if (targetPhone) {
                 document.getElementById("target-phone-input").value = targetPhone;
-                if (myPhone) startDirectChat();
+                if (myPhone) startDirectTerminal();
             }
         };
 
@@ -368,22 +363,22 @@
             return `room_${sorted[0]}_${sorted[1]}`;
         }
 
-        function startDirectChat() {
+        function startDirectTerminal() {
             myPhone = document.getElementById("my-phone-input").value.trim();
             targetPhone = document.getElementById("target-phone-input").value.trim();
 
             if (!myPhone || !targetPhone) {
-                alert("Dono numbers enter karein!");
+                alert("Apna number aur partner ka number dono enter karein.");
                 return;
             }
 
-            localStorage.setItem("syncora_wa_my_phone", myPhone);
+            localStorage.setItem("syncora_my_phone", myPhone);
             currentRoom = makeRoomId(myPhone, targetPhone);
 
             document.getElementById("landing-screen").style.display = "none";
             document.getElementById("chat-view").style.display = "flex";
-            document.getElementById("chat-partner-title").innerText = targetPhone;
-            document.getElementById("chat-avatar").innerText = targetPhone.slice(-2);
+            document.getElementById("partner-phone-label").innerText = targetPhone;
+            document.getElementById("partner-avatar").innerText = targetPhone.slice(-2);
 
             initSocket();
             fetchHistory();
@@ -410,8 +405,6 @@
                         appendImageBubble(data.image, 'received', data.time);
                     } else if (data.type === "location_message") {
                         appendLocationBubble(data.lat, data.lng, 'received', data.time);
-                    } else if (data.type === "call_signal") {
-                        handleIncomingCallSignal(data);
                     }
                 }
             };
@@ -436,7 +429,7 @@
             } catch (e) {}
         }
 
-        /* 1. TEXT & TRANSLATION */
+        /* 1. TEXT SEND & AUTO-TRANSLATE */
         async function sendTextMessage() {
             const input = document.getElementById("text-input");
             const text = input.value.trim();
@@ -479,7 +472,7 @@
             bubble.className = `msg-bubble ${type}`;
             let html = `<div>${text}</div>`;
             if (translated && translated !== text) {
-                html += `<div class="msg-translation">${translated}</div>`;
+                html += `<div class="msg-translation">AI: ${translated}</div>`;
             }
             html += `<div class="msg-time">${time || 'now'}</div>`;
             bubble.innerHTML = html;
@@ -487,7 +480,7 @@
             box.scrollTop = box.scrollHeight;
         }
 
-        /* 2. VOICE NOTES (PTT) */
+        /* 2. VOICE NOTES (AUDIO RECORDING) */
         async function handleMicOrSend() {
             const text = document.getElementById("text-input").value.trim();
             if (text) {
@@ -495,7 +488,6 @@
                 return;
             }
 
-            // Voice recording toggle
             if (!isRecording) {
                 startRecording();
             } else {
@@ -557,8 +549,8 @@
             bubble.className = `msg-bubble ${type}`;
             bubble.innerHTML = `
                 <div style="display:flex; align-items:center; gap:8px;">
-                    <span>🎤 Voice Note</span>
-                    <audio controls src="${audioBase64}" style="max-width: 200px; height: 32px;"></audio>
+                    <span>🎙️ Voice Note</span>
+                    <audio controls src="${audioBase64}" style="max-width: 190px; height: 32px;"></audio>
                 </div>
                 <div class="msg-time">${time || 'now'}</div>
             `;
@@ -592,17 +584,17 @@
             const bubble = document.createElement("div");
             bubble.className = `msg-bubble ${type}`;
             bubble.innerHTML = `
-                <img src="${imgSrc}" class="msg-media-img" alt="Shared Media">
+                <img src="${imgSrc}" class="msg-media-img" alt="Attached Media">
                 <div class="msg-time">${time || 'now'}</div>
             `;
             box.appendChild(bubble);
             box.scrollTop = box.scrollHeight;
         }
 
-        /* 4. LIVE LOCATION */
+        /* 4. LIVE LOCATION SHARING */
         function sendLiveLocation() {
             if (!navigator.geolocation) {
-                alert("Browser mein GPS support nahi hai.");
+                alert("Browser mein location support nahi hai.");
                 return;
             }
             navigator.geolocation.getCurrentPosition((pos) => {
@@ -630,7 +622,7 @@
             const mapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
             bubble.innerHTML = `
                 <a href="${mapUrl}" target="_blank" class="msg-location-link">
-                    📍 Live Location (Google Maps)
+                    📍 Live Location (View in Maps)
                 </a>
                 <div class="msg-time">${time || 'now'}</div>
             `;
@@ -638,13 +630,12 @@
             box.scrollTop = box.scrollHeight;
         }
 
-        /* 5. CALLING & TRANSLATION TRIGGER */
+        /* 5. CALL SCREEN & TIMER */
         function triggerCall(mode) {
             isCallActive = true;
             document.getElementById("call-overlay").style.display = "flex";
-            document.getElementById("call-contact-name").innerText = targetPhone;
+            document.getElementById("call-partner-name").innerText = targetPhone;
             document.getElementById("call-avatar").innerText = targetPhone.slice(-2);
-            document.getElementById("call-status-timer").innerText = "Connected";
 
             elapsedCallSecs = 0;
             clearInterval(callTimerInterval);
@@ -652,7 +643,7 @@
                 elapsedCallSecs++;
                 const mins = String(Math.floor(elapsedCallSecs / 60)).padStart(2, '0');
                 const secs = String(elapsedCallSecs % 60).padStart(2, '0');
-                document.getElementById("call-status-timer").innerText = `${mins}:${secs}`;
+                document.getElementById("call-timer").innerText = `Connected • ${mins}:${secs}`;
             }, 1000);
         }
 
