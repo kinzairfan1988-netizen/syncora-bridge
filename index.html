@@ -393,8 +393,8 @@
         let recordingSeconds = 0;
         let recordingTimerInterval = null;
 
-        // Speech recognition variable for live voice-to-text
-        let recognition = null;
+        // Browser speech-recognition engine
+        let speechRecognizer = null;
         let liveTranscript = "";
 
         let pendingPayload = null;
@@ -410,23 +410,27 @@
                     selectChat(inviteHost);
                 }
             }
-            initSpeechEngine();
+            setupSpeechRecognition();
         };
 
-        function initSpeechEngine() {
+        function setupSpeechRecognition() {
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (SpeechRec) {
-                recognition = new SpeechRec();
-                recognition.continuous = true;
-                recognition.interimResults = false;
-                recognition.lang = 'ur-PK'; // Primary Urdu/Roman Urdu listener
-                recognition.onresult = (event) => {
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        if (event.results[i].isFinal) {
-                            liveTranscript += event.results[i][0].transcript + " ";
+                try {
+                    speechRecognizer = new SpeechRec();
+                    speechRecognizer.continuous = true;
+                    speechRecognizer.interimResults = true;
+                    speechRecognizer.lang = 'ur-PK';
+                    speechRecognizer.onresult = (event) => {
+                        let finalStr = "";
+                        for (let i = 0; i < event.results.length; ++i) {
+                            finalStr += event.results[i][0].transcript;
                         }
-                    }
-                };
+                        liveTranscript = finalStr;
+                    };
+                } catch(e) {
+                    console.log("Speech recognition setup note:", e);
+                }
             }
         }
 
@@ -605,12 +609,12 @@
             }
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
                 recordedChunks = [];
                 liveTranscript = "";
 
-                if (recognition) {
-                    try { recognition.start(); } catch(e){}
+                if (speechRecognizer) {
+                    try { speechRecognizer.start(); } catch(e){}
                 }
 
                 mediaRecorder.ondataavailable = e => {
@@ -657,8 +661,8 @@
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
             }
-            if (recognition) {
-                try { recognition.stop(); } catch(e){}
+            if (speechRecognizer) {
+                try { speechRecognizer.stop(); } catch(e){}
             }
             resetRecordingUI();
         }
@@ -669,8 +673,8 @@
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
             }
-            if (recognition) {
-                try { recognition.stop(); } catch(e){}
+            if (speechRecognizer) {
+                try { speechRecognizer.stop(); } catch(e){}
             }
             resetRecordingUI();
         }
@@ -770,7 +774,7 @@
             btn.disabled = false;
 
             if (!translated || translated.trim() === "") {
-                translated = pendingPayload.type === "voice" ? "Voice Translation" : pendingPayload.content;
+                translated = pendingPayload.type === "voice" ? "Audio Note" : pendingPayload.content;
             }
 
             executeDispatch(pendingPayload.content, translated, pendingPayload.type);
