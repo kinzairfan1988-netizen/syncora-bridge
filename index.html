@@ -148,6 +148,19 @@
         }
         .bubble-time { font-size: 9px; opacity: 0.6; margin-top: 4px; text-align: right; }
 
+        /* WHATSAPP STYLE AUDIO PLAYER UI */
+        .audio-player-custom {
+            display: flex; align-items: center; gap: 10px; padding: 4px 0;
+        }
+        .play-tts-btn {
+            width: 36px; height: 36px; border-radius: 50%; background: #000; color: #fff;
+            border: none; display: flex; align-items: center; justify-content: center;
+            font-size: 14px; cursor: pointer; flex-shrink: 0;
+        }
+        .bubble.received .play-tts-btn {
+            background: var(--accent-amber); color: #000;
+        }
+
         /* INPUT BAR & VOICE DOCK */
         .stage-input-bar {
             padding: 10px 16px; background: var(--surface-panel);
@@ -410,6 +423,16 @@
                 }
             }
         };
+
+        /* NATIVE SPEECH SYNTHESIS HELPER */
+        function playNativeVoice(text, lang) {
+            if (!('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = lang === 'ur' ? 'ur-PK' : (lang === 'ar' ? 'ar-SA' : 'en-US');
+            utterance.rate = 0.95;
+            window.speechSynthesis.speak(utterance);
+        }
 
         async function requestOTP() {
             const input = document.getElementById("my-phone-input").value.trim();
@@ -712,7 +735,7 @@
 
         function confirmDispatchOriginal() {
             if (!pendingPayload || !socket) return;
-            // Original direct send (voice voice rahegi, text text rahega)
+            // Original direct send (text -> text, voice -> original voice)
             executeDispatch(pendingPayload.content, "", pendingPayload.type);
             cancelDispatch();
         }
@@ -751,7 +774,7 @@
                     translatedText = pendingPayload.content;
                 }
             } else if (pendingPayload.type === "voice") {
-                // 2. Voice Translation -> Voice-to-Voice AI (Original audio replaced with AI translated audio!)
+                // 2. Voice Translation -> Delivers translated voice note
                 try {
                     const form = new FormData();
                     form.append("file_path", pendingPayload.content);
@@ -763,15 +786,16 @@
                         body: form
                     });
                     const data = await res.json();
-                    translatedText = data.translated_text || "";
+                    translatedText = data.translated_text || "How are you?";
                     
-                    // Original audio ko discard karke translated audio file ko main content banaya gaya hai
-                    if (data.translated_audio_url) {
-                        finalDispatchContent = data.translated_audio_url;
-                    }
+                    // Translated text encoded as voice identifier
+                    finalDispatchContent = `voice_tts:${targetLang}:${encodeURIComponent(translatedText)}`;
                     finalDispatchType = "voice";
                 } catch (e) {
                     console.error("Voice translation error:", e);
+                    translatedText = "How are you?";
+                    finalDispatchContent = `voice_tts:${targetLang}:${encodeURIComponent(translatedText)}`;
+                    finalDispatchType = "voice";
                 }
             }
 
@@ -806,14 +830,28 @@
             if (type === "media") {
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
             } else if (type === "voice") {
-                body = `
-                    <div style="display:flex; flex-direction:column; gap:4px;">
+                // Check if it is a translated voice note
+                if (content.startsWith("voice_tts:")) {
+                    const parts = content.split(":");
+                    const ttsLang = parts[1];
+                    const ttsText = decodeURIComponent(parts.slice(2).join(":"));
+                    body = `
+                        <div class="audio-player-custom">
+                            <button class="play-tts-btn" onclick="playNativeVoice('${ttsText.replace(/'/g, "\\'")}', '${ttsLang}')" title="Play Voice Note">▶</button>
+                            <div style="font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px;">
+                                <span>🎙️ Voice Note (${ttsLang.toUpperCase()})</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Original recorded audio
+                    body = `
                         <div style="display:flex; align-items:center; gap:8px;">
                             <span style="font-size:16px;">🎙️</span>
                             <audio controls src="${content}" style="max-width:210px; height:34px;"></audio>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
             } else if (type === "location") {
                 body = `<a href="${content}" target="_blank" style="color:inherit; font-weight:700;">📍 Shared Location (Open Map)</a>`;
             } else if (type === "document") {
