@@ -393,7 +393,6 @@
         let recordingSeconds = 0;
         let recordingTimerInterval = null;
 
-        // Browser Speech recognition
         let speechRecognitionInstance = null;
         let liveTranscript = "";
 
@@ -591,7 +590,6 @@
                 recordedChunks = [];
                 liveTranscript = "";
 
-                // Start Speech Recognition
                 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SpeechRec) {
                     try {
@@ -714,6 +712,7 @@
 
         function confirmDispatchOriginal() {
             if (!pendingPayload || !socket) return;
+            // Original direct send (voice voice rahegi, text text rahega)
             executeDispatch(pendingPayload.content, "", pendingPayload.type);
             cancelDispatch();
         }
@@ -725,12 +724,15 @@
 
             const btn = document.getElementById("btn-modal-confirm-trans");
             const origText = btn.innerText;
-            btn.innerText = "Translating...";
+            btn.innerText = "Processing Translation...";
             btn.disabled = true;
 
-            let translated = "";
+            let translatedText = "";
+            let finalDispatchContent = pendingPayload.content;
+            let finalDispatchType = pendingPayload.type;
 
             if (pendingPayload.type === "text") {
+                // 1. Text Translation -> Delivers as Text
                 try {
                     const res = await fetch("/translate", {
                         method: "POST",
@@ -741,11 +743,15 @@
                         })
                     });
                     const data = await res.json();
-                    translated = data.translated_text || "";
+                    translatedText = data.translated_text || pendingPayload.content;
+                    finalDispatchContent = pendingPayload.content;
+                    finalDispatchType = "text";
                 } catch (e) {
                     console.error("Translation error:", e);
+                    translatedText = pendingPayload.content;
                 }
             } else if (pendingPayload.type === "voice") {
+                // 2. Voice Translation -> Voice-to-Voice AI (Original audio replaced with AI translated audio!)
                 try {
                     const form = new FormData();
                     form.append("file_path", pendingPayload.content);
@@ -757,7 +763,13 @@
                         body: form
                     });
                     const data = await res.json();
-                    translated = data.translated_text || "";
+                    translatedText = data.translated_text || "";
+                    
+                    // Original audio ko discard karke translated audio file ko main content banaya gaya hai
+                    if (data.translated_audio_url) {
+                        finalDispatchContent = data.translated_audio_url;
+                    }
+                    finalDispatchType = "voice";
                 } catch (e) {
                     console.error("Voice translation error:", e);
                 }
@@ -766,11 +778,8 @@
             btn.innerText = origText;
             btn.disabled = false;
 
-            if (!translated || translated.trim() === "") {
-                translated = targetLang === "en" ? "How are you? (Voice translated)" : "آپ کیسے ہیں؟ (صوتی ترجمہ)";
-            }
-
-            executeDispatch(pendingPayload.content, translated, pendingPayload.type);
+            // Deliver transformed message
+            executeDispatch(finalDispatchContent, translatedText, finalDispatchType);
             cancelDispatch();
         }
 
