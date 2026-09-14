@@ -63,7 +63,6 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 class TranslationRequest(BaseModel):
     text: str
-    source_lang: str = "auto"
     target_lang: str = "en"
 
 class OTPRequest(BaseModel):
@@ -87,8 +86,8 @@ def direct_translate(text: str, sl: str, tl: str) -> str:
             if data and data[0]:
                 parts = [part[0] for part in data[0] if part and part[0]]
                 return "".join(parts).strip()
-    except Exception as e:
-        print(f"[Direct Translate Error]: {e}")
+    except Exception:
+        pass
     return text
 
 class ConnectionManager:
@@ -112,49 +111,35 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# --- OTP ENDPOINTS ---
 @app.post("/api/otp/send")
 async def send_otp(req: OTPRequest):
     phone = req.phone.strip()
     if not phone:
         return JSONResponse(status_code=400, content={"error": "Phone number required"})
-    
-    # 4-Digit OTP Code
     otp_code = str(random.randint(1000, 9999))
-    
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("INSERT OR REPLACE INTO otp_store (phone, otp) VALUES (?, ?)", (phone, otp_code))
     conn.commit()
     conn.close()
-
-    print(f"=====================================")
-    print(f"[OTP GATEWAY] Code for {phone} is: {otp_code}")
-    print(f"=====================================")
-
-    # Returns OTP in response for instant demo testing + SMS log
-    return {"status": "ok", "message": "OTP sent successfully to SIM", "otp_preview": otp_code}
+    return {"status": "ok", "message": "OTP sent", "otp_preview": otp_code}
 
 @app.post("/api/otp/verify")
 async def verify_otp(req: OTPVerify):
     phone = req.phone.strip()
     otp = req.otp.strip()
-
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT otp FROM otp_store WHERE phone = ?", (phone,))
     row = cursor.fetchone()
-
     if not row or row[0] != otp:
         conn.close()
-        return JSONResponse(status_code=400, content={"error": "Galat OTP code! Dobara check karein."})
+        return JSONResponse(status_code=400, content={"error": "Galat OTP code!"})
 
-    # Register user if valid
     cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (phone, req.display_name or phone))
     cursor.execute("DELETE FROM otp_store WHERE phone = ?", (phone,))
     conn.commit()
     conn.close()
-
     return {"status": "verified", "phone": phone}
 
 @app.get("/api/chats/{phone}")
@@ -163,8 +148,7 @@ async def get_user_chats(phone: str):
     cursor = conn.cursor()
     cursor.execute("""
         SELECT DISTINCT CASE WHEN sender = ? THEN receiver ELSE sender END AS partner
-        FROM messages
-        WHERE sender = ? OR receiver = ?
+        FROM messages WHERE sender = ? OR receiver = ?
     """, (phone, phone, phone))
     partners = [row[0] for row in cursor.fetchall()]
     conn.close()
@@ -183,12 +167,8 @@ async def get_conversation(phone: str, partner: str):
     conn.close()
     messages = [
         {
-            "sender": r[0],
-            "receiver": r[1],
-            "msg_type": r[2],
-            "content": r[3],
-            "translated_content": r[4],
-            "time": r[5]
+            "sender": r[0], "receiver": r[1], "msg_type": r[2],
+            "content": r[3], "translated_content": r[4], "time": r[5]
         }
         for r in rows
     ]
@@ -208,23 +188,31 @@ async def translate_text(req: TranslationRequest):
     clean = req.text.strip()
     if not clean:
         return {"translated_text": ""}
-    
-    sl = req.source_lang if req.source_lang else "auto"
-    translated = direct_translate(clean, sl, req.target_lang)
+
+    # 1. Pehle Gemini se (Roman Urdu / Urdu Script dono ko perfectly translate karta hai)
+    if GEMINI_KEY:
+        for model_name in ["gemini-2.0-flash", "gemini-1.5-flash-8b", "gemini-1.5-flash"]:
+            try:
+                model = genai.GenerativeModel(model_name)
+                prompt = (
+                    f"You are a direct translation engine. Translate the following text "
+                    f"(which may be in Roman Urdu, Urdu, or any language) to target language code '{req.target_lang}'. "
+                    f"Return ONLY the plain translated sentence without quotes, punctuation artifacts or explanations:\n\n{clean}"
+                )
+                resp = model.generate_content(prompt)
+                if resp and hasattr(resp, "text") and resp.text:
+                    return {"translated_text": resp.text.strip()}
+            except Exception as e:
+                print(f"[Gemini translate error with {model_name}]: {e}")
+                continue
+
+    # 2. Google Translate Backup
+    translated = direct_translate(clean, "ur", req.target_lang)
     if translated and translated.lower() != clean.lower():
         return {"translated_text": translated}
-        
-    if GEMINI_KEY:
-        try:
-            model = genai.GenerativeModel("gemini-2.0-flash")
-            resp = model.generate_content(
-                f"Translate from '{sl}' to '{req.target_lang}'. Output ONLY the direct translated sentence:\n\n{clean}"
-            )
-            if resp and resp.text:
-                return {"translated_text": resp.text.strip()}
-        except Exception:
-            pass
-    return {"translated_text": translated}
+
+    translated_auto = direct_translate(clean, "auto", req.target_lang)
+    return {"translated_text": translated_auto}
 
 @app.websocket("/ws/{phone}")
 async def socket_endpoint(websocket: WebSocket, phone: str):
