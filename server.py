@@ -108,29 +108,6 @@ def roman_urdu_cleanup(text: str) -> str:
     t = re.sub(r'\bhain\b', 'ho', t)
     return t
 
-def generate_ai_speech_audio(text: str, lang: str) -> str:
-    """Translated text ko Google TTS engine ke zariye audio file (.mp3) mein convert karta hai"""
-    try:
-        tts_lang = lang if lang in ["en", "ur", "ar", "es", "fr", "de"] else "en"
-        encoded = urllib.parse.quote(text.strip().encode('utf-8'))
-        tts_url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={encoded}&tl={tts_lang}&client=tw-ob"
-        
-        req = urllib.request.Request(
-            tts_url,
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-        )
-        audio_filename = f"tts_{os.urandom(6).hex()}.mp3"
-        audio_filepath = os.path.join(UPLOAD_DIR, audio_filename)
-        
-        with urllib.request.urlopen(req, timeout=7) as response:
-            with open(audio_filepath, "wb") as f:
-                f.write(response.read())
-                
-        return f"/uploads/{audio_filename}"
-    except Exception as e:
-        print(f"[TTS Audio Generation Error]: {e}")
-        return ""
-
 class ConnectionManager:
     def __init__(self):
         self.active_sessions: Dict[str, WebSocket] = {}
@@ -216,7 +193,7 @@ async def translate_text(req: TranslationRequest):
 
     return {"translated_text": clean}
 
-# --- VOICE-TO-VOICE TRANSLATION PIPELINE ---
+# --- AUDIO TRANSLATION PIPELINE ---
 @app.post("/api/translate-audio")
 async def translate_audio_route(
     file_path: str = Form(...),
@@ -232,7 +209,7 @@ async def translate_audio_route(
             res = await translate_text(req)
             translated_text = res.get("translated_text", "")
 
-        # Step 2: Gemini Direct Audio Processing (agar hint se na mila ho)
+        # Step 2: Gemini Direct Audio Processing
         local_filename = os.path.basename(file_path)
         actual_path = os.path.join(UPLOAD_DIR, local_filename)
 
@@ -265,19 +242,15 @@ async def translate_audio_route(
         if not translated_text:
             translated_text = "How are you?" if target_lang == "en" else "آپ کیسے ہیں؟"
 
-        # Step 3: GENERATE TRANSLATED AUDIO (Voice-to-Voice)
-        translated_audio_url = generate_ai_speech_audio(translated_text, target_lang)
-
         return {
             "translated_text": translated_text,
-            "translated_audio_url": translated_audio_url if translated_audio_url else file_path
+            "target_lang": target_lang
         }
     except Exception as e:
         print(f"[Audio Translate Root Error]: {e}")
-        fallback_audio = generate_ai_speech_audio("How are you?", target_lang)
         return {
             "translated_text": "How are you?",
-            "translated_audio_url": fallback_audio if fallback_audio else file_path
+            "target_lang": target_lang
         }
 
 # --- OTP ENDPOINTS ---
