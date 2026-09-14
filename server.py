@@ -12,11 +12,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import google.generativeai as genai
 
-# Setup directories
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Database Initialization
 DB_PATH = "syncora.db"
 
 def init_db():
@@ -54,11 +52,9 @@ def init_db():
 
 init_db()
 
-# Application Definition
 app = FastAPI(title="Syncora Terminal Core Engine")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
-# Gemini Configuration
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 if GEMINI_KEY:
     try:
@@ -91,7 +87,7 @@ def translate_via_google(text: str, source: str, target: str) -> str:
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source}&tl={target}&dt=t&q={encoded}"
         req = urllib.request.Request(
             url, 
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         )
         with urllib.request.urlopen(req, timeout=5) as response:
             res_json = json.loads(response.read().decode('utf-8'))
@@ -102,6 +98,15 @@ def translate_via_google(text: str, source: str, target: str) -> str:
     except Exception as e:
         print(f"[Google GTX Error]: {e}")
     return ""
+
+def roman_urdu_cleanup(text: str) -> str:
+    t = text.lower().strip()
+    # Normalize common variations
+    t = re.sub(r'\bkisy\b', 'kaisy', t)
+    t = re.sub(r'\bkaise\b', 'kaisy', t)
+    t = re.sub(r'\bkese\b', 'kaisy', t)
+    t = re.sub(r'\bhain\b', 'ho', t)
+    return t
 
 class ConnectionManager:
     def __init__(self):
@@ -124,7 +129,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# --- TEXT TRANSLATION ROUTE ---
+# --- TEXT TRANSLATE ROUTE ---
 @app.post("/translate")
 async def translate_text(req: TranslationRequest):
     clean = req.text.strip()
@@ -134,16 +139,17 @@ async def translate_text(req: TranslationRequest):
     target_lang = req.target_lang.strip().lower()
     has_script = is_urdu_or_arabic(clean)
 
-    # Gemini Engine Attempt
+    # 1. Gemini Engine Call
     if GEMINI_KEY:
         for model_name in ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]:
             try:
                 model = genai.GenerativeModel(model_name)
                 prompt = (
                     f"Translate the following text strictly into target language '{target_lang}'.\n"
-                    f"- If input is Roman Urdu (e.g. 'ap kaisy hain') or Urdu script and target is 'en', translate to clean natural English.\n"
-                    f"- If input is English and target is 'ur', translate to natural Urdu script.\n"
-                    f"Return ONLY the direct translation, no quotes, notes or explanations:\n\n{clean}"
+                    f"Input may be in Roman Urdu (e.g. 'ap kisy hain' or 'kya kar rahy ho'), Urdu script, or English.\n"
+                    f"- If input is Roman Urdu/Urdu and target is 'en', translate to simple English.\n"
+                    f"- If input is English and target is 'ur', translate to Urdu script.\n"
+                    f"Output ONLY the translated sentence, without any explanations or quotes:\n\n{clean}"
                 )
                 response = model.generate_content(prompt)
                 if response and hasattr(response, "text") and response.text:
@@ -154,79 +160,84 @@ async def translate_text(req: TranslationRequest):
                 print(f"[Gemini Exception {model_name}]: {e}")
                 continue
 
-    # Google Translate Direct Fallback
-    source_guess = "ur" if has_script else "auto"
-    g_res = translate_via_google(clean, source_guess, target_lang)
+    # 2. Google Translate Call
+    source_param = "ur" if has_script else "auto"
+    g_res = translate_via_google(clean, source_param, target_lang)
     if g_res and g_res.lower() != clean.lower():
         return {"translated_text": g_res}
 
+    # If target is English, also try explicit Urdu to English translation for Roman Urdu
     if target_lang == "en":
         g_res_ur = translate_via_google(clean, "ur", "en")
         if g_res_ur and g_res_ur.lower() != clean.lower():
             return {"translated_text": g_res_ur}
 
-    # Common Dictionary Fallback
+    # 3. Direct Fuzzy Dictionary
+    norm = roman_urdu_cleanup(clean)
     local_dict = {
-        "ap kaisy hain": "How are you?",
-        "aap kaise hain": "How are you?",
-        "aap kaise ho": "How are you?",
+        "ap kaisy ho": "How are you?",
+        "aap kaisy ho": "How are you?",
         "kya hal hai": "How are you?",
         "kya ho raha hai": "What is happening?",
+        "kya kar rahy ho": "What are you doing?",
         "main theek hoon": "I am fine.",
         "shukriya": "Thank you.",
-        "آپ کیسے ہیں": "How are you?",
-        "آپ کیسے ہو": "How are you?",
-        "کیا حال ہے": "How are you?",
-        "کیا کر رہے ہیں": "What are you doing?",
         "how are you": "آپ کیسے ہیں؟",
         "what are you doing": "آپ کیا کر رہے ہیں؟",
         "where are you": "آپ کہاں ہیں؟",
         "i am fine": "میں ٹھیک ہوں۔",
-        "thank you": "شکریہ۔",
-        "hello": "ہیلو",
-        "good morning": "صبح بخیر"
+        "thank you": "شکریہ۔"
     }
-
-    norm_key = re.sub(r'[^\w\s]', '', clean.lower()).strip()
-    if norm_key in local_dict:
-        return {"translated_text": local_dict[norm_key]}
+    cleaned_key = re.sub(r'[^\w\s]', '', norm).strip()
+    if cleaned_key in local_dict:
+        return {"translated_text": local_dict[cleaned_key]}
 
     return {"translated_text": clean}
 
-# --- AUDIO MULTIMODAL TRANSLATION ROUTE ---
+# --- AUDIO TRANSLATE ROUTE ---
 @app.post("/api/translate-audio")
 async def translate_audio_route(
     file_path: str = Form(...),
-    target_lang: str = Form("en")
+    target_lang: str = Form("en"),
+    transcript_hint: str = Form("")
 ):
     try:
-        # File URL se local file path nikalna
+        # Step A: Agar browser speech-to-text ne direct transcript pakad li ho
+        if transcript_hint and transcript_hint.strip():
+            hint_clean = transcript_hint.strip()
+            # Text translator se guzaar dein
+            req = TranslationRequest(text=hint_clean, target_lang=target_lang)
+            res = await translate_text(req)
+            if res.get("translated_text") and res["translated_text"] != hint_clean:
+                return {"translated_text": res["translated_text"]}
+
+        # Step B: Gemini Multimodal File Processing
         local_filename = os.path.basename(file_path)
         actual_path = os.path.join(UPLOAD_DIR, local_filename)
 
         if not os.path.exists(actual_path):
-            return JSONResponse(status_code=404, content={"translated_text": "", "error": "Audio file not found"})
+            return JSONResponse(status_code=404, content={"translated_text": "", "error": "File not found"})
 
         if GEMINI_KEY:
             for model_name in ["gemini-1.5-flash", "gemini-2.0-flash"]:
                 try:
-                    # Upload audio to Gemini API
-                    audio_file = genai.upload_file(path=actual_path)
+                    uploaded_file = genai.upload_file(path=actual_path, mime_type="audio/webm")
                     model = genai.GenerativeModel(model_name)
                     prompt = (
-                        f"Listen carefully to this voice note. The speaker may speak in Urdu, Roman Urdu, Hindi, or English. "
-                        f"Translate what they are saying into target language code '{target_lang}'. "
-                        f"Provide ONLY the direct translated sentence as clear text without any introductory labels or quotes."
+                        f"Listen to this audio clip. The speaker might be speaking Urdu, Hindi, or English. "
+                        f"Translate whatever they are saying into target language '{target_lang}'. "
+                        f"Provide ONLY the direct translation text. Do not add any preface, notes, or quotes."
                     )
-                    resp = model.generate_content([prompt, audio_file])
+                    resp = model.generate_content([prompt, uploaded_file])
                     if resp and hasattr(resp, "text") and resp.text:
                         out = resp.text.strip().replace('"', '').replace("'", "")
-                        return {"translated_text": out}
+                        if out:
+                            return {"translated_text": out}
                 except Exception as e:
-                    print(f"[Gemini Audio Exception {model_name}]: {e}")
+                    print(f"[Gemini Audio Failure {model_name}]: {e}")
                     continue
 
-        return {"translated_text": "Audio Translation (Voice Note processed)"}
+        return {"translated_text": "Voice Note (Transcription Unavailable)"}
     except Exception as e:
         print(f"[Audio Translate Root Error]: {e}")
         return {"translated_text": ""}
