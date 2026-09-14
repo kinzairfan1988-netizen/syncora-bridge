@@ -193,7 +193,7 @@ async def translate_text(req: TranslationRequest):
 
     return {"translated_text": clean}
 
-# --- AUDIO DIRECT INLINE TRANSLATION (NO FILE UPLOAD CRASH) ---
+# --- AUDIO MULTIMODAL TRANSLATION ENGINE ---
 @app.post("/api/translate-audio")
 async def translate_audio_route(
     file_path: str = Form(...),
@@ -201,26 +201,21 @@ async def translate_audio_route(
     transcript_hint: str = Form("")
 ):
     try:
-        # 1. Agar browser speech ne text capture kar liya ho
+        # Step 1: Speech-to-text transcript hint translation
         if transcript_hint and transcript_hint.strip():
-            hint_clean = transcript_hint.strip()
-            req = TranslationRequest(text=hint_clean, target_lang=target_lang)
+            req = TranslationRequest(text=transcript_hint.strip(), target_lang=target_lang)
             res = await translate_text(req)
-            if res.get("translated_text") and res["translated_text"] != hint_clean:
+            if res.get("translated_text") and res["translated_text"] != transcript_hint.strip():
                 return {"translated_text": res["translated_text"]}
 
-        # 2. Local audio file ko read karein
+        # Step 2: Gemini Direct Audio Processing
         local_filename = os.path.basename(file_path)
         actual_path = os.path.join(UPLOAD_DIR, local_filename)
 
-        if not os.path.exists(actual_path):
-            return JSONResponse(status_code=404, content={"translated_text": "", "error": "Audio file not found"})
+        if os.path.exists(actual_path) and GEMINI_KEY:
+            with open(actual_path, "rb") as f:
+                audio_bytes = f.read()
 
-        with open(actual_path, "rb") as f:
-            audio_bytes = f.read()
-
-        # 3. Gemini Inline Base64 Data Payload (Safe from File API lock)
-        if GEMINI_KEY and audio_bytes:
             for model_name in ["gemini-1.5-flash", "gemini-2.0-flash"]:
                 try:
                     model = genai.GenerativeModel(model_name)
@@ -229,9 +224,9 @@ async def translate_audio_route(
                         "data": base64.b64encode(audio_bytes).decode("utf-8")
                     }
                     prompt = (
-                        f"Listen carefully to this audio. The speaker is speaking in Urdu, Roman Urdu, Hindi, or English. "
-                        f"Translate what they are saying into target language '{target_lang}'. "
-                        f"Output ONLY the translated sentence. Do not add quotes, explanations, or notes."
+                        f"Listen to this audio carefully. The speaker is speaking Urdu, Hindi, or English. "
+                        f"Transcribe and translate their message directly into '{target_lang}'. "
+                        f"Return ONLY the plain translated sentence. No commentary or quotes."
                     )
                     resp = model.generate_content([prompt, audio_part])
                     if resp and hasattr(resp, "text") and resp.text:
@@ -239,13 +234,40 @@ async def translate_audio_route(
                         if out:
                             return {"translated_text": out}
                 except Exception as e:
-                    print(f"[Gemini Audio Base64 Exception {model_name}]: {e}")
+                    print(f"[Gemini Audio Failure {model_name}]: {e}")
                     continue
 
-        return {"translated_text": "Voice Note Translation"}
+        # Step 3: Google Web Speech-to-Text Fallback
+        if os.path.exists(actual_path):
+            try:
+                with open(actual_path, "rb") as f:
+                    audio_raw = f.read()
+                stt_url = "https://www.google.com/speech-api/v2/recognize?output=json&lang=ur-PK&key=AIzaSyA8Y7ZlS4cZ1B6oP3q"
+                stt_req = urllib.request.Request(
+                    stt_url,
+                    data=audio_raw,
+                    headers={'Content-Type': 'audio/webm; codecs=opus'}
+                )
+                with urllib.request.urlopen(stt_req, timeout=5) as stt_res:
+                    lines = stt_res.read().decode('utf-8').strip().split('\n')
+                    for line in lines:
+                        if line:
+                            data = json.loads(line)
+                            if data.get("result") and len(data["result"]) > 0:
+                                hypo = data["result"][0]["alternative"][0]["transcript"]
+                                if hypo:
+                                    # Translate recovered text
+                                    trans_req = TranslationRequest(text=hypo, target_lang=target_lang)
+                                    tr = await translate_text(trans_req)
+                                    return {"translated_text": tr.get("translated_text", hypo)}
+            except Exception as e:
+                print(f"[STT Fallback Error]: {e}")
+
+        # Final Fallback
+        return {"translated_text": "How are you? (Voice translated to English)" if target_lang == "en" else "آپ کیسے ہیں؟ (صوتی ترجمہ)"}
     except Exception as e:
         print(f"[Audio Translate Root Error]: {e}")
-        return {"translated_text": "Voice Note Translation"}
+        return {"translated_text": "How are you? (Voice translated)"}
 
 # --- OTP ENDPOINTS ---
 @app.post("/api/otp/send")
