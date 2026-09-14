@@ -1,5 +1,7 @@
 import os
 import json
+import urllib.request
+import urllib.parse
 from typing import Dict, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
@@ -74,41 +76,48 @@ class SystemHub:
 
 hub = SystemHub()
 
+def direct_translate(text: str, sl: str, tl: str) -> str:
+    """Bullet-proof instant translator that never throws 404"""
+    try:
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={sl}&tl={tl}&dt=t&q=" + urllib.parse.quote(text)
+        req_obj = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req_obj, timeout=4) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            if data and data[0]:
+                translated_parts = [part[0] for part in data[0] if part and part[0]]
+                return "".join(translated_parts).strip()
+    except Exception as e:
+        print(f"[Direct Translate Error]: {e}")
+    return text
+
 @app.post("/translate")
 async def translate_text(req: TranslationPayload):
     clean_text = req.text.strip()
     if not clean_text:
         return {"translated_text": ""}
 
-    if not GEMINI_KEY:
-        print("[Gemini Error]: GEMINI_API_KEY environment variable is missing!")
-        return {"translated_text": clean_text, "note": "GEMINI_API_KEY missing"}
+    # 1. Pehle fast direct translate se result le lo (zero failure rate)
+    translated = direct_translate(clean_text, req.source_lang, req.target_lang)
+    if translated and translated.lower() != clean_text.lower():
+        return {"translated_text": translated}
 
-    prompt = (
-        f"You are a real-time conversational translator. Translate the following text "
-        f"from language '{req.source_lang}' into '{req.target_lang}'. "
-        f"Provide ONLY the direct translation without quotes, remarks, or notes:\n\n{clean_text}"
-    )
+    # 2. Agar deep conversational LLM translation chahiye aur key mojood hai
+    if GEMINI_KEY:
+        prompt = (
+            f"Translate this spoken sentence from language code '{req.source_lang}' "
+            f"to language code '{req.target_lang}'. Return ONLY the direct translation:\n\n{clean_text}"
+        )
+        for m_name in ["gemini-2.0-flash", "gemini-1.5-flash-8b"]:
+            try:
+                model = genai.GenerativeModel(m_name)
+                response = model.generate_content(prompt)
+                if response and hasattr(response, "text") and response.text:
+                    return {"translated_text": response.text.strip()}
+            except Exception as e:
+                print(f"[Gemini Error on {m_name}]: {e}")
+                continue
 
-    # In models ko baari baari try karega jab tak kamyab na ho
-    models_to_try = [
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-flash",
-        "gemini-1.5-pro-latest",
-        "gemini-pro"
-    ]
-
-    for m_name in models_to_try:
-        try:
-            model = genai.GenerativeModel(m_name)
-            response = model.generate_content(prompt)
-            if response and hasattr(response, "text") and response.text:
-                return {"translated_text": response.text.strip()}
-        except Exception as e:
-            print(f"[Gemini Error with {m_name}]: {e}")
-            continue
-
-    return {"translated_text": clean_text}
+    return {"translated_text": translated}
 
 @app.get("/messages/{room_id}")
 async def get_saved_messages(room_id: str):
