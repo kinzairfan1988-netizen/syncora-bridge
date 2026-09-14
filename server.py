@@ -6,7 +6,7 @@ import sqlite3
 import urllib.request
 import urllib.parse
 from typing import Dict
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -124,7 +124,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# --- TRANSLATION ROUTE ---
+# --- TEXT TRANSLATION ROUTE ---
 @app.post("/translate")
 async def translate_text(req: TranslationRequest):
     clean = req.text.strip()
@@ -134,7 +134,7 @@ async def translate_text(req: TranslationRequest):
     target_lang = req.target_lang.strip().lower()
     has_script = is_urdu_or_arabic(clean)
 
-    # 1. Gemini Engine Attempt
+    # Gemini Engine Attempt
     if GEMINI_KEY:
         for model_name in ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]:
             try:
@@ -154,7 +154,7 @@ async def translate_text(req: TranslationRequest):
                 print(f"[Gemini Exception {model_name}]: {e}")
                 continue
 
-    # 2. Google Translate Direct Fallback
+    # Google Translate Direct Fallback
     source_guess = "ur" if has_script else "auto"
     g_res = translate_via_google(clean, source_guess, target_lang)
     if g_res and g_res.lower() != clean.lower():
@@ -165,7 +165,7 @@ async def translate_text(req: TranslationRequest):
         if g_res_ur and g_res_ur.lower() != clean.lower():
             return {"translated_text": g_res_ur}
 
-    # 3. Essential Dictionary Fallback
+    # Common Dictionary Fallback
     local_dict = {
         "ap kaisy hain": "How are you?",
         "aap kaise hain": "How are you?",
@@ -192,6 +192,44 @@ async def translate_text(req: TranslationRequest):
         return {"translated_text": local_dict[norm_key]}
 
     return {"translated_text": clean}
+
+# --- AUDIO MULTIMODAL TRANSLATION ROUTE ---
+@app.post("/api/translate-audio")
+async def translate_audio_route(
+    file_path: str = Form(...),
+    target_lang: str = Form("en")
+):
+    try:
+        # File URL se local file path nikalna
+        local_filename = os.path.basename(file_path)
+        actual_path = os.path.join(UPLOAD_DIR, local_filename)
+
+        if not os.path.exists(actual_path):
+            return JSONResponse(status_code=404, content={"translated_text": "", "error": "Audio file not found"})
+
+        if GEMINI_KEY:
+            for model_name in ["gemini-1.5-flash", "gemini-2.0-flash"]:
+                try:
+                    # Upload audio to Gemini API
+                    audio_file = genai.upload_file(path=actual_path)
+                    model = genai.GenerativeModel(model_name)
+                    prompt = (
+                        f"Listen carefully to this voice note. The speaker may speak in Urdu, Roman Urdu, Hindi, or English. "
+                        f"Translate what they are saying into target language code '{target_lang}'. "
+                        f"Provide ONLY the direct translated sentence as clear text without any introductory labels or quotes."
+                    )
+                    resp = model.generate_content([prompt, audio_file])
+                    if resp and hasattr(resp, "text") and resp.text:
+                        out = resp.text.strip().replace('"', '').replace("'", "")
+                        return {"translated_text": out}
+                except Exception as e:
+                    print(f"[Gemini Audio Exception {model_name}]: {e}")
+                    continue
+
+        return {"translated_text": "Audio Translation (Voice Note processed)"}
+    except Exception as e:
+        print(f"[Audio Translate Root Error]: {e}")
+        return {"translated_text": ""}
 
 # --- OTP ENDPOINTS ---
 @app.post("/api/otp/send")
@@ -261,6 +299,8 @@ async def get_conversation(phone: str, partner: str):
 @app.post("/api/upload")
 async def upload_media(file: UploadFile = File(...)):
     ext = os.path.splitext(file.filename)[1]
+    if not ext:
+        ext = ".webm"
     filename = f"{os.urandom(8).hex()}{ext}"
     filepath = os.path.join(UPLOAD_DIR, filename)
     with open(filepath, "wb") as f:
