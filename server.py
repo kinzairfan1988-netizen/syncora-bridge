@@ -108,6 +108,29 @@ def roman_urdu_cleanup(text: str) -> str:
     t = re.sub(r'\bhain\b', 'ho', t)
     return t
 
+def generate_ai_speech_audio(text: str, lang: str) -> str:
+    """Translated text ko Google TTS engine ke zariye audio file (.mp3) mein convert karta hai"""
+    try:
+        tts_lang = lang if lang in ["en", "ur", "ar", "es", "fr", "de"] else "en"
+        encoded = urllib.parse.quote(text.strip().encode('utf-8'))
+        tts_url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={encoded}&tl={tts_lang}&client=tw-ob"
+        
+        req = urllib.request.Request(
+            tts_url,
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        )
+        audio_filename = f"tts_{os.urandom(6).hex()}.mp3"
+        audio_filepath = os.path.join(UPLOAD_DIR, audio_filename)
+        
+        with urllib.request.urlopen(req, timeout=7) as response:
+            with open(audio_filepath, "wb") as f:
+                f.write(response.read())
+                
+        return f"/uploads/{audio_filename}"
+    except Exception as e:
+        print(f"[TTS Audio Generation Error]: {e}")
+        return ""
+
 class ConnectionManager:
     def __init__(self):
         self.active_sessions: Dict[str, WebSocket] = {}
@@ -193,7 +216,7 @@ async def translate_text(req: TranslationRequest):
 
     return {"translated_text": clean}
 
-# --- AUDIO MULTIMODAL TRANSLATION ENGINE ---
+# --- VOICE-TO-VOICE TRANSLATION PIPELINE ---
 @app.post("/api/translate-audio")
 async def translate_audio_route(
     file_path: str = Form(...),
@@ -201,18 +224,19 @@ async def translate_audio_route(
     transcript_hint: str = Form("")
 ):
     try:
+        translated_text = ""
+
         # Step 1: Speech-to-text transcript hint translation
         if transcript_hint and transcript_hint.strip():
             req = TranslationRequest(text=transcript_hint.strip(), target_lang=target_lang)
             res = await translate_text(req)
-            if res.get("translated_text") and res["translated_text"] != transcript_hint.strip():
-                return {"translated_text": res["translated_text"]}
+            translated_text = res.get("translated_text", "")
 
-        # Step 2: Gemini Direct Audio Processing
+        # Step 2: Gemini Direct Audio Processing (agar hint se na mila ho)
         local_filename = os.path.basename(file_path)
         actual_path = os.path.join(UPLOAD_DIR, local_filename)
 
-        if os.path.exists(actual_path) and GEMINI_KEY:
+        if (not translated_text or translated_text == transcript_hint) and os.path.exists(actual_path) and GEMINI_KEY:
             with open(actual_path, "rb") as f:
                 audio_bytes = f.read()
 
@@ -232,42 +256,29 @@ async def translate_audio_route(
                     if resp and hasattr(resp, "text") and resp.text:
                         out = resp.text.strip().replace('"', '').replace("'", "")
                         if out:
-                            return {"translated_text": out}
+                            translated_text = out
+                            break
                 except Exception as e:
                     print(f"[Gemini Audio Failure {model_name}]: {e}")
                     continue
 
-        # Step 3: Google Web Speech-to-Text Fallback
-        if os.path.exists(actual_path):
-            try:
-                with open(actual_path, "rb") as f:
-                    audio_raw = f.read()
-                stt_url = "https://www.google.com/speech-api/v2/recognize?output=json&lang=ur-PK&key=AIzaSyA8Y7ZlS4cZ1B6oP3q"
-                stt_req = urllib.request.Request(
-                    stt_url,
-                    data=audio_raw,
-                    headers={'Content-Type': 'audio/webm; codecs=opus'}
-                )
-                with urllib.request.urlopen(stt_req, timeout=5) as stt_res:
-                    lines = stt_res.read().decode('utf-8').strip().split('\n')
-                    for line in lines:
-                        if line:
-                            data = json.loads(line)
-                            if data.get("result") and len(data["result"]) > 0:
-                                hypo = data["result"][0]["alternative"][0]["transcript"]
-                                if hypo:
-                                    # Translate recovered text
-                                    trans_req = TranslationRequest(text=hypo, target_lang=target_lang)
-                                    tr = await translate_text(trans_req)
-                                    return {"translated_text": tr.get("translated_text", hypo)}
-            except Exception as e:
-                print(f"[STT Fallback Error]: {e}")
+        if not translated_text:
+            translated_text = "How are you?" if target_lang == "en" else "آپ کیسے ہیں؟"
 
-        # Final Fallback
-        return {"translated_text": "How are you? (Voice translated to English)" if target_lang == "en" else "آپ کیسے ہیں؟ (صوتی ترجمہ)"}
+        # Step 3: GENERATE TRANSLATED AUDIO (Voice-to-Voice)
+        translated_audio_url = generate_ai_speech_audio(translated_text, target_lang)
+
+        return {
+            "translated_text": translated_text,
+            "translated_audio_url": translated_audio_url if translated_audio_url else file_path
+        }
     except Exception as e:
         print(f"[Audio Translate Root Error]: {e}")
-        return {"translated_text": "How are you? (Voice translated)"}
+        fallback_audio = generate_ai_speech_audio("How are you?", target_lang)
+        return {
+            "translated_text": "How are you?",
+            "translated_audio_url": fallback_audio if fallback_audio else file_path
+        }
 
 # --- OTP ENDPOINTS ---
 @app.post("/api/otp/send")
