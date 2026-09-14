@@ -8,7 +8,10 @@ import google.generativeai as genai
 
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 if GEMINI_KEY:
-    genai.configure(api_key=GEMINI_KEY)
+    try:
+        genai.configure(api_key=GEMINI_KEY)
+    except Exception as e:
+        print(f"[Gemini Config Error]: {e}")
 
 app = FastAPI(title="Syncora Multi-Language & Video Terminal")
 
@@ -78,22 +81,34 @@ async def translate_text(req: TranslationPayload):
         return {"translated_text": ""}
 
     if not GEMINI_KEY:
+        print("[Gemini Error]: GEMINI_API_KEY environment variable is missing!")
         return {"translated_text": clean_text, "note": "GEMINI_API_KEY missing"}
 
-    try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        prompt = (
-            f"You are a real-time conversational translator. Translate this spoken sentence "
-            f"from language code '{req.source_lang}' to language code '{req.target_lang}'. "
-            f"Return ONLY the direct translation without explanation, quotes, or conversational filler:\n\n"
-            f"{clean_text}"
-        )
-        response = model.generate_content(prompt)
-        translated = response.text.strip() if response and response.text else clean_text
-        return {"translated_text": translated}
-    except Exception as e:
-        print(f"[Gemini Error]: {e}")
-        return {"translated_text": clean_text}
+    prompt = (
+        f"You are a real-time conversational translator. Translate the following text "
+        f"from language '{req.source_lang}' into '{req.target_lang}'. "
+        f"Provide ONLY the direct translation without quotes, remarks, or notes:\n\n{clean_text}"
+    )
+
+    # In models ko baari baari try karega jab tak kamyab na ho
+    models_to_try = [
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash",
+        "gemini-1.5-pro-latest",
+        "gemini-pro"
+    ]
+
+    for m_name in models_to_try:
+        try:
+            model = genai.GenerativeModel(m_name)
+            response = model.generate_content(prompt)
+            if response and hasattr(response, "text") and response.text:
+                return {"translated_text": response.text.strip()}
+        except Exception as e:
+            print(f"[Gemini Error with {m_name}]: {e}")
+            continue
+
+    return {"translated_text": clean_text}
 
 @app.get("/messages/{room_id}")
 async def get_saved_messages(room_id: str):
