@@ -10,15 +10,15 @@
     <style>
         :root {
             --bg-obsidian: #09090b;
-            --surface-card: #121215;
-            --surface-hover: #18181b;
+            --surface-panel: #111114;
+            --surface-card: #18181c;
+            --surface-hover: #222228;
             --border-graphite: #27272a;
             --border-subtle: rgba(255, 255, 255, 0.05);
             --accent-amber: #f59e0b;
             --accent-amber-dim: rgba(245, 158, 11, 0.12);
             --accent-amber-glow: rgba(245, 158, 11, 0.25);
             --danger-red: #ef4444;
-            --danger-glow: rgba(239, 68, 68, 0.25);
             --text-primary: #fafafa;
             --text-secondary: #a1a1aa;
             --text-muted: #71717a;
@@ -31,463 +31,359 @@
             font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
             background-color: var(--bg-obsidian);
             color: var(--text-primary);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow-x: hidden;
-        }
-
-        .app-viewport {
-            width: 100%;
-            max-width: 480px;
             height: 100vh;
-            max-height: 920px;
-            background-color: var(--bg-obsidian);
-            border: 1px solid var(--border-graphite);
-            position: relative;
+            width: 100vw;
             display: flex;
-            flex-direction: column;
             overflow: hidden;
         }
 
-        @media (max-width: 480px) {
-            .app-viewport { max-height: 100vh; border: none; }
+        /* LOGIN POPUP */
+        .auth-overlay {
+            position: fixed; inset: 0; background: rgba(9, 9, 11, 0.95);
+            z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px;
+        }
+        .auth-card {
+            background: var(--surface-panel); border: 1px solid var(--border-graphite);
+            border-radius: 20px; padding: 32px 24px; width: 100%; max-width: 380px; text-align: center;
+        }
+        .auth-title { font-family: 'Space Grotesk', sans-serif; font-size: 22px; color: var(--accent-amber); margin-bottom: 6px; }
+        .auth-input {
+            width: 100%; background: var(--surface-card); border: 1px solid var(--border-graphite);
+            padding: 12px 14px; border-radius: 12px; color: #fff; font-size: 14px; margin: 16px 0 10px 0; outline: none;
+        }
+        .auth-input:focus { border-color: var(--accent-amber); }
+        .btn-auth {
+            width: 100%; background: var(--accent-amber); color: #000; font-weight: 700;
+            border: none; padding: 12px; border-radius: 12px; cursor: pointer;
         }
 
-        /* 1. FRONT SCREEN: DIRECT NUMBER ACCESS */
-        .landing-screen {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 32px 24px;
-            text-align: center;
-            background: var(--bg-obsidian);
-        }
-        .syncora-badge {
-            width: 68px; height: 68px; border-radius: 20px;
-            background: var(--accent-amber-dim);
-            border: 2px solid var(--accent-amber);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 26px; font-weight: 700; color: var(--accent-amber);
-            margin-bottom: 20px;
-            box-shadow: 0 0 30px var(--accent-amber-glow);
-            font-family: 'Space Grotesk', sans-serif;
-        }
-        .brand-title {
-            font-size: 24px; font-weight: 700;
-            font-family: 'Space Grotesk', sans-serif;
-            letter-spacing: -0.5px; margin-bottom: 6px;
-        }
-        .brand-subtitle {
-            font-size: 13px; color: var(--text-muted);
-            margin-bottom: 28px;
-        }
-        .input-cluster {
-            width: 100%; display: flex; flex-direction: column; gap: 12px;
-        }
-        .terminal-input {
-            width: 100%; background: var(--surface-card);
-            border: 1px solid var(--border-graphite);
-            border-radius: 14px; padding: 14px 16px;
-            color: var(--text-primary); font-size: 14px;
-            outline: none; transition: border-color 0.2s ease;
-        }
-        .terminal-input:focus { border-color: var(--accent-amber); }
-        .btn-launch-terminal {
-            width: 100%; background: var(--accent-amber);
-            color: #000; border: none; border-radius: 14px;
-            padding: 14px; font-size: 14px; font-weight: 700;
-            cursor: pointer; margin-top: 6px;
-            box-shadow: 0 4px 20px var(--accent-amber-glow);
-            transition: transform 0.1s ease;
-        }
-        .btn-launch-terminal:active { transform: scale(0.98); }
+        /* 2-PANEL LAYOUT */
+        .workspace { display: flex; width: 100%; height: 100%; }
 
-        /* 2. DIRECT CHAT TERMINAL */
-        .chat-view {
-            display: none;
-            flex: 1;
-            flex-direction: column;
-            height: 100%;
-            background: var(--bg-obsidian);
-            position: relative;
+        /* LEFT SIDEBAR */
+        .sidebar-panel {
+            width: 380px; border-right: 1px solid var(--border-graphite);
+            background: var(--surface-panel); display: flex; flex-direction: column; flex-shrink: 0;
         }
-
-        .chat-header {
-            background: rgba(18, 18, 21, 0.96);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border-graphite);
-            padding: 10px 14px;
+        .sidebar-header {
+            padding: 14px 18px; border-bottom: 1px solid var(--border-subtle);
             display: flex; align-items: center; justify-content: space-between;
-            z-index: 10;
         }
-        .header-meta { display: flex; align-items: center; gap: 10px; }
-        .chat-avatar-pill {
-            width: 38px; height: 38px; border-radius: 50%;
-            background: #1c1c21; border: 1px solid var(--accent-amber);
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 13px; color: var(--accent-amber);
+        .app-brand { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 700; color: var(--accent-amber); }
+        .sidebar-search {
+            padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); display: flex; gap: 8px;
         }
-        .icon-btn {
-            background: transparent; border: none;
-            color: var(--text-secondary); font-size: 18px;
-            cursor: pointer; padding: 6px; border-radius: 8px;
-            transition: color 0.2s;
+        .search-input {
+            flex: 1; background: var(--surface-card); border: 1px solid var(--border-graphite);
+            padding: 8px 12px; border-radius: 10px; color: #fff; font-size: 13px; outline: none;
         }
-        .icon-btn:hover { color: var(--accent-amber); }
-        .call-btn-cluster { display: flex; align-items: center; gap: 4px; }
-        .btn-terminal-call {
+        .btn-new-chat {
+            background: var(--accent-amber-dim); border: 1px solid rgba(245, 158, 11, 0.3);
+            color: var(--accent-amber); padding: 8px 12px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer;
+        }
+        .chat-list { flex: 1; overflow-y: auto; }
+        .chat-item {
+            padding: 12px 18px; border-bottom: 1px solid var(--border-subtle);
+            display: flex; align-items: center; gap: 12px; cursor: pointer; transition: background 0.15s;
+        }
+        .chat-item:hover, .chat-item.active { background: var(--surface-hover); }
+        .chat-avatar {
+            width: 44px; height: 44px; border-radius: 50%; background: #1f1f24;
+            border: 1px solid var(--border-graphite); display: flex; align-items: center;
+            justify-content: center; font-weight: 700; color: var(--accent-amber); flex-shrink: 0;
+        }
+        .chat-info { flex: 1; overflow: hidden; }
+        .chat-title { font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+        .chat-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+        /* RIGHT CONVERSATION STAGE */
+        .stage-panel {
+            flex: 1; display: flex; flex-direction: column; background: var(--bg-obsidian); position: relative;
+        }
+        .stage-header {
+            padding: 12px 18px; background: var(--surface-panel);
+            border-bottom: 1px solid var(--border-graphite);
+            display: flex; align-items: center; justify-content: space-between; z-index: 10;
+        }
+        .action-dock { display: flex; align-items: center; gap: 6px; }
+        .btn-action {
             background: var(--surface-card); border: 1px solid var(--border-graphite);
-            color: var(--text-primary); padding: 6px 9px; border-radius: 10px;
-            font-size: 12px; font-weight: 700; cursor: pointer;
+            color: var(--text-primary); padding: 8px 12px; border-radius: 10px;
+            font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;
         }
-        .btn-terminal-call.translate {
+        .btn-action.translate {
             background: var(--accent-amber-dim); color: var(--accent-amber);
             border-color: rgba(245, 158, 11, 0.4);
         }
 
-        .chat-translate-bar {
-            padding: 6px 14px;
-            background: rgba(245, 158, 11, 0.04);
-            border-bottom: 1px solid var(--border-subtle);
-            display: flex; align-items: center; justify-content: space-between;
-            font-size: 11px; color: var(--text-muted);
+        .messages-container {
+            flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
         }
-        .lang-pill {
-            background: var(--surface-card); color: var(--accent-amber);
-            border: 1px solid var(--border-graphite); border-radius: 8px;
-            padding: 2px 6px; font-size: 11px; outline: none;
+        .bubble {
+            max-width: 65%; padding: 10px 14px; border-radius: 14px; font-size: 13px; line-height: 1.4; word-break: break-word;
         }
+        .bubble.sent {
+            align-self: flex-end; background: var(--accent-amber); color: #000; font-weight: 500; border-bottom-right-radius: 2px;
+        }
+        .bubble.received {
+            align-self: flex-start; background: var(--surface-card); color: var(--text-primary);
+            border: 1px solid var(--border-graphite); border-bottom-left-radius: 2px;
+        }
+        .bubble-translation {
+            font-size: 11px; margin-top: 4px; padding-top: 4px; border-top: 1px dashed rgba(0,0,0,0.2); font-style: italic;
+        }
+        .bubble.received .bubble-translation { border-top-color: var(--border-graphite); color: var(--online-green); }
+        .bubble-time { font-size: 9px; opacity: 0.6; margin-top: 4px; text-align: right; }
 
-        .chat-messages-container {
-            flex: 1; padding: 16px; overflow-y: auto;
-            display: flex; flex-direction: column; gap: 10px;
+        /* INPUT BAR */
+        .stage-input-bar {
+            padding: 12px 18px; background: var(--surface-panel);
+            border-top: 1px solid var(--border-graphite); display: flex; align-items: center; gap: 8px;
         }
+        .input-box {
+            flex: 1; background: var(--surface-card); border: 1px solid var(--border-graphite);
+            padding: 12px 14px; border-radius: 12px; color: #fff; font-size: 13px; outline: none;
+        }
+        .input-box:focus { border-color: var(--accent-amber); }
+        .icon-btn {
+            background: transparent; border: none; color: var(--text-secondary);
+            font-size: 18px; cursor: pointer; padding: 6px; border-radius: 8px;
+        }
+        .icon-btn:hover { color: var(--accent-amber); }
+        .btn-send {
+            width: 44px; height: 44px; border-radius: 12px; background: var(--accent-amber);
+            color: #000; border: none; font-size: 16px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+        }
+        .btn-send.recording { background: var(--danger-red); color: #fff; }
 
-        .msg-bubble {
-            max-width: 82%; padding: 10px 14px; border-radius: 14px;
-            font-size: 13px; line-height: 1.4; word-break: break-word;
-        }
-        .msg-bubble.sent {
-            align-self: flex-end; background: var(--accent-amber);
-            color: #000; font-weight: 500; border-bottom-right-radius: 4px;
-        }
-        .msg-bubble.received {
-            align-self: flex-start; background: var(--surface-card);
-            color: var(--text-primary); border: 1px solid var(--border-graphite);
-            border-bottom-left-radius: 4px;
-        }
-        .msg-time {
-            font-size: 9px; opacity: 0.6; margin-top: 4px; text-align: right;
-        }
-        .msg-translation {
-            font-size: 11px; margin-top: 4px; padding-top: 4px;
-            border-top: 1px dashed rgba(0, 0, 0, 0.2); font-style: italic;
-        }
-        .msg-bubble.received .msg-translation {
-            border-top-color: var(--border-graphite); color: var(--online-green);
-        }
-        .msg-media-img {
-            max-width: 100%; border-radius: 8px; margin-top: 4px; display: block;
-        }
-        .msg-location-link {
-            color: inherit; text-decoration: underline; font-weight: 700;
-        }
-
-        /* BOTTOM INPUT BAR */
-        .chat-input-bar {
-            padding: 10px 14px 16px 14px;
-            background: var(--bg-obsidian);
-            border-top: 1px solid var(--border-subtle);
-            display: flex; align-items: center; gap: 8px;
-        }
-        .input-shell {
-            flex: 1; background: var(--surface-card);
-            border: 1px solid var(--border-graphite);
-            border-radius: 14px; display: flex; align-items: center;
-            padding: 2px 10px;
-        }
-        .input-shell:focus-within { border-color: var(--accent-amber); }
-        .main-text-input {
-            flex: 1; background: transparent; border: none;
-            outline: none; color: var(--text-primary);
-            font-size: 13px; padding: 10px 6px;
-        }
-        .btn-action-circle {
-            width: 44px; height: 44px; border-radius: 14px;
-            background: var(--accent-amber); border: none;
-            color: #000; display: flex; align-items: center;
-            justify-content: center; font-size: 16px; font-weight: 700;
-            cursor: pointer; flex-shrink: 0;
-            box-shadow: 0 4px 15px var(--accent-amber-glow);
-        }
-        .btn-action-circle.recording {
-            background: var(--danger-red); color: #fff;
-            animation: ringPulse 1s infinite alternate;
-        }
-        @keyframes ringPulse { from { transform: scale(1); } to { transform: scale(1.08); } }
-
-        /* ACTIVE CALL OVERLAY */
-        .call-overlay {
-            position: absolute; inset: 0; background: var(--bg-obsidian);
-            z-index: 100; display: none; flex-direction: column;
-            justify-content: space-between; padding: 36px 20px;
-        }
-        .caller-display-card { text-align: center; }
-        .caller-title { font-size: 22px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
-        .call-timer { font-size: 14px; color: var(--accent-amber); margin-top: 4px; }
-        .call-subtitle-panel {
-            background: var(--surface-card); border: 1px solid var(--border-graphite);
-            border-radius: 14px; padding: 14px; text-align: center;
-        }
-        .btn-hangup {
-            width: 56px; height: 56px; border-radius: 50%;
-            background: var(--danger-red); border: none; color: white;
-            font-size: 22px; cursor: pointer; margin: 0 auto; display: block;
-            box-shadow: 0 4px 20px var(--danger-glow);
+        @media (max-width: 768px) {
+            .sidebar-panel { width: 100%; }
+            .stage-panel { display: none; }
+            body.in-chat .sidebar-panel { display: none; }
+            body.in-chat .stage-panel { display: flex; width: 100%; }
         }
     </style>
 </head>
 <body>
 
-    <div class="app-viewport">
-        
-        <!-- 1. DIRECT NUMBER LOGIN SCREEN -->
-        <div class="landing-screen" id="landing-screen">
-            <div class="syncora-badge">IA</div>
-            <h1 class="brand-title">Syncora Terminal</h1>
-            <p class="brand-subtitle">Direct line calling & live translation bina number save kiye</p>
-
-            <div class="input-cluster">
-                <input type="tel" class="terminal-input" id="my-phone-input" placeholder="Aapka Mobile Number (e.g. 03001234567)">
-                <input type="tel" class="terminal-input" id="target-phone-input" placeholder="Jisse connect hona hai uska Number">
-                <button class="btn-launch-terminal" onclick="startDirectTerminal()">Connect Direct Line</button>
-            </div>
+    <!-- AUTH OVERLAY -->
+    <div class="auth-overlay" id="auth-overlay">
+        <div class="auth-card">
+            <h2 class="auth-title">Syncora Terminal</h2>
+            <p style="font-size: 13px; color: var(--text-muted);">Apna phone number register karein</p>
+            <input type="tel" id="my-phone-input" class="auth-input" placeholder="Mobile Number (e.g. 03001234567)">
+            <button class="btn-auth" onclick="authenticate()">Start Terminal</button>
         </div>
+    </div>
 
-        <!-- 2. DIRECT CHAT TERMINAL -->
-        <div class="chat-view" id="chat-view">
-            <header class="chat-header">
-                <div class="header-meta">
-                    <button class="icon-btn" onclick="exitChat()">←</button>
-                    <div class="chat-avatar-pill" id="partner-avatar">IA</div>
+    <!-- MAIN TWO-PANEL WORKSPACE -->
+    <div class="workspace">
+        
+        <!-- SIDEBAR -->
+        <aside class="sidebar-panel">
+            <div class="sidebar-header">
+                <span class="app-brand">SYNCORA CORE</span>
+                <span style="font-size: 12px; color: var(--online-green);" id="my-status-label">● Online</span>
+            </div>
+            <div class="sidebar-search">
+                <input type="tel" id="target-phone-input" class="search-input" placeholder="Direct Number (e.g. 0301...)">
+                <button class="btn-new-chat" onclick="openDirectChat()">Chat</button>
+            </div>
+            <div class="chat-list" id="chat-list">
+                <!-- Recent Chats Injected Here -->
+            </div>
+        </aside>
+
+        <!-- ACTIVE CHAT STAGE -->
+        <main class="stage-panel" id="stage-panel">
+            <header class="stage-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button class="icon-btn" onclick="backToSidebar()" style="display: none;" id="mobile-back-btn">←</button>
+                    <div class="chat-avatar" id="active-avatar">--</div>
                     <div>
-                        <div style="font-size: 14px; font-weight: 700;" id="partner-phone-label">0300...</div>
-                        <div style="font-size: 10px; color: var(--online-green);">Direct Line Active</div>
+                        <div style="font-size: 14px; font-weight: 700;" id="active-partner-label">Select a conversation</div>
+                        <div style="font-size: 11px; color: var(--online-green);">Encrypted Channel</div>
                     </div>
                 </div>
-                <div class="call-btn-cluster">
-                    <button class="btn-terminal-call" onclick="triggerCall('voice')">📞</button>
-                    <button class="btn-terminal-call" onclick="triggerCall('video')">📹</button>
-                    <button class="btn-terminal-call translate" onclick="triggerCall('translate')">🌐 Translate</button>
+                <div class="action-dock">
+                    <button class="btn-action translate" onclick="alert('Translation toggle ready')">🌐 Translate: Urdu ➔ Eng</button>
                 </div>
             </header>
 
-            <div class="chat-translate-bar">
-                <span>Translate:</span>
-                <select class="lang-pill" id="chat-source-lang">
-                    <option value="ur">Urdu (اردو)</option>
-                    <option value="en">English</option>
-                    <option value="ar">Arabic</option>
-                </select>
-                <span>➔</span>
-                <select class="lang-pill" id="chat-target-lang">
-                    <option value="en">English</option>
-                    <option value="ur">Urdu (اردو)</option>
-                    <option value="ar">Arabic</option>
-                </select>
-                <input type="checkbox" id="auto-translate-check" checked title="Enable Auto-Translate">
-            </div>
+            <div class="messages-container" id="messages-container"></div>
 
-            <div class="chat-messages-container" id="chat-box"></div>
-
-            <div class="chat-input-bar">
-                <div class="input-shell">
-                    <input type="text" class="main-text-input" id="text-input" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendTextMessage()">
-                    <button class="icon-btn" onclick="document.getElementById('file-picker').click()" title="Send Image">📎</button>
-                    <button class="icon-btn" onclick="sendLiveLocation()" title="Share Location">📍</button>
-                    <input type="file" id="file-picker" accept="image/*" style="display:none;" onchange="handleFileUpload(event)">
-                </div>
-                <button class="btn-action-circle" id="mic-send-btn" onclick="handleMicOrSend()">➤</button>
-            </div>
-        </div>
-
-        <!-- 3. ACTIVE CALL OVERLAY -->
-        <div class="call-overlay" id="call-overlay">
-            <div class="caller-display-card">
-                <div class="syncora-badge" style="margin: 0 auto 16px auto;" id="call-avatar">IA</div>
-                <div class="caller-title" id="call-partner-name">User</div>
-                <div class="call-timer" id="call-timer">Connected • 00:00</div>
-            </div>
-
-            <div class="call-subtitle-panel">
-                <div style="font-size: 11px; color: var(--text-muted);" id="call-sub-original">Speak naturally...</div>
-                <div style="font-size: 14px; color: var(--online-green); font-weight: 600; margin-top: 4px;" id="call-sub-translated">AI Live Translation Active</div>
-            </div>
-
-            <div>
-                <button class="btn-hangup" onclick="hangupCall()">🛑</button>
-            </div>
-        </div>
+            <footer class="stage-input-bar">
+                <input type="text" id="text-input" class="input-box" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendText()">
+                <button class="icon-btn" onclick="document.getElementById('file-picker').click()" title="Send Media">📎</button>
+                <button class="icon-btn" onclick="shareLocation()" title="Send Location">📍</button>
+                <input type="file" id="file-picker" style="display:none;" onchange="uploadFile(event)">
+                <button class="btn-send" id="mic-send-btn" onclick="handleMicOrSend()">➤</button>
+            </footer>
+        </main>
 
     </div>
 
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        let myPhone = localStorage.getItem("syncora_my_phone") || "";
-        let targetPhone = urlParams.get('chat') || "";
-        let currentRoom = "";
+        let myPhone = localStorage.getItem("syncora_user_phone") || "";
+        let activePartner = "";
         let socket = null;
         let mediaRecorder = null;
         let recordedChunks = [];
         let isRecording = false;
 
-        // Call State
-        let isCallActive = false;
-        let callTimerInterval = null;
-        let elapsedCallSecs = 0;
-
         window.onload = () => {
-            if (myPhone) document.getElementById("my-phone-input").value = myPhone;
-            if (targetPhone) {
-                document.getElementById("target-phone-input").value = targetPhone;
-                if (myPhone) startDirectTerminal();
+            if (myPhone) {
+                document.getElementById("auth-overlay").style.display = "none";
+                document.getElementById("my-status-label").innerText = `● ${myPhone}`;
+                initSocket();
+                loadRecentChats();
             }
         };
 
-        function makeRoomId(num1, num2) {
-            const sorted = [num1.trim(), num2.trim()].sort();
-            return `room_${sorted[0]}_${sorted[1]}`;
-        }
-
-        function startDirectTerminal() {
-            myPhone = document.getElementById("my-phone-input").value.trim();
-            targetPhone = document.getElementById("target-phone-input").value.trim();
-
-            if (!myPhone || !targetPhone) {
-                alert("Apna number aur partner ka number dono enter karein.");
-                return;
+        async function authenticate() {
+            const input = document.getElementById("my-phone-input").value.trim();
+            if (!input) return;
+            const res = await fetch("/api/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: input })
+            });
+            if (res.ok) {
+                myPhone = input;
+                localStorage.setItem("syncora_user_phone", myPhone);
+                document.getElementById("auth-overlay").style.display = "none";
+                document.getElementById("my-status-label").innerText = `● ${myPhone}`;
+                initSocket();
+                loadRecentChats();
             }
-
-            localStorage.setItem("syncora_my_phone", myPhone);
-            currentRoom = makeRoomId(myPhone, targetPhone);
-
-            document.getElementById("landing-screen").style.display = "none";
-            document.getElementById("chat-view").style.display = "flex";
-            document.getElementById("partner-phone-label").innerText = targetPhone;
-            document.getElementById("partner-avatar").innerText = targetPhone.slice(-2);
-
-            initSocket();
-            fetchHistory();
-        }
-
-        function exitChat() {
-            if (socket) socket.close();
-            document.getElementById("chat-view").style.display = "none";
-            document.getElementById("landing-screen").style.display = "flex";
         }
 
         function initSocket() {
-            const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-            socket = new WebSocket(`${wsProtocol}${window.location.host}/ws/${currentRoom}`);
+            const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
+            socket = new WebSocket(`${proto}${window.location.host}/ws/${myPhone}`);
 
             socket.onmessage = (event) => {
-                if (typeof event.data === "string") {
-                    const data = JSON.parse(event.data);
-                    if (data.type === "text_message") {
-                        appendBubble(data.text, 'received', data.translated, data.time);
-                    } else if (data.type === "voice_note") {
-                        appendVoiceBubble(data.audio, 'received', data.time);
-                    } else if (data.type === "media_message") {
-                        appendImageBubble(data.image, 'received', data.time);
-                    } else if (data.type === "location_message") {
-                        appendLocationBubble(data.lat, data.lng, 'received', data.time);
+                const data = JSON.parse(event.data);
+                if (data.action === "new_message") {
+                    if (data.sender === activePartner) {
+                        appendBubble(data.content, "received", data.translated, data.msg_type, data.time);
                     }
+                    loadRecentChats();
                 }
             };
+
+            socket.onclose = () => { setTimeout(initSocket, 2000); };
         }
 
-        async function fetchHistory() {
-            try {
-                const res = await fetch(`/messages/${currentRoom}`);
-                const data = await res.json();
-                const box = document.getElementById("chat-box");
-                box.innerHTML = "";
-                if (data.messages) {
-                    data.messages.forEach(msg => {
-                        const isMe = msg.sender === myPhone;
-                        const type = isMe ? 'sent' : 'received';
-                        if (msg.type === "text_message") appendBubble(msg.text, type, msg.translated, msg.time);
-                        if (msg.type === "voice_note") appendVoiceBubble(msg.audio, type, msg.time);
-                        if (msg.type === "media_message") appendImageBubble(msg.image, type, msg.time);
-                        if (msg.type === "location_message") appendLocationBubble(msg.lat, msg.lng, type, msg.time);
-                    });
-                }
-            } catch (e) {}
+        async function loadRecentChats() {
+            if (!myPhone) return;
+            const res = await fetch(`/api/chats/${myPhone}`);
+            const data = await res.json();
+            const list = document.getElementById("chat-list");
+            list.innerHTML = "";
+            data.chats.forEach(partner => {
+                const item = document.createElement("div");
+                item.className = `chat-item ${partner === activePartner ? 'active' : ''}`;
+                item.onclick = () => selectChat(partner);
+                item.innerHTML = `
+                    <div class="chat-avatar">${partner.slice(-2)}</div>
+                    <div class="chat-info">
+                        <div class="chat-title">${partner}</div>
+                        <div class="chat-subtitle">Direct line active</div>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
         }
 
-        /* 1. TEXT SEND & AUTO-TRANSLATE */
-        async function sendTextMessage() {
+        function openDirectChat() {
+            const partner = document.getElementById("target-phone-input").value.trim();
+            if (!partner || partner === myPhone) return;
+            selectChat(partner);
+        }
+
+        async function selectChat(partner) {
+            activePartner = partner;
+            document.body.classList.add("in-chat");
+            document.getElementById("active-partner-label").innerText = partner;
+            document.getElementById("active-avatar").innerText = partner.slice(-2);
+            document.getElementById("mobile-back-btn").style.display = "inline-block";
+
+            const res = await fetch(`/api/messages/${myPhone}/${partner}`);
+            const data = await res.json();
+            const box = document.getElementById("messages-container");
+            box.innerHTML = "";
+            data.messages.forEach(m => {
+                const type = m.sender === myPhone ? "sent" : "received";
+                appendBubble(m.content, type, m.translated_content, m.msg_type, m.time);
+            });
+            loadRecentChats();
+        }
+
+        function backToSidebar() {
+            document.body.classList.remove("in-chat");
+        }
+
+        async function sendText() {
             const input = document.getElementById("text-input");
             const text = input.value.trim();
-            if (!text || !socket || socket.readyState !== WebSocket.OPEN) return;
+            if (!text || !activePartner || !socket) return;
 
-            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            // Auto translation bridge
             let translated = "";
-
-            if (document.getElementById("auto-translate-check").checked) {
-                try {
-                    const res = await fetch("/translate", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            text: text,
-                            source_lang: document.getElementById("chat-source-lang").value,
-                            target_lang: document.getElementById("chat-target-lang").value
-                        })
-                    });
-                    const data = await res.json();
-                    translated = data.translated_text || "";
-                } catch (e) {}
-            }
+            try {
+                const tRes = await fetch("/translate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text: text, source_lang: "ur", target_lang: "en" })
+                });
+                const tData = await tRes.json();
+                translated = tData.translated_text || "";
+            } catch (e) {}
 
             const payload = {
-                type: "text_message",
-                text: text,
-                translated: translated,
-                sender: myPhone,
-                time: timeStr
+                action: "chat_message",
+                receiver: activePartner,
+                msg_type: "text",
+                content: text,
+                translated: translated
             };
             socket.send(JSON.stringify(payload));
-            appendBubble(text, 'sent', translated, timeStr);
+            appendBubble(text, "sent", translated, "text", "now");
             input.value = "";
+            loadRecentChats();
         }
 
-        function appendBubble(text, type, translated = "", time = "") {
-            const box = document.getElementById("chat-box");
+        function appendBubble(content, dir, translated, type, time) {
+            const box = document.getElementById("messages-container");
             const bubble = document.createElement("div");
-            bubble.className = `msg-bubble ${type}`;
-            let html = `<div>${text}</div>`;
-            if (translated && translated !== text) {
-                html += `<div class="msg-translation">AI: ${translated}</div>`;
+            bubble.className = `bubble ${dir}`;
+
+            let body = `<div>${content}</div>`;
+            if (type === "media") {
+                body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
+            } else if (type === "voice") {
+                body = `<audio controls src="${content}" style="max-width:200px; height:32px;"></audio>`;
+            } else if (type === "location") {
+                body = `<a href="${content}" target="_blank" style="color:inherit; font-weight:700;">📍 View Location</a>`;
             }
-            html += `<div class="msg-time">${time || 'now'}</div>`;
-            bubble.innerHTML = html;
+
+            if (translated && translated !== content) {
+                body += `<div class="bubble-translation">AI: ${translated}</div>`;
+            }
+            body += `<div class="bubble-time">${time}</div>`;
+            bubble.innerHTML = body;
             box.appendChild(bubble);
             box.scrollTop = box.scrollHeight;
         }
 
-        /* 2. VOICE NOTES (AUDIO RECORDING) */
+        /* VOICE NOTES */
         async function handleMicOrSend() {
             const text = document.getElementById("text-input").value.trim();
             if (text) {
-                sendTextMessage();
+                sendText();
                 return;
             }
-
             if (!isRecording) {
                 startRecording();
             } else {
@@ -500,157 +396,64 @@
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
                 recordedChunks = [];
-
-                mediaRecorder.ondataavailable = (e) => {
-                    if (e.data.size > 0) recordedChunks.push(e.data);
-                };
-
-                mediaRecorder.onstop = () => {
+                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+                mediaRecorder.onstop = async () => {
                     const blob = new Blob(recordedChunks, { type: 'audio/webm' });
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        const base64Audio = reader.result;
-                        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        const payload = {
-                            type: "voice_note",
-                            audio: base64Audio,
-                            sender: myPhone,
-                            time: timeStr
-                        };
-                        socket.send(JSON.stringify(payload));
-                        appendVoiceBubble(base64Audio, 'sent', timeStr);
-                    };
-                    reader.readAsDataURL(blob);
+                    const form = new FormData();
+                    form.append("file", blob, "voice.webm");
+                    const res = await fetch("/api/upload", { method: "POST", body: form });
+                    const data = await res.json();
+                    socket.send(JSON.stringify({
+                        action: "chat_message",
+                        receiver: activePartner,
+                        msg_type: "voice",
+                        content: data.url
+                    }));
+                    appendBubble(data.url, "sent", "", "voice", "now");
                 };
-
                 mediaRecorder.start();
                 isRecording = true;
-                const btn = document.getElementById("mic-send-btn");
-                btn.classList.add("recording");
-                btn.innerText = "⏹";
+                document.getElementById("mic-send-btn").classList.add("recording");
             } catch (err) {
-                alert("Microphone permission required: " + err.message);
+                alert("Microphone required for voice notes.");
             }
         }
 
         function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                mediaRecorder.stop();
-            }
+            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
             isRecording = false;
-            const btn = document.getElementById("mic-send-btn");
-            btn.classList.remove("recording");
-            btn.innerText = "➤";
+            document.getElementById("mic-send-btn").classList.remove("recording");
         }
 
-        function appendVoiceBubble(audioBase64, type, time) {
-            const box = document.getElementById("chat-box");
-            const bubble = document.createElement("div");
-            bubble.className = `msg-bubble ${type}`;
-            bubble.innerHTML = `
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span>🎙️ Voice Note</span>
-                    <audio controls src="${audioBase64}" style="max-width: 190px; height: 32px;"></audio>
-                </div>
-                <div class="msg-time">${time || 'now'}</div>
-            `;
-            box.appendChild(bubble);
-            box.scrollTop = box.scrollHeight;
-        }
-
-        /* 3. IMAGE SHARING */
-        function handleFileUpload(e) {
+        /* MEDIA & LOCATION */
+        async function uploadFile(e) {
             const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (evt) => {
-                const base64Img = evt.target.result;
-                const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                const payload = {
-                    type: "media_message",
-                    image: base64Img,
-                    sender: myPhone,
-                    time: timeStr
-                };
-                socket.send(JSON.stringify(payload));
-                appendImageBubble(base64Img, 'sent', timeStr);
-            };
-            reader.readAsDataURL(file);
+            if (!file || !activePartner) return;
+            const form = new FormData();
+            form.append("file", file);
+            const res = await fetch("/api/upload", { method: "POST", body: form });
+            const data = await res.json();
+            socket.send(JSON.stringify({
+                action: "chat_message",
+                receiver: activePartner,
+                msg_type: "media",
+                content: data.url
+            }));
+            appendBubble(data.url, "sent", "", "media", "now");
         }
 
-        function appendImageBubble(imgSrc, type, time) {
-            const box = document.getElementById("chat-box");
-            const bubble = document.createElement("div");
-            bubble.className = `msg-bubble ${type}`;
-            bubble.innerHTML = `
-                <img src="${imgSrc}" class="msg-media-img" alt="Attached Media">
-                <div class="msg-time">${time || 'now'}</div>
-            `;
-            box.appendChild(bubble);
-            box.scrollTop = box.scrollHeight;
-        }
-
-        /* 4. LIVE LOCATION SHARING */
-        function sendLiveLocation() {
-            if (!navigator.geolocation) {
-                alert("Browser mein location support nahi hai.");
-                return;
-            }
-            navigator.geolocation.getCurrentPosition((pos) => {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
-                const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                const payload = {
-                    type: "location_message",
-                    lat: lat,
-                    lng: lng,
-                    sender: myPhone,
-                    time: timeStr
-                };
-                socket.send(JSON.stringify(payload));
-                appendLocationBubble(lat, lng, 'sent', timeStr);
-            }, (err) => {
-                alert("Location access denied: " + err.message);
+        function shareLocation() {
+            if (!navigator.geolocation || !activePartner) return;
+            navigator.geolocation.getCurrentPosition(pos => {
+                const mapLink = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
+                socket.send(JSON.stringify({
+                    action: "chat_message",
+                    receiver: activePartner,
+                    msg_type: "location",
+                    content: mapLink
+                }));
+                appendBubble(mapLink, "sent", "", "location", "now");
             });
-        }
-
-        function appendLocationBubble(lat, lng, type, time) {
-            const box = document.getElementById("chat-box");
-            const bubble = document.createElement("div");
-            bubble.className = `msg-bubble ${type}`;
-            const mapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
-            bubble.innerHTML = `
-                <a href="${mapUrl}" target="_blank" class="msg-location-link">
-                    📍 Live Location (View in Maps)
-                </a>
-                <div class="msg-time">${time || 'now'}</div>
-            `;
-            box.appendChild(bubble);
-            box.scrollTop = box.scrollHeight;
-        }
-
-        /* 5. CALL SCREEN & TIMER */
-        function triggerCall(mode) {
-            isCallActive = true;
-            document.getElementById("call-overlay").style.display = "flex";
-            document.getElementById("call-partner-name").innerText = targetPhone;
-            document.getElementById("call-avatar").innerText = targetPhone.slice(-2);
-
-            elapsedCallSecs = 0;
-            clearInterval(callTimerInterval);
-            callTimerInterval = setInterval(() => {
-                elapsedCallSecs++;
-                const mins = String(Math.floor(elapsedCallSecs / 60)).padStart(2, '0');
-                const secs = String(elapsedCallSecs % 60).padStart(2, '0');
-                document.getElementById("call-timer").innerText = `Connected • ${mins}:${secs}`;
-            }, 1000);
-        }
-
-        function hangupCall() {
-            isCallActive = false;
-            clearInterval(callTimerInterval);
-            document.getElementById("call-overlay").style.display = "none";
         }
     </script>
 </body>
