@@ -3,1353 +3,664 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Syncora Terminal</title>
+    <title>WhatsApp Direct</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-obsidian: #09090b;
-            --surface-card: #121215;
-            --surface-hover: #18181b;
-            --border-graphite: #27272a;
-            --border-subtle: rgba(255, 255, 255, 0.05);
-            --accent-amber: #f59e0b;
-            --accent-amber-dim: rgba(245, 158, 11, 0.12);
-            --accent-amber-glow: rgba(245, 158, 11, 0.25);
-            --danger-red: #ef4444;
-            --danger-glow: rgba(239, 68, 68, 0.25);
-            --text-primary: #fafafa;
-            --text-secondary: #a1a1aa;
-            --text-muted: #71717a;
-            --online-green: #10b981;
+            --wa-bg: #0b141a;
+            --wa-header: #202c33;
+            --wa-card: #111b21;
+            --wa-green: #00a884;
+            --wa-green-bubble: #005c4b;
+            --wa-received-bubble: #202c33;
+            --text-primary: #e9edef;
+            --text-secondary: #8696a0;
+            --border-color: rgba(134, 150, 160, 0.15);
+            --danger-red: #ea4335;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
         body {
             font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
-            background-color: var(--bg-obsidian);
+            background-color: #0c1317;
             color: var(--text-primary);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            overflow-x: hidden;
         }
 
-        .app-viewport {
+        .app-container {
             width: 100%;
             max-width: 480px;
             height: 100vh;
             max-height: 920px;
-            background-color: var(--bg-obsidian);
-            border: 1px solid var(--border-graphite);
+            background-color: var(--wa-bg);
             position: relative;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            border: 1px solid var(--border-color);
         }
 
         @media (max-width: 480px) {
-            .app-viewport { max-height: 100vh; border: none; }
+            .app-container { max-height: 100vh; border: none; }
         }
 
-        /* 1. DIRECTORY SCREEN */
-        .view-directory {
+        /* 1. NUMBER ENTRY SCREEN */
+        .landing-screen {
             flex: 1;
             display: flex;
             flex-direction: column;
-            overflow-y: auto;
-            position: relative;
-        }
-
-        .top-navbar {
-            padding: 12px 18px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: rgba(9, 9, 11, 0.92);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border-subtle);
-            z-index: 10;
-        }
-
-        .brand-cluster { display: flex; align-items: center; gap: 12px; }
-        
-        .profile-title-group {
-            display: flex;
-            flex-direction: column;
-            gap: 1px;
-        }
-        .brand-app-name {
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            color: var(--accent-amber);
-            font-family: 'Space Grotesk', sans-serif;
-        }
-        .user-display-name {
-            font-size: 14px;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .my-profile-badge {
-            width: 40px; height: 40px; border-radius: 50%;
-            border: 2px solid var(--accent-amber); background: #1c1c21;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 14px; font-weight: 700; color: var(--accent-amber);
-            cursor: pointer; overflow: hidden; background-size: cover; background-position: center;
-            flex-shrink: 0;
-        }
-
-        .header-actions { display: flex; align-items: center; gap: 6px; }
-        .btn-header-action {
-            background: var(--accent-amber-dim);
-            border: 1px solid rgba(245, 158, 11, 0.3);
-            color: var(--accent-amber);
-            padding: 6px 11px;
-            border-radius: 10px;
-            font-size: 12px;
-            font-weight: 700;
-            cursor: pointer;
-        }
-
-        .directory-container {
-            flex: 1;
-            padding: 18px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            overflow-y: auto;
-        }
-
-        .section-label {
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-        }
-
-        .contact-card {
-            background: var(--surface-card);
-            border: 1px solid var(--border-graphite);
-            border-radius: 16px;
-            padding: 12px 14px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .contact-card:hover {
-            border-color: var(--accent-amber);
-            background: var(--surface-hover);
-        }
-
-        .user-identity { display: flex; align-items: center; gap: 12px; flex: 1; }
-        .avatar-box {
-            width: 44px; height: 44px; border-radius: 50%; background: #1c1c21;
-            border: 1px solid var(--border-subtle); display: flex; align-items: center;
-            justify-content: center; font-weight: 700; color: var(--accent-amber);
-            text-transform: uppercase; font-size: 14px; overflow: hidden;
-            background-size: cover; background-position: center; flex-shrink: 0;
-        }
-
-        .contact-name { font-size: 14px; font-weight: 700; color: var(--text-primary); }
-        .contact-sub { font-size: 12px; color: var(--text-muted); font-family: 'Space Grotesk', monospace; margin-top: 2px; }
-
-        .card-actions { display: flex; align-items: center; gap: 8px; }
-        .btn-card-del {
-            background: transparent; border: none; color: var(--text-muted);
-            font-size: 16px; cursor: pointer; padding: 4px;
-        }
-        .btn-card-del:hover { color: var(--danger-red); }
-
-        .fab-add {
-            position: absolute;
-            bottom: 24px;
-            right: 24px;
-            width: 56px;
-            height: 56px;
-            border-radius: 18px;
-            background: var(--accent-amber);
-            color: #000;
-            border: none;
-            display: flex;
-            align-items: center;
             justify-content: center;
-            font-size: 26px;
+            align-items: center;
+            padding: 30px 24px;
+            text-align: center;
+            background: var(--wa-card);
+        }
+        .landing-logo {
+            width: 64px; height: 64px; border-radius: 50%;
+            background: var(--wa-green); display: flex;
+            align-items: center; justify-content: center;
+            font-size: 32px; margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0, 168, 132, 0.3);
+        }
+        .landing-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+        .landing-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 24px; }
+        .phone-input-box {
+            width: 100%;
+            background: #2a3942;
+            border: 1px solid transparent;
+            border-radius: 12px;
+            padding: 14px 16px;
+            color: var(--text-primary);
+            font-size: 15px;
+            outline: none;
+            margin-bottom: 12px;
+        }
+        .phone-input-box:focus { border-color: var(--wa-green); }
+        .btn-start-chat {
+            width: 100%;
+            background: var(--wa-green);
+            color: #111b21;
+            border: none;
+            border-radius: 12px;
+            padding: 14px;
+            font-size: 15px;
             font-weight: 700;
             cursor: pointer;
-            box-shadow: 0 4px 20px var(--accent-amber-glow);
-            transition: all 0.2s ease;
-            z-index: 20;
+            margin-top: 6px;
         }
 
-        /* 2. DIRECT CHAT VIEW */
-        .view-chat-screen {
+        /* 2. CHAT SCREEN */
+        .chat-view {
             display: none;
             flex: 1;
             flex-direction: column;
-            overflow: hidden;
-            background: var(--bg-obsidian);
+            height: 100%;
+            background: #0b141a;
+            position: relative;
         }
 
-        .chat-top-header {
+        .chat-header {
+            background: var(--wa-header);
             padding: 10px 14px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: rgba(18, 18, 21, 0.96);
-            border-bottom: 1px solid var(--border-graphite);
             z-index: 10;
         }
+        .chat-user-meta { display: flex; align-items: center; gap: 10px; }
+        .chat-avatar {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: #6b7c85; display: flex; align-items: center;
+            justify-content: center; font-weight: 700; font-size: 14px;
+        }
+        .chat-header-actions { display: flex; align-items: center; gap: 8px; }
+        .icon-btn {
+            background: transparent; border: none;
+            color: var(--text-secondary); font-size: 19px;
+            cursor: pointer; padding: 6px; border-radius: 50%;
+        }
+        .icon-btn:hover { color: var(--text-primary); }
 
-        .chat-contact-meta { display: flex; align-items: center; gap: 8px; max-width: 44%; }
-        .btn-back-arrow {
-            background: transparent; border: none; color: var(--text-muted);
-            font-size: 20px; cursor: pointer; padding: 2px;
-        }
-
-        .chat-action-cluster { display: flex; align-items: center; gap: 5px; }
-        .chat-header-btn {
-            background: var(--surface-card); border: 1px solid var(--border-graphite);
-            color: var(--text-primary); padding: 7px 9px; border-radius: 10px;
-            font-size: 12px; font-weight: 700; display: flex; align-items: center;
-            gap: 3px; cursor: pointer; white-space: nowrap;
-        }
-        .chat-header-btn.translate-call {
-            background: var(--accent-amber-dim); color: var(--accent-amber);
-            border-color: rgba(245, 158, 11, 0.4);
-        }
-        .chat-header-btn.video-call {
-            background: rgba(16, 185, 129, 0.15); color: var(--online-green);
-            border-color: rgba(16, 185, 129, 0.4);
-        }
-        .chat-header-btn.share-link-btn {
-            background: rgba(255, 255, 255, 0.05); color: var(--text-secondary);
-        }
-
-        .chat-translate-toggle-bar {
-            padding: 8px 12px;
-            background: rgba(245, 158, 11, 0.05);
-            border-bottom: 1px solid var(--border-subtle);
+        .chat-translate-bar {
+            background: #182229;
+            padding: 6px 12px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            font-size: 11px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .lang-select {
+            background: #202c33; color: var(--wa-green);
+            border: 1px solid var(--border-color); border-radius: 6px;
+            padding: 3px 6px; font-size: 11px; outline: none;
+        }
+
+        .chat-messages-container {
+            flex: 1;
+            padding: 14px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0);
+            background-size: 20px 20px;
+        }
+
+        .msg-bubble {
+            max-width: 80%;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.4;
+            word-break: break-word;
+            position: relative;
+        }
+        .msg-bubble.sent {
+            align-self: flex-end;
+            background: var(--wa-green-bubble);
+            color: var(--text-primary);
+            border-top-right-radius: 0;
+        }
+        .msg-bubble.received {
+            align-self: flex-start;
+            background: var(--wa-received-bubble);
+            color: var(--text-primary);
+            border-top-left-radius: 0;
+        }
+        .msg-time {
+            font-size: 10px; color: rgba(255, 255, 255, 0.5);
+            margin-top: 4px; text-align: right;
+        }
+        .msg-translation {
+            font-size: 12px; color: #70e6c7;
+            border-top: 1px dashed rgba(255, 255, 255, 0.15);
+            margin-top: 4px; padding-top: 4px;
+        }
+        .msg-media-img {
+            max-width: 100%; border-radius: 6px;
+            margin-top: 4px; display: block;
+        }
+        .msg-location-link {
+            display: flex; align-items: center; gap: 6px;
+            color: #53bdeb; text-decoration: none; font-weight: 600;
+        }
+
+        /* BOTTOM INPUT BAR */
+        .chat-input-bar {
+            background: var(--wa-header);
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
             gap: 6px;
         }
-
-        .lang-dropdown-pill {
-            background: var(--surface-card);
-            border: 1px solid var(--border-graphite);
-            color: var(--accent-amber);
-            font-size: 11px;
-            font-weight: 700;
-            padding: 3px 6px;
-            border-radius: 8px;
+        .input-pill {
+            flex: 1;
+            background: #2a3942;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            padding: 4px 12px;
+        }
+        .main-text-input {
+            flex: 1;
+            background: transparent;
+            border: none;
             outline: none;
-            cursor: pointer;
-            max-width: 115px;
+            color: var(--text-primary);
+            font-size: 14px;
+            padding: 8px 4px;
         }
-        .lang-dropdown-pill option { background: #18181b; color: #fff; }
+        .btn-circle-action {
+            width: 42px; height: 42px; border-radius: 50%;
+            background: var(--wa-green); border: none;
+            color: #111b21; display: flex; align-items: center;
+            justify-content: center; font-size: 18px;
+            cursor: pointer; flex-shrink: 0;
+        }
+        .btn-circle-action.recording {
+            background: var(--danger-red);
+            animation: pulseRecord 1s infinite alternate;
+        }
+        @keyframes pulseRecord { from { transform: scale(1); } to { transform: scale(1.1); } }
 
-        .chat-messages-area {
-            flex: 1; padding: 16px; overflow-y: auto;
-            display: flex; flex-direction: column; gap: 10px;
+        /* ACTIVE CALL MODAL */
+        .call-overlay {
+            position: absolute; inset: 0; background: #111b21;
+            z-index: 100; display: none; flex-direction: column;
+            justify-content: space-between; padding: 30px 20px;
         }
-
-        .chat-bubble {
-            max-width: 82%; padding: 10px 14px; border-radius: 14px;
-            font-size: 13px; line-height: 1.4; word-break: break-word;
+        .call-top { text-align: center; }
+        .call-contact-name { font-size: 22px; font-weight: 700; margin-top: 10px; }
+        .call-status { font-size: 13px; color: var(--wa-green); margin-top: 4px; }
+        .call-sub-box {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px; padding: 14px; text-align: center;
         }
-        .chat-bubble.sent {
-            align-self: flex-end; background: var(--accent-amber);
-            color: #000; font-weight: 500; border-bottom-right-radius: 4px;
+        .call-actions {
+            display: flex; justify-content: center; gap: 20px;
         }
-        .chat-bubble.received {
-            align-self: flex-start; background: var(--surface-card);
-            color: var(--text-primary); border: 1px solid var(--border-graphite);
-            border-bottom-left-radius: 4px;
-        }
-
-        .bubble-translation {
-            font-size: 11px; margin-top: 4px; padding-top: 4px;
-            border-top: 1px dashed rgba(0, 0, 0, 0.2); font-style: italic;
-        }
-        .chat-bubble.received .bubble-translation {
-            border-top-color: var(--border-graphite); color: var(--online-green);
-        }
-        .chat-time { font-size: 9px; opacity: 0.6; margin-top: 4px; text-align: right; }
-
-        .chat-input-bar {
-            padding: 12px 14px 18px 14px; display: flex; gap: 8px;
-            background: var(--bg-obsidian); border-top: 1px solid var(--border-subtle);
-        }
-
-        .chat-input {
-            flex: 1; background: var(--surface-card); border: 1px solid var(--border-graphite);
-            color: var(--text-primary); border-radius: 12px; padding: 12px 14px;
-            font-size: 13px; outline: none;
-        }
-        .chat-input:focus { border-color: var(--accent-amber); }
-
-        .chat-send-btn {
-            background: var(--accent-amber); border: none; color: #000;
-            width: 44px; height: 44px; border-radius: 12px; display: flex;
-            align-items: center; justify-content: center; font-size: 16px;
-            font-weight: 700; cursor: pointer;
-        }
-
-        /* 3. INCOMING CALL MODAL */
-        .incoming-modal-backdrop {
-            position: absolute; inset: 0; background: rgba(0, 0, 0, 0.92);
-            backdrop-filter: blur(14px); z-index: 200; display: none;
-            flex-direction: column; align-items: center; justify-content: center; padding: 24px;
-        }
-        .incoming-dialog {
-            background: var(--surface-card); border: 1px solid var(--accent-amber);
-            border-radius: 28px; padding: 36px 24px; width: 100%; text-align: center;
-            box-shadow: 0 0 50px var(--accent-amber-glow);
-            animation: ringPulse 1.2s infinite ease-in-out;
-        }
-        @keyframes ringPulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
-
-        .incoming-avatar {
-            width: 90px; height: 90px; border-radius: 50%; background: #18181b;
-            border: 3px solid var(--accent-amber); margin: 0 auto 16px auto;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 30px; font-weight: 700; color: var(--accent-amber);
-            box-shadow: 0 0 30px var(--accent-amber-glow); text-transform: uppercase;
-            overflow: hidden; background-size: cover; background-position: center;
-        }
-        .incoming-actions { display: flex; gap: 16px; margin-top: 28px; }
-        .btn-call-action {
-            flex: 1; padding: 14px 0; border-radius: 14px; font-size: 14px;
-            font-weight: 700; border: none; cursor: pointer;
-        }
-        .btn-accept { background: var(--online-green); color: white; box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
-        .btn-decline { background: var(--danger-red); color: white; box-shadow: 0 0 15px var(--danger-glow); }
-
-        /* 4. ACTIVE CALL OVERLAY */
-        .call-screen-overlay {
-            position: absolute; inset: 0; background: var(--bg-obsidian); z-index: 100;
-            display: none; flex-direction: column; justify-content: space-between; padding: 24px 20px;
-            overflow: hidden;
-        }
-
-        .video-stage-container {
-            position: absolute; inset: 0; z-index: 1; display: none; background: #000;
-        }
-        .remote-video-frame { width: 100%; height: 100%; object-fit: cover; }
-        .local-video-pip {
-            position: absolute; top: 70px; right: 16px;
-            width: 100px; height: 145px; border-radius: 14px;
-            border: 2px solid var(--accent-amber); object-fit: cover;
-            background: #18181b; z-index: 20; box-shadow: 0 4px 20px rgba(0,0,0,0.8);
-        }
-
-        .call-ui-layer {
-            position: relative; z-index: 10; height: 100%;
-            display: flex; flex-direction: column; justify-content: space-between;
-        }
-
-        .call-header { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-
-        .call-lang-bar {
-            display: flex; align-items: center; gap: 6px; background: rgba(18, 18, 21, 0.85);
-            backdrop-filter: blur(8px); border: 1px solid var(--border-graphite);
-            padding: 4px 10px; border-radius: 20px; font-size: 11px; color: var(--text-muted);
-        }
-
-        .caller-title { font-size: 22px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; text-shadow: 0 2px 8px rgba(0,0,0,0.8); }
-        .call-duration { font-size: 14px; font-weight: 600; color: var(--accent-amber); font-variant-numeric: tabular-nums; }
-
-        .call-stage-center {
-            display: flex; flex-direction: column; align-items: center;
-            justify-content: center; position: relative; margin: 10px 0;
-        }
-        .pulse-wave-ring {
-            width: 140px; height: 140px; border-radius: 50%; background: var(--accent-amber-dim);
-            border: 1px solid rgba(245, 158, 11, 0.2); position: absolute; animation: ripple 2s infinite ease-out;
-        }
-        @keyframes ripple { 0% { transform: scale(0.9); opacity: 0.8; } 100% { transform: scale(1.4); opacity: 0; } }
-
-        .caller-large-avatar {
-            width: 114px; height: 114px; border-radius: 50%; background: #18181b;
-            border: 2px solid var(--accent-amber); display: flex; align-items: center;
-            justify-content: center; font-size: 38px; font-weight: 700; color: var(--accent-amber);
-            position: relative; z-index: 2; box-shadow: 0 0 30px var(--accent-amber-glow);
-            text-transform: uppercase; overflow: hidden; background-size: cover; background-position: center;
-        }
-
-        .subtitles-box {
-            background: rgba(18, 18, 21, 0.88); backdrop-filter: blur(10px);
-            border: 1px solid var(--border-graphite); border-radius: 14px;
-            padding: 12px 14px; min-height: 70px; display: flex;
-            flex-direction: column; justify-content: center; gap: 4px; text-align: center;
-        }
-        .sub-original { font-size: 11px; color: var(--text-muted); }
-        .sub-translated { font-size: 14px; color: var(--online-green); font-weight: 600; }
-
-        .call-controls-row {
-            display: flex; align-items: center; justify-content: space-around;
-            background: rgba(18, 18, 21, 0.85); backdrop-filter: blur(12px);
-            padding: 12px; border-radius: 28px; border: 1px solid var(--border-graphite);
-        }
-        .ctrl-btn-circle {
-            width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--border-graphite);
-            background: var(--surface-card); color: var(--text-primary); font-size: 18px;
-            cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: all 0.2s ease;
-        }
-        .ctrl-btn-circle.active { background: var(--accent-amber); color: #000; border-color: var(--accent-amber); }
-        .ctrl-btn-circle.muted-state { background: var(--text-primary); color: #000; }
-        .ctrl-btn-circle.hangup { background: var(--danger-red); border-color: var(--danger-red); color: white; }
-
-        /* MODALS */
-        .modal-backdrop {
-            position: absolute; inset: 0; background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(8px); z-index: 100; display: none;
-            align-items: center; justify-content: center; padding: 20px;
-        }
-        .modal-card {
-            background: var(--surface-card); border: 1px solid var(--border-graphite);
-            border-radius: 20px; padding: 24px; width: 100%; display: flex;
-            flex-direction: column; gap: 14px; box-shadow: 0 0 40px rgba(0,0,0,0.8);
-        }
-        .modal-header { display: flex; align-items: center; justify-content: space-between; }
-        .modal-title { font-size: 16px; font-weight: 700; color: var(--accent-amber); }
-        .modal-close { background: transparent; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; }
-
-        .input-group { display: flex; flex-direction: column; gap: 8px; }
-        .input-field {
-            background: var(--bg-obsidian); border: 1px solid var(--border-graphite);
-            color: var(--text-primary); padding: 12px 14px; border-radius: 12px;
-            font-size: 14px; outline: none;
-        }
-        .input-field:focus { border-color: var(--accent-amber); }
-
-        .btn-modal-save {
-            background: var(--accent-amber); color: #000; font-weight: 700;
-            border: none; border-radius: 12px; padding: 12px; font-size: 14px; cursor: pointer;
+        .btn-hangup {
+            width: 56px; height: 56px; border-radius: 50%;
+            background: var(--danger-red); border: none;
+            color: white; font-size: 22px; cursor: pointer;
         }
     </style>
 </head>
 <body>
 
-    <div class="app-viewport">
+    <div class="app-container">
         
-        <!-- 1. DIRECTORY SCREEN (FOR HOST ONLY) -->
-        <div class="view-directory" id="view-dir">
-            <header class="top-navbar">
-                <div class="brand-cluster">
-                    <div class="my-profile-badge" id="my-profile-avatar-btn" onclick="openProfileModal()" title="Edit My Profile & DP">IA</div>
-                    <div class="profile-title-group">
-                        <div class="brand-app-name">Syncora Terminal</div>
-                        <div class="user-display-name" id="host-navbar-name">Irfan Anees</div>
-                    </div>
-                </div>
-                <div class="header-actions">
-                    <button class="btn-header-action" onclick="copyMyPersonalDirectLink()" id="main-copy-btn">📋 My Link</button>
-                    <button class="btn-header-action" onclick="openAddModal()">＋ Add</button>
-                </div>
-            </header>
+        <!-- 1. DIRECT NUMBER LOGIN / LANDING SCREEN -->
+        <div class="landing-screen" id="landing-screen">
+            <div class="landing-logo">💬</div>
+            <h2 class="landing-title">WhatsApp Direct</h2>
+            <p class="landing-desc">Direct chat & call bina kisi contact ko save kiye</p>
 
-            <main class="directory-container" id="contact-list-container">
-                <div class="section-label">Saved Contacts</div>
-            </main>
+            <input type="tel" class="phone-input-box" id="my-phone-input" placeholder="Aapka Mobile Number (e.g. 03001234567)">
+            <input type="tel" class="phone-input-box" id="target-phone-input" placeholder="Jisse baat karni hai uska Number">
 
-            <button class="fab-add" onclick="openAddModal()" title="Add New Contact">＋</button>
+            <button class="btn-start-chat" onclick="startDirectChat()">Start Chat</button>
         </div>
 
         <!-- 2. DIRECT CHAT VIEW -->
-        <div class="view-chat-screen" id="view-chat-screen">
-            <header class="chat-top-header">
-                <div class="chat-contact-meta">
-                    <button class="btn-back-arrow" id="chat-back-btn" onclick="closeContactChat()">←</button>
-                    <div class="avatar-box" id="chat-header-avatar" style="width: 38px; height: 38px; font-size: 14px;" onclick="openProfileModal()" title="Tap to update Profile/DP">IA</div>
-                    <div style="overflow: hidden;">
-                        <div style="font-size: 13px; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;" id="chat-header-title">Irfan Anees</div>
-                        <div style="font-size: 10px; color: var(--online-green);">Direct Line Active</div>
+        <div class="chat-view" id="chat-view">
+            <header class="chat-header">
+                <div class="chat-user-meta">
+                    <button class="icon-btn" onclick="exitChat()" style="margin-right: -4px;">←</button>
+                    <div class="chat-avatar" id="chat-avatar">U</div>
+                    <div>
+                        <div style="font-size: 14px; font-weight: 700;" id="chat-partner-title">0300...</div>
+                        <div style="font-size: 11px; color: var(--wa-green);">online</div>
                     </div>
                 </div>
-
-                <div class="chat-action-cluster">
-                    <button class="chat-header-btn" onclick="initiateCall('voice')" title="Voice Call">📞</button>
-                    <button class="chat-header-btn video-call" onclick="initiateCall('video')" title="Video Call">📹</button>
-                    <button class="chat-header-btn translate-call" onclick="initiateCall('translate')" title="AI Live Translate">🌐</button>
-                    <button class="chat-header-btn share-link-btn" onclick="copyMyPersonalDirectLink()" id="chat-copy-btn" title="Copy My Direct Link">📋 Link</button>
+                <div class="chat-header-actions">
+                    <button class="icon-btn" onclick="triggerCall('voice')" title="Voice Call">📞</button>
+                    <button class="icon-btn" onclick="triggerCall('video')" title="Video Call">📹</button>
+                    <button class="icon-btn" onclick="triggerCall('translate')" title="AI Translate Call">🌐</button>
                 </div>
             </header>
 
-            <!-- TRANSLATION BAR -->
-            <div class="chat-translate-toggle-bar">
-                <span>Translate:</span>
-                <select class="lang-dropdown-pill" id="chat-source-lang">
-                    <option value="ur">Urdu (اردو)</option>
-                    <option value="en">English (US)</option>
-                    <option value="de">German (Deutsch)</option>
-                    <option value="fr">French (Français)</option>
-                    <option value="es">Spanish (Español)</option>
-                    <option value="it">Italian (Italiano)</option>
-                    <option value="ru">Russian (Русский)</option>
-                    <option value="pt">Portuguese (Português)</option>
-                    <option value="ms">Malay (Melayu)</option>
-                    <option value="ar">Arabic (العربية)</option>
-                    <option value="tr">Turkish (Türkçe)</option>
-                    <option value="zh">Chinese (中文)</option>
+            <!-- TRANSLATE BAR -->
+            <div class="chat-translate-bar">
+                <span>Auto-Translate Text:</span>
+                <select class="lang-select" id="chat-source-lang">
+                    <option value="ur">Urdu</option>
+                    <option value="en">English</option>
+                    <option value="ar">Arabic</option>
                 </select>
                 <span>➔</span>
-                <select class="lang-dropdown-pill" id="chat-target-lang">
-                    <option value="en">English (US)</option>
-                    <option value="ur">Urdu (اردو)</option>
-                    <option value="de">German (Deutsch)</option>
-                    <option value="fr">French (Français)</option>
-                    <option value="es">Spanish (Español)</option>
-                    <option value="it">Italian (Italiano)</option>
-                    <option value="ru">Russian (Русский)</option>
-                    <option value="pt">Portuguese (Português)</option>
-                    <option value="ms">Malay (Melayu)</option>
-                    <option value="ar">Arabic (العربية)</option>
-                    <option value="tr">Turkish (Türkçe)</option>
-                    <option value="zh">Chinese (中文)</option>
+                <select class="lang-select" id="chat-target-lang">
+                    <option value="en">English</option>
+                    <option value="ur">Urdu</option>
+                    <option value="ar">Arabic</option>
                 </select>
-                <input type="checkbox" id="chat-translate-toggle" checked title="Enable Auto-Translate">
+                <input type="checkbox" id="auto-translate-check" checked>
             </div>
 
-            <div class="chat-messages-area" id="chat-msgs-box"></div>
+            <!-- MESSAGES AREA -->
+            <div class="chat-messages-container" id="chat-box"></div>
 
+            <!-- BOTTOM INPUT BAR -->
             <div class="chat-input-bar">
-                <input type="text" class="chat-input" id="chat-input-field" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendChatMessage()">
-                <button class="chat-send-btn" onclick="sendChatMessage()">➤</button>
+                <div class="input-pill">
+                    <input type="text" class="main-text-input" id="text-input" placeholder="Message" onkeypress="if(event.key==='Enter') sendTextMessage()">
+                    <button class="icon-btn" onclick="document.getElementById('file-picker').click()" title="Send Image">📎</button>
+                    <button class="icon-btn" onclick="sendLiveLocation()" title="Send Live Location">📍</button>
+                    <input type="file" id="file-picker" accept="image/*" style="display:none;" onchange="handleFileUpload(event)">
+                </div>
+                <button class="btn-circle-action" id="mic-send-btn" onclick="handleMicOrSend()">➤</button>
             </div>
         </div>
 
-        <!-- 3. INCOMING CALL MODAL -->
-        <div class="incoming-modal-backdrop" id="incoming-modal">
-            <div class="incoming-dialog">
-                <div class="incoming-avatar" id="incoming-caller-avatar">IA</div>
-                <h3 style="font-size: 21px; margin-bottom: 6px;" id="incoming-caller-name">Incoming Call...</h3>
-                <p style="font-size: 13px; color: var(--accent-amber);" id="incoming-call-type-label">Voice Line</p>
-                <div class="incoming-actions">
-                    <button class="btn-call-action btn-decline" onclick="declineCall()">Decline</button>
-                    <button class="btn-call-action btn-accept" onclick="acceptCall()">Accept</button>
-                </div>
+        <!-- 3. ACTIVE CALL SCREEN -->
+        <div class="call-overlay" id="call-overlay">
+            <div class="call-top">
+                <div class="chat-avatar" style="width: 70px; height: 70px; margin: 0 auto; font-size: 24px;" id="call-avatar">U</div>
+                <div class="call-contact-name" id="call-contact-name">User</div>
+                <div class="call-status" id="call-status-timer">Calling...</div>
+            </div>
+
+            <div class="call-sub-box">
+                <div style="font-size: 12px; color: var(--text-secondary);" id="call-sub-original">Speak now...</div>
+                <div style="font-size: 15px; color: var(--wa-green); font-weight: 600; margin-top: 4px;" id="call-sub-translated">Translation will appear here</div>
+            </div>
+
+            <div class="call-actions">
+                <button class="btn-hangup" onclick="hangupCall()">🛑</button>
             </div>
         </div>
 
-        <!-- 4. ACTIVE CALL OVERLAY -->
-        <section class="call-screen-overlay" id="call-screen">
-            <div class="video-stage-container" id="video-stage">
-                <img id="remote-video-feed" class="remote-video-frame" alt="Partner Video">
-                <video id="local-video-pip" class="local-video-pip" autoplay playsinline muted></video>
-            </div>
-
-            <div class="call-ui-layer">
-                <div class="call-header">
-                    <div class="call-lang-bar" id="call-lang-bar">
-                        <span>Speak:</span>
-                        <select class="lang-dropdown-pill" id="call-speak-lang" onchange="syncCallSpeechLang()">
-                            <option value="ur-PK">Urdu (اردو)</option>
-                            <option value="en-US">English (US)</option>
-                            <option value="de-DE">German (Deutsch)</option>
-                            <option value="fr-FR">French (Français)</option>
-                            <option value="es-ES">Spanish (Español)</option>
-                            <option value="it-IT">Italian (Italiano)</option>
-                            <option value="ru-RU">Russian (Русский)</option>
-                            <option value="pt-PT">Portuguese (Português)</option>
-                            <option value="ms-MY">Malay (Melayu)</option>
-                            <option value="ar-SA">Arabic (العربية)</option>
-                            <option value="tr-TR">Turkish (Türkçe)</option>
-                            <option value="zh-CN">Chinese (中文)</option>
-                        </select>
-                        <span>➔ Translate:</span>
-                        <select class="lang-dropdown-pill" id="call-target-lang">
-                            <option value="en">English (US)</option>
-                            <option value="ur">Urdu (اردو)</option>
-                            <option value="de">German (Deutsch)</option>
-                            <option value="fr">French (Français)</option>
-                            <option value="es">Spanish (Español)</option>
-                            <option value="it">Italian (Italiano)</option>
-                            <option value="ru">Russian (Русский)</option>
-                            <option value="pt">Portuguese (Português)</option>
-                            <option value="ms">Malay (Melayu)</option>
-                            <option value="ar">Arabic (العربية)</option>
-                            <option value="tr">Turkish (Türkçe)</option>
-                            <option value="zh">Chinese (中文)</option>
-                        </select>
-                    </div>
-
-                    <div class="caller-title" id="call-status-label">Partner</div>
-                    <div class="call-duration" id="call-timer">00:00</div>
-                </div>
-
-                <div class="call-stage-center" id="voice-avatar-stage">
-                    <div class="pulse-wave-ring"></div>
-                    <div class="caller-large-avatar" id="active-call-avatar">IA</div>
-                </div>
-
-                <div class="subtitles-box" id="call-subtitle-box">
-                    <div class="sub-original" id="sub-original">Speak naturally...</div>
-                    <div class="sub-translated" id="sub-translated">Voice Channel Ready</div>
-                </div>
-
-                <div class="call-controls-row">
-                    <button class="ctrl-btn-circle" id="mute-btn" onclick="toggleMute()" title="Mute Mic">🎙️</button>
-                    <button class="ctrl-btn-circle" id="video-toggle-btn" onclick="toggleVideoCamera()" title="Camera Switch">📷</button>
-                    <button class="ctrl-btn-circle" id="speaker-btn" onclick="toggleSpeaker()" title="Loudspeaker">🔊</button>
-                    <button class="ctrl-btn-circle hangup" onclick="endCall(true)" title="End Call">🛑</button>
-                </div>
-            </div>
-        </section>
-
-        <!-- ADD CONTACT MODAL -->
-        <div class="modal-backdrop" id="add-modal">
-            <div class="modal-card">
-                <div class="modal-header">
-                    <div class="modal-title">New Contact</div>
-                    <button class="modal-close" onclick="closeAddModal()">✕</button>
-                </div>
-                <div class="input-group">
-                    <input type="text" id="modal-name-input" class="input-field" placeholder="Contact Name">
-                    <input type="tel" id="modal-phone-input" class="input-field" placeholder="Mobile Number (e.g. 03001234567)">
-                </div>
-                <button class="btn-modal-save" onclick="saveContactFromModal()">Save Contact</button>
-            </div>
-        </div>
-
-        <!-- PROFILE & DP SETUP MODAL -->
-        <div class="modal-backdrop" id="profile-modal">
-            <div class="modal-card">
-                <div class="modal-header">
-                    <div class="modal-title">Edit Profile & DP</div>
-                    <button class="modal-close" onclick="closeProfileModal()">✕</button>
-                </div>
-                <div class="input-group">
-                    <label style="font-size: 12px; color: var(--text-muted);">Your Display Name:</label>
-                    <input type="text" id="my-name-input" class="input-field" placeholder="Your Name">
-                    <label style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Choose Profile Picture (DP):</label>
-                    <input type="file" id="my-photo-input" accept="image/*" class="input-field" style="padding: 8px;">
-                </div>
-                <button class="btn-modal-save" onclick="saveMyProfile()">Save & Update DP</button>
-            </div>
-        </div>
     </div>
-
-    <canvas id="video-capture-canvas" style="display:none;"></canvas>
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        const isGuest = urlParams.get('role') === 'guest';
-        const hostNameParam = urlParams.get('host_name') ? decodeURIComponent(urlParams.get('host_name')) : null;
-        const hostPhotoParam = urlParams.get('host_photo') ? decodeURIComponent(urlParams.get('host_photo')) : "";
-
-        let myName = localStorage.getItem("syncora_my_name") || (isGuest ? "Guest" : "Irfan Anees");
-        let myPhoto = localStorage.getItem("syncora_my_photo") || "";
-
-        let myPersonalRoomId = localStorage.getItem("syncora_personal_room");
-        if (!myPersonalRoomId) {
-            myPersonalRoomId = "direct-" + Math.random().toString(36).substring(2, 9);
-            localStorage.setItem("syncora_personal_room", myPersonalRoomId);
-        }
-
-        let currentRoom = urlParams.get('room') || myPersonalRoomId;
-
-        let contacts = [];
-        if (!isGuest) {
-            contacts = JSON.parse(localStorage.getItem("syncora_contacts_list") || "[]");
-        }
-
-        let partnerLivePhoto = isGuest ? hostPhotoParam : "";
-        let partnerLiveName = isGuest ? (hostNameParam || "Irfan Anees") : "Irfan Anees";
-
-        const myId = "usr-" + Math.random().toString(36).substring(2, 8);
+        let myPhone = localStorage.getItem("syncora_wa_my_phone") || "";
+        let targetPhone = urlParams.get('chat') || "";
+        let currentRoom = "";
         let socket = null;
-        let audioContext = null;
-        let mediaStream = null;
-        let scriptNode = null;
-        let speechRecognition = null;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
+
+        // Call State
         let isCallActive = false;
-        let currentCallMode = 'voice';
-        let isMuted = false;
-        let isCameraOff = false;
-        let isSpeakerOn = false;
-        let timerInterval = null;
-        let videoInterval = null;
-        let elapsedSeconds = 0;
-        let playbackTime = 0;
-        let ringInterval = null;
-        let gainNode = null;
-        let lastProcessedText = "";
+        let callTimerInterval = null;
+        let elapsedCallSecs = 0;
 
-        function getInitials(name) {
-            if (!name) return "IA";
-            const parts = name.trim().split(" ");
-            if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-            return name.substring(0, 2).toUpperCase();
-        }
-
-        function applyAvatar(element, name, photoUrl) {
-            if (!element) return;
-            if (photoUrl) {
-                element.style.backgroundImage = `url('${photoUrl}')`;
-                element.innerText = "";
-            } else {
-                element.style.backgroundImage = "none";
-                element.innerText = getInitials(name);
+        window.onload = () => {
+            if (myPhone) document.getElementById("my-phone-input").value = myPhone;
+            if (targetPhone) {
+                document.getElementById("target-phone-input").value = targetPhone;
+                if (myPhone) startDirectChat();
             }
+        };
+
+        function makeRoomId(num1, num2) {
+            const sorted = [num1.trim(), num2.trim()].sort();
+            return `room_${sorted[0]}_${sorted[1]}`;
         }
 
-        function renderContactList() {
-            if (isGuest) return;
+        function startDirectChat() {
+            myPhone = document.getElementById("my-phone-input").value.trim();
+            targetPhone = document.getElementById("target-phone-input").value.trim();
 
-            const container = document.getElementById("contact-list-container");
-            container.innerHTML = '<div class="section-label">Saved Contacts</div>';
-
-            if (contacts.length === 0) {
-                container.innerHTML += '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No contacts saved yet.<br>Tap <b>＋ Add</b> to add someone.</div>';
+            if (!myPhone || !targetPhone) {
+                alert("Dono numbers enter karein!");
                 return;
             }
 
-            contacts.forEach((c, index) => {
-                const card = document.createElement("div");
-                card.className = "contact-card";
-                card.innerHTML = `
-                    <div class="user-identity" onclick="selectContact(${index})">
-                        <div class="avatar-box">${getInitials(c.name)}</div>
-                        <div class="user-meta">
-                            <div class="contact-name">${c.name}</div>
-                            <div class="contact-sub">${c.phone}</div>
-                        </div>
-                    </div>
-                    <div class="card-actions">
-                        <button class="btn-card-del" onclick="event.stopPropagation(); deleteContact(${index})" title="Delete Contact">🗑️</button>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
+            localStorage.setItem("syncora_wa_my_phone", myPhone);
+            currentRoom = makeRoomId(myPhone, targetPhone);
+
+            document.getElementById("landing-screen").style.display = "none";
+            document.getElementById("chat-view").style.display = "flex";
+            document.getElementById("chat-partner-title").innerText = targetPhone;
+            document.getElementById("chat-avatar").innerText = targetPhone.slice(-2);
+
+            initSocket();
+            fetchHistory();
         }
 
-        function deleteContact(index) {
-            if (confirm(`Delete ${contacts[index].name}?`)) {
-                contacts.splice(index, 1);
-                localStorage.setItem("syncora_contacts_list", JSON.stringify(contacts));
-                renderContactList();
-            }
-        }
-
-        function selectContact(index) {
-            const c = contacts[index];
-            partnerLiveName = c.name;
-            partnerLivePhoto = "";
-            openContactChat();
-        }
-
-        function updateUI() {
-            applyAvatar(document.getElementById("my-profile-avatar-btn"), myName, myPhoto);
-            document.getElementById("host-navbar-name").innerText = myName;
-
-            if (isGuest) {
-                document.getElementById("view-dir").style.display = "none";
-                document.getElementById("view-chat-screen").style.display = "flex";
-                document.getElementById("chat-back-btn").style.display = "none";
-            }
-
-            document.getElementById("chat-header-title").innerText = isGuest ? partnerLiveName : "Direct Line";
-            document.getElementById("call-status-label").innerText = partnerLiveName;
-            applyAvatar(document.getElementById("chat-header-avatar"), partnerLiveName, partnerLivePhoto);
-            applyAvatar(document.getElementById("active-call-avatar"), partnerLiveName, partnerLivePhoto);
-            applyAvatar(document.getElementById("incoming-caller-avatar"), partnerLiveName, partnerLivePhoto);
-            document.getElementById("incoming-caller-name").innerText = `${partnerLiveName} is calling...`;
-        }
-
-        function openAddModal() {
-            document.getElementById("modal-name-input").value = "";
-            document.getElementById("modal-phone-input").value = "";
-            document.getElementById("add-modal").style.display = "flex";
-        }
-        function closeAddModal() {
-            document.getElementById("add-modal").style.display = "none";
-        }
-        function saveContactFromModal() {
-            const nameInput = document.getElementById("modal-name-input").value.trim();
-            const phoneInput = document.getElementById("modal-phone-input").value.trim();
-            if (!nameInput || !phoneInput) return;
-
-            contacts.push({ name: nameInput, phone: phoneInput });
-            localStorage.setItem("syncora_contacts_list", JSON.stringify(contacts));
-            renderContactList();
-            closeAddModal();
-        }
-
-        function openProfileModal() {
-            document.getElementById("my-name-input").value = myName;
-            document.getElementById("profile-modal").style.display = "flex";
-        }
-        function closeProfileModal() {
-            document.getElementById("profile-modal").style.display = "none";
-        }
-        function saveMyProfile() {
-            const name = document.getElementById("my-name-input").value.trim() || myName;
-            myName = name;
-            localStorage.setItem("syncora_my_name", myName);
-
-            const fileInput = document.getElementById("my-photo-input");
-            if (fileInput.files && fileInput.files[0]) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    myPhoto = e.target.result;
-                    localStorage.setItem("syncora_my_photo", myPhoto);
-                    updateUI();
-                    broadcastIdentity();
-                    closeProfileModal();
-                };
-                reader.readAsDataURL(fileInput.files[0]);
-            } else {
-                updateUI();
-                broadcastIdentity();
-                closeProfileModal();
-            }
-        }
-
-        function broadcastIdentity() {
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    type: "profile_sync",
-                    user_name: myName,
-                    user_photo: myPhoto
-                }));
-            }
-        }
-
-        function openContactChat() {
-            document.getElementById("view-dir").style.display = "none";
-            document.getElementById("view-chat-screen").style.display = "flex";
-            updateUI();
-            if (!socket || socket.readyState !== WebSocket.OPEN) {
-                initSocket();
-            }
-            fetchOfflineHistory();
-        }
-
-        function closeContactChat() {
-            if (isGuest) return;
-            document.getElementById("view-chat-screen").style.display = "none";
-            document.getElementById("view-dir").style.display = "flex";
-        }
-
-        function copyMyPersonalDirectLink() {
-            const origin = window.location.origin;
-            const path = window.location.pathname;
-            const params = new URLSearchParams();
-            params.set("room", myPersonalRoomId);
-            params.set("role", "guest");
-            params.set("host_name", myName);
-
-            const finalUrl = `${origin}${path}?${params.toString()}`;
-            navigator.clipboard.writeText(finalUrl).then(() => {
-                const b1 = document.getElementById("main-copy-btn");
-                const b2 = document.getElementById("chat-copy-btn");
-                if (b1) b1.innerText = "✅ Copied";
-                if (b2) b2.innerText = "✅ Done";
-                setTimeout(() => {
-                    if (b1) b1.innerText = "📋 My Link";
-                    if (b2) b2.innerText = "📋 Link";
-                }, 1500);
-            });
+        function exitChat() {
+            if (socket) socket.close();
+            document.getElementById("chat-view").style.display = "none";
+            document.getElementById("landing-screen").style.display = "flex";
         }
 
         function initSocket() {
             const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
             socket = new WebSocket(`${wsProtocol}${window.location.host}/ws/${currentRoom}`);
-            socket.binaryType = "arraybuffer";
-
-            socket.onopen = () => {
-                broadcastIdentity();
-            };
 
             socket.onmessage = (event) => {
                 if (typeof event.data === "string") {
                     const data = JSON.parse(event.data);
-                    if (data.type === "profile_sync") {
-                        partnerLiveName = data.user_name || partnerLiveName;
-                        partnerLivePhoto = data.user_photo || "";
-                        updateUI();
-                    } else if (data.type === "call_invite") {
-                        currentCallMode = data.call_mode || 'voice';
-                        if (data.caller_name) partnerLiveName = data.caller_name;
-                        if (data.caller_photo) partnerLivePhoto = data.caller_photo;
-                        updateUI();
-
-                        const labelMap = {
-                            'voice': '📞 Voice Call',
-                            'translate': '🌐 AI Live Translation Call',
-                            'video': '📹 Video Call'
-                        };
-                        document.getElementById("incoming-call-type-label").innerText = labelMap[currentCallMode] || 'Voice Call';
-                        document.getElementById("incoming-modal").style.display = "flex";
-                        startIncomingRingtone();
-                    } else if (data.type === "call_accepted") {
-                        stopIncomingRingtone();
-                        currentCallMode = data.call_mode || 'voice';
-                        setupActiveCallUI();
-                        startCallTimer();
-                        startMediaStreams();
-                    } else if (data.type === "call_declined" || data.type === "call_ended") {
-                        stopIncomingRingtone();
-                        endCall(false);
-                    } else if (data.type === "text_message") {
-                        appendChatMessage(data.text, 'received', data.translated, data.time);
-                    } else if (data.type === "live_subtitle") {
-                        document.getElementById("sub-original").innerText = `Partner: "${data.original}"`;
-                        document.getElementById("sub-translated").innerText = `AI: ${data.translated}`;
-                    } else if (data.type === "video_frame") {
-                        const remoteImg = document.getElementById("remote-video-feed");
-                        if (remoteImg) remoteImg.src = data.image;
+                    if (data.type === "text_message") {
+                        appendBubble(data.text, 'received', data.translated, data.time);
+                    } else if (data.type === "voice_note") {
+                        appendVoiceBubble(data.audio, 'received', data.time);
+                    } else if (data.type === "media_message") {
+                        appendImageBubble(data.image, 'received', data.time);
+                    } else if (data.type === "location_message") {
+                        appendLocationBubble(data.lat, data.lng, 'received', data.time);
+                    } else if (data.type === "call_signal") {
+                        handleIncomingCallSignal(data);
                     }
-                } else if (event.data instanceof ArrayBuffer) {
-                    playRawAudio(event.data);
                 }
-            };
-
-            socket.onclose = () => {
-                setTimeout(initSocket, 1500);
             };
         }
 
-        async function fetchOfflineHistory() {
+        async function fetchHistory() {
             try {
                 const res = await fetch(`/messages/${currentRoom}`);
                 const data = await res.json();
-                const box = document.getElementById("chat-msgs-box");
+                const box = document.getElementById("chat-box");
                 box.innerHTML = "";
-                if (data.messages && data.messages.length > 0) {
+                if (data.messages) {
                     data.messages.forEach(msg => {
-                        const type = (msg.sender === myId) ? 'sent' : 'received';
-                        appendChatMessage(msg.text, type, msg.translated, msg.time);
+                        const isMe = msg.sender === myPhone;
+                        const type = isMe ? 'sent' : 'received';
+                        if (msg.type === "text_message") appendBubble(msg.text, type, msg.translated, msg.time);
+                        if (msg.type === "voice_note") appendVoiceBubble(msg.audio, type, msg.time);
+                        if (msg.type === "media_message") appendImageBubble(msg.image, type, msg.time);
+                        if (msg.type === "location_message") appendLocationBubble(msg.lat, msg.lng, type, msg.time);
                     });
                 }
             } catch (e) {}
         }
 
-        async function sendChatMessage() {
-            const input = document.getElementById("chat-input-field");
+        /* 1. TEXT & TRANSLATION */
+        async function sendTextMessage() {
+            const input = document.getElementById("text-input");
             const text = input.value.trim();
             if (!text || !socket || socket.readyState !== WebSocket.OPEN) return;
 
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             let translated = "";
 
-            const isAutoTranslate = document.getElementById("chat-translate-toggle").checked;
-            if (isAutoTranslate) {
+            if (document.getElementById("auto-translate-check").checked) {
                 try {
-                    const src = document.getElementById("chat-source-lang").value;
-                    const tgt = document.getElementById("chat-target-lang").value;
                     const res = await fetch("/translate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             text: text,
-                            source_lang: src,
-                            target_lang: tgt
+                            source_lang: document.getElementById("chat-source-lang").value,
+                            target_lang: document.getElementById("chat-target-lang").value
                         })
                     });
                     const data = await res.json();
                     translated = data.translated_text || "";
-                } catch (e) {
-                    console.error("Chat translation failed:", e);
-                }
+                } catch (e) {}
             }
 
-            socket.send(JSON.stringify({
+            const payload = {
                 type: "text_message",
                 text: text,
                 translated: translated,
-                sender: myId,
-                sender_name: myName,
-                sender_photo: myPhoto,
+                sender: myPhone,
                 time: timeStr
-            }));
-
-            appendChatMessage(text, 'sent', translated, timeStr);
+            };
+            socket.send(JSON.stringify(payload));
+            appendBubble(text, 'sent', translated, timeStr);
             input.value = "";
         }
 
-        function appendChatMessage(text, type, translated = "", timeStr = "") {
-            const box = document.getElementById("chat-msgs-box");
+        function appendBubble(text, type, translated = "", time = "") {
+            const box = document.getElementById("chat-box");
             const bubble = document.createElement("div");
-            bubble.className = `chat-bubble ${type}`;
-
-            let content = `<div>${text}</div>`;
+            bubble.className = `msg-bubble ${type}`;
+            let html = `<div>${text}</div>`;
             if (translated && translated !== text) {
-                content += `<div class="bubble-translation">AI: ${translated}</div>`;
+                html += `<div class="msg-translation">${translated}</div>`;
             }
-            content += `<div class="chat-time">${timeStr || 'now'}</div>`;
-
-            bubble.innerHTML = content;
+            html += `<div class="msg-time">${time || 'now'}</div>`;
+            bubble.innerHTML = html;
             box.appendChild(bubble);
             box.scrollTop = box.scrollHeight;
         }
 
-        function startIncomingRingtone() {
-            stopIncomingRingtone();
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            const ringCtx = new AudioCtx();
-
-            function playBeep() {
-                if (!document.getElementById("incoming-modal").style.display || document.getElementById("incoming-modal").style.display === "none") return;
-                const osc1 = ringCtx.createOscillator();
-                const osc2 = ringCtx.createOscillator();
-                const gain = ringCtx.createGain();
-
-                osc1.type = "sine"; osc2.type = "sine";
-                osc1.frequency.setValueAtTime(440, ringCtx.currentTime);
-                osc2.frequency.setValueAtTime(480, ringCtx.currentTime);
-
-                gain.gain.setValueAtTime(0.3, ringCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, ringCtx.currentTime + 1.8);
-
-                osc1.connect(gain); osc2.connect(gain); gain.connect(ringCtx.destination);
-                osc1.start(); osc2.start();
-                osc1.stop(ringCtx.currentTime + 1.8); osc2.stop(ringCtx.currentTime + 1.8);
-
-                if (navigator.vibrate) navigator.vibrate([400, 200, 400, 1000]);
+        /* 2. VOICE NOTES (PTT) */
+        async function handleMicOrSend() {
+            const text = document.getElementById("text-input").value.trim();
+            if (text) {
+                sendTextMessage();
+                return;
             }
-            playBeep();
-            ringInterval = setInterval(playBeep, 3000);
-        }
 
-        function stopIncomingRingtone() {
-            if (ringInterval) { clearInterval(ringInterval); ringInterval = null; }
-            if (navigator.vibrate) navigator.vibrate(0);
-        }
-
-        function setupActiveCallUI() {
-            const langBar = document.getElementById("call-lang-bar");
-            const subBox = document.getElementById("call-subtitle-box");
-            const videoStage = document.getElementById("video-stage");
-            const avatarStage = document.getElementById("voice-avatar-stage");
-
-            if (currentCallMode === 'video') {
-                videoStage.style.display = "block";
-                avatarStage.style.display = "none";
-                langBar.style.display = "none";
-                subBox.style.display = "none";
-            } else if (currentCallMode === 'translate') {
-                videoStage.style.display = "none";
-                avatarStage.style.display = "flex";
-                langBar.style.display = "flex";
-                subBox.style.display = "flex";
-                document.getElementById("sub-translated").innerText = "AI Live Translation Active";
+            // Voice recording toggle
+            if (!isRecording) {
+                startRecording();
             } else {
-                videoStage.style.display = "none";
-                avatarStage.style.display = "flex";
-                langBar.style.display = "none";
-                subBox.style.display = "none";
+                stopRecording();
             }
         }
 
-        function syncCallSpeechLang() {
-            const lang = document.getElementById("call-speak-lang").value;
-            if (speechRecognition) {
-                speechRecognition.lang = lang;
-                if (isCallActive && currentCallMode === 'translate') {
-                    try {
-                        speechRecognition.stop();
-                        setTimeout(() => { speechRecognition.start(); }, 200);
-                    } catch (e) {}
-                }
-            }
-        }
-
-        function initSpeechEngine() {
-            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRec) return;
-
-            speechRecognition = new SpeechRec();
-            speechRecognition.continuous = true;
-            speechRecognition.interimResults = false;
-            speechRecognition.lang = document.getElementById("call-speak-lang") ? document.getElementById("call-speak-lang").value : "ur-PK";
-
-            speechRecognition.onresult = async (event) => {
-                if (!isCallActive || currentCallMode !== 'translate' || isMuted) return;
-                const lastIdx = event.results.length - 1;
-                const originalText = event.results[lastIdx][0].transcript.trim();
-
-                // Chota noise ya single harf ignore karein
-                if (originalText.length < 2) return;
-
-                // Echo Prevention: Same jumla dobara execute na karein
-                if (originalText.toLowerCase() === lastProcessedText.toLowerCase()) return;
-                lastProcessedText = originalText;
-
-                document.getElementById("sub-original").innerText = `You: "${originalText}"`;
-                document.getElementById("sub-translated").innerText = "Translating...";
-
-                const src = document.getElementById("call-speak-lang").value.split("-")[0];
-                const tgt = document.getElementById("call-target-lang").value;
-
-                try {
-                    const res = await fetch("/translate", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            text: originalText,
-                            source_lang: src,
-                            target_lang: tgt
-                        })
-                    });
-                    const data = await res.json();
-                    const translatedText = data.translated_text || originalText;
-                    document.getElementById("sub-translated").innerText = `AI: ${translatedText}`;
-
-                    if (socket && socket.readyState === WebSocket.OPEN) {
-                        socket.send(JSON.stringify({
-                            type: "live_subtitle",
-                            original: originalText,
-                            translated: translatedText
-                        }));
-                    }
-                } catch (e) {
-                    console.error("Live translation call failed:", e);
-                }
-            };
-
-            speechRecognition.onend = () => {
-                if (isCallActive && currentCallMode === 'translate' && !isMuted) {
-                    try { speechRecognition.start(); } catch (e) {}
-                }
-            };
-        }
-
-        async function ensureAudioContext() {
-            if (!audioContext || audioContext.state === "closed") {
-                const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                audioContext = new AudioCtx({ sampleRate: 16000 });
-                gainNode = audioContext.createGain();
-                gainNode.gain.value = 1.0;
-                gainNode.connect(audioContext.destination);
-            }
-            if (audioContext.state === "suspended") await audioContext.resume();
-        }
-
-        async function startMediaStreams() {
-            await ensureAudioContext();
-            const isVideoMode = (currentCallMode === 'video');
-
+        async function startRecording() {
             try {
-                mediaStream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        echoCancellation: { ideal: true },
-                        noiseSuppression: { ideal: true },
-                        autoGainControl: { ideal: true }
-                    },
-                    video: isVideoMode ? { facingMode: "user", width: { ideal: 480 }, height: { ideal: 640 } } : false
-                });
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                recordedChunks = [];
 
-                const source = audioContext.createMediaStreamSource(mediaStream);
-                scriptNode = audioContext.createScriptProcessor(4096, 1, 1);
-
-                scriptNode.onaudioprocess = (e) => {
-                    if (!isCallActive || isMuted || !socket || socket.readyState !== WebSocket.OPEN) return;
-                    const channelData = e.inputBuffer.getChannelData(0);
-                    const pcmData = new Int16Array(channelData.length);
-                    for (let i = 0; i < channelData.length; i++) {
-                        const s = Math.max(-1, Math.min(1, channelData[i]));
-                        pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                    }
-                    socket.send(pcmData.buffer);
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
                 };
 
-                source.connect(scriptNode);
-                const silentGain = audioContext.createGain();
-                silentGain.gain.value = 0;
-                scriptNode.connect(silentGain);
-                silentGain.connect(audioContext.destination);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const base64Audio = reader.result;
+                        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        const payload = {
+                            type: "voice_note",
+                            audio: base64Audio,
+                            sender: myPhone,
+                            time: timeStr
+                        };
+                        socket.send(JSON.stringify(payload));
+                        appendVoiceBubble(base64Audio, 'sent', timeStr);
+                    };
+                    reader.readAsDataURL(blob);
+                };
 
-                if (isVideoMode) {
-                    const localVideo = document.getElementById("local-video-pip");
-                    localVideo.srcObject = mediaStream;
-
-                    const canvas = document.getElementById("video-capture-canvas");
-                    const ctx = canvas.getContext("2d");
-                    canvas.width = 320;
-                    canvas.height = 420;
-
-                    videoInterval = setInterval(() => {
-                        if (!isCallActive || isCameraOff || !socket || socket.readyState !== WebSocket.OPEN) return;
-                        if (localVideo.videoWidth) {
-                            ctx.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
-                            const base64Img = canvas.toDataURL("image/jpeg", 0.45);
-                            socket.send(JSON.stringify({
-                                type: "video_frame",
-                                image: base64Img
-                            }));
-                        }
-                    }, 85);
-                }
-
-                if (currentCallMode === 'translate' && speechRecognition) {
-                    try {
-                        speechRecognition.lang = document.getElementById("call-speak-lang").value;
-                        speechRecognition.start();
-                    } catch (e) {}
-                }
-
+                mediaRecorder.start();
+                isRecording = true;
+                const btn = document.getElementById("mic-send-btn");
+                btn.classList.add("recording");
+                btn.innerText = "⏹";
             } catch (err) {
-                alert("Camera/Mic permission required: " + err.message);
+                alert("Microphone permission required: " + err.message);
             }
         }
 
-        function playRawAudio(arrayBuffer) {
-            if (!audioContext || !isCallActive) return;
-            const pcmData = new Int16Array(arrayBuffer);
-            const floatData = new Float32Array(pcmData.length);
-            for (let i = 0; i < pcmData.length; i++) floatData[i] = pcmData[i] / 32768.0;
-
-            const audioBuf = audioContext.createBuffer(1, floatData.length, 16000);
-            audioBuf.copyToChannel(floatData, 0);
-
-            const source = audioContext.createBufferSource();
-            source.buffer = audioBuf;
-            source.connect(gainNode);
-
-            const currentTime = audioContext.currentTime;
-            if (playbackTime < currentTime) playbackTime = currentTime + 0.04;
-            source.start(playbackTime);
-            playbackTime += audioBuf.duration;
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+            }
+            isRecording = false;
+            const btn = document.getElementById("mic-send-btn");
+            btn.classList.remove("recording");
+            btn.innerText = "➤";
         }
 
-        async function initiateCall(mode = 'voice') {
-            await ensureAudioContext();
+        function appendVoiceBubble(audioBase64, type, time) {
+            const box = document.getElementById("chat-box");
+            const bubble = document.createElement("div");
+            bubble.className = `msg-bubble ${type}`;
+            bubble.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span>🎤 Voice Note</span>
+                    <audio controls src="${audioBase64}" style="max-width: 200px; height: 32px;"></audio>
+                </div>
+                <div class="msg-time">${time || 'now'}</div>
+            `;
+            box.appendChild(bubble);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        /* 3. IMAGE SHARING */
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                const base64Img = evt.target.result;
+                const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const payload = {
+                    type: "media_message",
+                    image: base64Img,
+                    sender: myPhone,
+                    time: timeStr
+                };
+                socket.send(JSON.stringify(payload));
+                appendImageBubble(base64Img, 'sent', timeStr);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function appendImageBubble(imgSrc, type, time) {
+            const box = document.getElementById("chat-box");
+            const bubble = document.createElement("div");
+            bubble.className = `msg-bubble ${type}`;
+            bubble.innerHTML = `
+                <img src="${imgSrc}" class="msg-media-img" alt="Shared Media">
+                <div class="msg-time">${time || 'now'}</div>
+            `;
+            box.appendChild(bubble);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        /* 4. LIVE LOCATION */
+        function sendLiveLocation() {
+            if (!navigator.geolocation) {
+                alert("Browser mein GPS support nahi hai.");
+                return;
+            }
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const payload = {
+                    type: "location_message",
+                    lat: lat,
+                    lng: lng,
+                    sender: myPhone,
+                    time: timeStr
+                };
+                socket.send(JSON.stringify(payload));
+                appendLocationBubble(lat, lng, 'sent', timeStr);
+            }, (err) => {
+                alert("Location access denied: " + err.message);
+            });
+        }
+
+        function appendLocationBubble(lat, lng, type, time) {
+            const box = document.getElementById("chat-box");
+            const bubble = document.createElement("div");
+            bubble.className = `msg-bubble ${type}`;
+            const mapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+            bubble.innerHTML = `
+                <a href="${mapUrl}" target="_blank" class="msg-location-link">
+                    📍 Live Location (Google Maps)
+                </a>
+                <div class="msg-time">${time || 'now'}</div>
+            `;
+            box.appendChild(bubble);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        /* 5. CALLING & TRANSLATION TRIGGER */
+        function triggerCall(mode) {
             isCallActive = true;
-            currentCallMode = mode;
-            lastProcessedText = "";
-            setupActiveCallUI();
+            document.getElementById("call-overlay").style.display = "flex";
+            document.getElementById("call-contact-name").innerText = targetPhone;
+            document.getElementById("call-avatar").innerText = targetPhone.slice(-2);
+            document.getElementById("call-status-timer").innerText = "Connected";
 
-            document.getElementById("call-screen").style.display = "flex";
-            document.getElementById("sub-translated").innerText = "Waiting for partner to answer...";
-
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    type: "call_invite",
-                    call_mode: mode,
-                    caller_name: myName,
-                    caller_photo: myPhoto
-                }));
-            }
-        }
-
-        async function acceptCall() {
-            stopIncomingRingtone();
-            await ensureAudioContext();
-            document.getElementById("incoming-modal").style.display = "none";
-            isCallActive = true;
-            lastProcessedText = "";
-            setupActiveCallUI();
-
-            document.getElementById("call-screen").style.display = "flex";
-            startCallTimer();
-            startMediaStreams();
-
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    type: "call_accepted",
-                    call_mode: currentCallMode
-                }));
-            }
-        }
-
-        function declineCall() {
-            stopIncomingRingtone();
-            document.getElementById("incoming-modal").style.display = "none";
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type: "call_declined" }));
-            }
-        }
-
-        function startCallTimer() {
-            elapsedSeconds = 0;
-            clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                elapsedSeconds++;
-                const mins = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0');
-                const secs = String(elapsedSeconds % 60).padStart(2, '0');
-                document.getElementById("call-timer").innerText = `${mins}:${secs}`;
+            elapsedCallSecs = 0;
+            clearInterval(callTimerInterval);
+            callTimerInterval = setInterval(() => {
+                elapsedCallSecs++;
+                const mins = String(Math.floor(elapsedCallSecs / 60)).padStart(2, '0');
+                const secs = String(elapsedCallSecs % 60).padStart(2, '0');
+                document.getElementById("call-status-timer").innerText = `${mins}:${secs}`;
             }, 1000);
         }
 
-        function endCall(sendSignal = true) {
-            stopIncomingRingtone();
+        function hangupCall() {
             isCallActive = false;
-            lastProcessedText = "";
-            clearInterval(timerInterval);
-            if (videoInterval) clearInterval(videoInterval);
-            document.getElementById("call-timer").innerText = "00:00";
-
-            if (scriptNode) { scriptNode.disconnect(); scriptNode = null; }
-            if (speechRecognition) { try { speechRecognition.stop(); } catch (e) {} }
-
-            if (mediaStream) {
-                mediaStream.getTracks().forEach(t => t.stop());
-                mediaStream = null;
-            }
-
-            const localVideo = document.getElementById("local-video-pip");
-            if (localVideo) localVideo.srcObject = null;
-            const remoteImg = document.getElementById("remote-video-feed");
-            if (remoteImg) remoteImg.src = "";
-
-            playbackTime = 0;
-            document.getElementById("incoming-modal").style.display = "none";
-            document.getElementById("call-screen").style.display = "none";
-
-            if (sendSignal && socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type: "call_ended" }));
-            }
+            clearInterval(callTimerInterval);
+            document.getElementById("call-overlay").style.display = "none";
         }
-
-        function toggleMute() {
-            isMuted = !isMuted;
-            const btn = document.getElementById("mute-btn");
-            btn.classList.toggle("muted-state", isMuted);
-            btn.innerText = isMuted ? "🔇" : "🎙️";
-        }
-
-        function toggleVideoCamera() {
-            if (mediaStream && mediaStream.getVideoTracks().length > 0) {
-                const videoTrack = mediaStream.getVideoTracks()[0];
-                videoTrack.enabled = !videoTrack.enabled;
-                isCameraOff = !videoTrack.enabled;
-                const btn = document.getElementById("video-toggle-btn");
-                btn.classList.toggle("muted-state", isCameraOff);
-                btn.innerText = isCameraOff ? "🚫" : "📷";
-            }
-        }
-
-        function toggleSpeaker() {
-            isSpeakerOn = !isSpeakerOn;
-            const btn = document.getElementById("speaker-btn");
-            btn.classList.toggle("active", isSpeakerOn);
-            if (gainNode) gainNode.gain.value = isSpeakerOn ? 2.5 : 1.0;
-        }
-
-        window.onload = () => {
-            renderContactList();
-            updateUI();
-            initSpeechEngine();
-            if (isGuest) {
-                initSocket();
-                fetchOfflineHistory();
-            }
-        };
     </script>
 </body>
 </html>
