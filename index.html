@@ -153,7 +153,7 @@
         }
         .input-shell {
             flex: 1; background: var(--surface-card); border: 1px solid var(--border-graphite);
-            border-radius: 24px; display: flex; align-items: center; padding: 2px 12px; gap: 6px;
+            border-radius: 24px; display: flex; align-items: center; padding: 2px 8px 2px 12px; gap: 6px;
         }
         .input-shell:focus-within { border-color: var(--accent-amber); }
         .main-text-input {
@@ -161,6 +161,20 @@
             color: var(--text-primary); font-size: 14px; padding: 10px 4px;
         }
 
+        /* INSIDE INPUT MIC BUTTON */
+        .btn-inside-mic {
+            background: transparent; border: none; font-size: 18px; color: var(--accent-amber);
+            cursor: pointer; padding: 6px 8px; border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; transition: all 0.2s;
+        }
+        .btn-inside-mic:hover { background: var(--accent-amber-dim); }
+        .btn-inside-mic.recording {
+            color: var(--danger-red);
+            animation: pulseRecord 1s infinite alternate;
+        }
+        @keyframes pulseRecord { from { transform: scale(1); } to { transform: scale(1.15); } }
+
+        /* RECORDING BAR STATE */
         .recording-bar {
             flex: 1; background: var(--surface-card); border: 1px solid rgba(239, 68, 68, 0.4);
             border-radius: 24px; display: none; align-items: center; justify-content: space-between; padding: 8px 16px;
@@ -169,13 +183,14 @@
         .rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger-red); animation: blink 1s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
 
-        .btn-circle-action {
+        /* PERMANENT SEND BUTTON */
+        .btn-send-permanent {
             width: 44px; height: 44px; border-radius: 50%; background: var(--accent-amber);
             color: #000; border: none; font-size: 18px; cursor: pointer; flex-shrink: 0;
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 2px 10px var(--accent-amber-glow);
+            box-shadow: 0 2px 10px var(--accent-amber-glow); transition: transform 0.1s;
         }
-        .btn-circle-action.recording { background: var(--danger-red); color: #fff; }
+        .btn-send-permanent:active { transform: scale(0.92); }
 
         .icon-btn {
             background: transparent; border: none; color: var(--text-secondary);
@@ -211,6 +226,7 @@
             justify-content: center; gap: 8px;
         }
         .btn-choice-orig { background: var(--surface-card); color: var(--text-primary); }
+        .btn-choice-orig:hover { border-color: var(--accent-amber); }
         .btn-choice-trans { background: var(--accent-amber); color: #000; border: none; }
         .lang-options-drawer { display: none; flex-direction: column; gap: 8px; margin-top: 6px; text-align: left; }
         .lang-dropdown {
@@ -228,17 +244,20 @@
 </head>
 <body>
 
+    <!-- 1. WHATSAPP STYLE OTP AUTH OVERLAY -->
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
             <div class="auth-badge">IA</div>
             <h2 class="auth-title">Verify Phone Number</h2>
             <p class="auth-desc" id="auth-desc">Syncora Terminal mein enter hone ke liye apna mobile number enter karein.</p>
 
+            <!-- STEP 1: PHONE NUMBER ENTRY -->
             <div id="auth-step-phone">
                 <input type="tel" id="my-phone-input" class="auth-input" placeholder="Mobile Number (e.g. 03001234567)">
                 <button class="btn-auth" onclick="requestOTP()">Send OTP SMS</button>
             </div>
 
+            <!-- STEP 2: 4-DIGIT OTP VERIFICATION -->
             <div id="auth-step-otp" style="display: none;">
                 <div class="otp-boxes">
                     <input type="text" maxlength="1" class="otp-input" id="otp-1" oninput="focusNext(this, 'otp-2')">
@@ -256,6 +275,7 @@
         </div>
     </div>
 
+    <!-- SEND CONFIRMATION MODAL -->
     <div class="send-modal-backdrop" id="send-modal">
         <div class="send-modal-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Dispatch Mode</h3>
@@ -290,8 +310,10 @@
         </div>
     </div>
 
+    <!-- 2-PANEL WORKSPACE -->
     <div class="workspace">
         
+        <!-- SIDEBAR -->
         <aside class="sidebar-panel">
             <div class="sidebar-header">
                 <span class="app-brand">SYNCORA CORE</span>
@@ -307,6 +329,7 @@
             <div class="chat-list" id="chat-list"></div>
         </aside>
 
+        <!-- ACTIVE STAGE -->
         <main class="stage-panel" id="stage-panel">
             <header class="stage-header">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -321,6 +344,7 @@
 
             <div class="messages-container" id="messages-container"></div>
 
+            <!-- ATTACHMENT MENU POPUP -->
             <div class="attach-popup-menu" id="attach-menu">
                 <div class="attach-menu-item" onclick="document.getElementById('file-picker-media').click()">
                     <span>🖼️</span> Photos / Videos
@@ -336,13 +360,17 @@
             <input type="file" id="file-picker-media" accept="image/*,video/*" style="display:none;" onchange="uploadAttachment(event, 'media')">
             <input type="file" id="file-picker-doc" accept="*/*" style="display:none;" onchange="uploadAttachment(event, 'document')">
 
+            <!-- DYNAMIC INPUT & VOICE DOCK -->
             <footer class="stage-input-bar">
                 
+                <!-- INPUT SHELL WITH ATTACHMENT & INSIDE MIC BUTTON -->
                 <div class="input-shell" id="input-shell">
                     <button class="icon-btn" onclick="toggleAttachMenu()" title="Attach Link">📎</button>
-                    <input type="text" id="text-input" class="main-text-input" placeholder="Message" oninput="handleInputTyping(this)" onkeypress="if(event.key==='Enter') stageMessageForDispatch()">
+                    <input type="text" id="text-input" class="main-text-input" placeholder="Message" onkeypress="if(event.key==='Enter') stageMessageForDispatch()">
+                    <button class="btn-inside-mic" id="inside-mic-btn" onclick="toggleVoiceRecording()" title="Record Voice Note">🎙️</button>
                 </div>
 
+                <!-- RECORDING BAR STATE -->
                 <div class="recording-bar" id="recording-bar">
                     <div class="rec-indicator">
                         <div class="rec-dot"></div>
@@ -350,12 +378,13 @@
                     </div>
                     <div style="display: flex; align-items: center; gap: 12px;">
                         <button class="icon-btn" onclick="cancelRecording()" style="color: var(--danger-red);" title="Delete Recording">🗑️</button>
-                        <button class="icon-btn" onclick="stopAndFinishRecording()" style="color: var(--online-green);" title="Done">✓</button>
+                        <button class="icon-btn" onclick="stopAndFinishRecording()" style="color: var(--online-green);" title="Done & Send">✓</button>
                     </div>
                 </div>
 
-                <button class="btn-circle-action" id="action-btn" onclick="handleActionButton()">
-                    🎙️
+                <!-- PERMANENT SEND ARROW BUTTON -->
+                <button class="btn-send-permanent" id="send-arrow-btn" onclick="stageMessageForDispatch()" title="Send Message">
+                    ➤
                 </button>
             </footer>
         </main>
@@ -384,7 +413,6 @@
                 initSocket();
                 loadRecentChats();
                 
-                // Agar invite link se aaya hai toh direct us bande ki chat open ho jaye
                 if (inviteHost && inviteHost !== myPhone) {
                     selectChat(inviteHost);
                 }
@@ -409,8 +437,6 @@
                 document.getElementById("auth-step-phone").style.display = "none";
                 document.getElementById("auth-step-otp").style.display = "block";
                 document.getElementById("auth-desc").innerText = `4-digit OTP aapke number ${input} par send kar diya gaya hai.`;
-
-                // Alert notification for demo / SIM preview
                 alert(`[SMS Gateway] Your Syncora verification code is: ${data.otp_preview}`);
                 document.getElementById("otp-1").focus();
             } else {
@@ -553,30 +579,15 @@
             }
         });
 
-        /* DYNAMIC MIC / SEND SWITCH */
-        function handleInputTyping(el) {
-            const btn = document.getElementById("action-btn");
-            if (el.value.trim().length > 0) {
-                btn.innerText = "➤";
+        /* ONE-TAP VOICE RECORDING */
+        function toggleVoiceRecording() {
+            if (!isRecording) {
+                startVoiceRecording();
             } else {
-                btn.innerText = "🎙️";
+                stopAndFinishRecording();
             }
         }
 
-        function handleActionButton() {
-            const input = document.getElementById("text-input");
-            if (input.value.trim().length > 0) {
-                stageMessageForDispatch();
-            } else {
-                if (!isRecording) {
-                    startVoiceRecording();
-                } else {
-                    stopAndFinishRecording();
-                }
-            }
-        }
-
-        /* VOICE RECORDING */
         async function startVoiceRecording() {
             if (!activePartner) {
                 alert("Pehle koi chat select karein.");
@@ -611,9 +622,6 @@
 
                 document.getElementById("input-shell").style.display = "none";
                 document.getElementById("recording-bar").style.display = "flex";
-                const btn = document.getElementById("action-btn");
-                btn.classList.add("recording");
-                btn.innerText = "✓";
 
                 recordingSeconds = 0;
                 document.getElementById("rec-timer").innerText = "0:00";
@@ -625,18 +633,22 @@
                 }, 1000);
 
             } catch (err) {
-                alert("Microphone permission required: " + err.message);
+                alert("Microphone permission required for voice notes: " + err.message);
             }
         }
 
         function stopAndFinishRecording() {
-            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+            }
             resetRecordingUI();
         }
 
         function cancelRecording() {
             recordedChunks = [];
-            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+            }
             resetRecordingUI();
         }
 
@@ -645,9 +657,6 @@
             clearInterval(recordingTimerInterval);
             document.getElementById("recording-bar").style.display = "none";
             document.getElementById("input-shell").style.display = "flex";
-            const btn = document.getElementById("action-btn");
-            btn.classList.remove("recording");
-            btn.innerText = "🎙️";
         }
 
         /* DISPATCH MODAL */
@@ -720,7 +729,6 @@
             socket.send(JSON.stringify(payload));
             appendBubble(content, "sent", translated, msgType, "now");
             document.getElementById("text-input").value = "";
-            document.getElementById("action-btn").innerText = "🎙️";
             loadRecentChats();
         }
 
