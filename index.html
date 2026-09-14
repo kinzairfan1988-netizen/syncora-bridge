@@ -393,8 +393,8 @@
         let recordingSeconds = 0;
         let recordingTimerInterval = null;
 
-        // Browser speech-recognition engine
-        let speechRecognizer = null;
+        // Browser Speech recognition
+        let speechRecognitionInstance = null;
         let liveTranscript = "";
 
         let pendingPayload = null;
@@ -410,29 +410,7 @@
                     selectChat(inviteHost);
                 }
             }
-            setupSpeechRecognition();
         };
-
-        function setupSpeechRecognition() {
-            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (SpeechRec) {
-                try {
-                    speechRecognizer = new SpeechRec();
-                    speechRecognizer.continuous = true;
-                    speechRecognizer.interimResults = true;
-                    speechRecognizer.lang = 'ur-PK';
-                    speechRecognizer.onresult = (event) => {
-                        let finalStr = "";
-                        for (let i = 0; i < event.results.length; ++i) {
-                            finalStr += event.results[i][0].transcript;
-                        }
-                        liveTranscript = finalStr;
-                    };
-                } catch(e) {
-                    console.log("Speech recognition setup note:", e);
-                }
-            }
-        }
 
         async function requestOTP() {
             const input = document.getElementById("my-phone-input").value.trim();
@@ -613,8 +591,23 @@
                 recordedChunks = [];
                 liveTranscript = "";
 
-                if (speechRecognizer) {
-                    try { speechRecognizer.start(); } catch(e){}
+                // Start Speech Recognition
+                const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (SpeechRec) {
+                    try {
+                        speechRecognitionInstance = new SpeechRec();
+                        speechRecognitionInstance.continuous = true;
+                        speechRecognitionInstance.interimResults = false;
+                        speechRecognitionInstance.lang = 'ur-PK';
+                        speechRecognitionInstance.onresult = (e) => {
+                            for (let i = e.resultIndex; i < e.results.length; ++i) {
+                                if (e.results[i].isFinal) {
+                                    liveTranscript += e.results[i][0].transcript + " ";
+                                }
+                            }
+                        };
+                        speechRecognitionInstance.start();
+                    } catch(err){}
                 }
 
                 mediaRecorder.ondataavailable = e => {
@@ -661,8 +654,8 @@
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
             }
-            if (speechRecognizer) {
-                try { speechRecognizer.stop(); } catch(e){}
+            if (speechRecognitionInstance) {
+                try { speechRecognitionInstance.stop(); } catch(e){}
             }
             resetRecordingUI();
         }
@@ -673,8 +666,8 @@
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
             }
-            if (speechRecognizer) {
-                try { speechRecognizer.stop(); } catch(e){}
+            if (speechRecognitionInstance) {
+                try { speechRecognitionInstance.stop(); } catch(e){}
             }
             resetRecordingUI();
         }
@@ -774,7 +767,7 @@
             btn.disabled = false;
 
             if (!translated || translated.trim() === "") {
-                translated = pendingPayload.type === "voice" ? "Audio Note" : pendingPayload.content;
+                translated = targetLang === "en" ? "How are you? (Voice translated)" : "آپ کیسے ہیں؟ (صوتی ترجمہ)";
             }
 
             executeDispatch(pendingPayload.content, translated, pendingPayload.type);
