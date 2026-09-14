@@ -80,15 +80,19 @@ def get_chat_id(u1: str, u2: str) -> str:
 def direct_translate(text: str, sl: str, tl: str) -> str:
     try:
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={sl}&tl={tl}&dt=t&q=" + urllib.parse.quote(text)
-        req_obj = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req_obj, timeout=4) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-            if data and data[0]:
-                parts = [part[0] for part in data[0] if part and part[0]]
-                return "".join(parts).strip()
-    except Exception:
-        pass
-    return text
+        req_obj = urllib.request.Request(
+            url, 
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        )
+        with urllib.request.urlopen(req_obj, timeout=5) as resp:
+            raw = resp.read().decode('utf-8')
+            data = json.loads(raw)
+            if data and isinstance(data, list) and len(data) > 0 and data[0]:
+                out = "".join([part[0] for part in data[0] if part and len(part) > 0 and part[0]])
+                return out.strip()
+    except Exception as e:
+        print(f"[Direct Translate Error]: {e}")
+    return ""
 
 class ConnectionManager:
     def __init__(self):
@@ -189,30 +193,47 @@ async def translate_text(req: TranslationRequest):
     if not clean:
         return {"translated_text": ""}
 
-    # 1. Pehle Gemini se (Roman Urdu / Urdu Script dono ko perfectly translate karta hai)
+    # 1. Gemini Translation
     if GEMINI_KEY:
         for model_name in ["gemini-2.0-flash", "gemini-1.5-flash-8b", "gemini-1.5-flash"]:
             try:
                 model = genai.GenerativeModel(model_name)
                 prompt = (
-                    f"You are a direct translation engine. Translate the following text "
-                    f"(which may be in Roman Urdu, Urdu, or any language) to target language code '{req.target_lang}'. "
-                    f"Return ONLY the plain translated sentence without quotes, punctuation artifacts or explanations:\n\n{clean}"
+                    f"You are a translation API. Translate this text accurately into language '{req.target_lang}'. "
+                    f"If the text is Roman Urdu (e.g., 'ap kaisy hain'), Urdu script ('آپ کیسے ہیں'), or any other language, "
+                    f"provide the direct translation in '{req.target_lang}' without any notes, explanations, or quotes:\n\n{clean}"
                 )
                 resp = model.generate_content(prompt)
                 if resp and hasattr(resp, "text") and resp.text:
-                    return {"translated_text": resp.text.strip()}
+                    out = resp.text.strip().replace('"', '').replace("'", "")
+                    if out:
+                        return {"translated_text": out}
             except Exception as e:
-                print(f"[Gemini translate error with {model_name}]: {e}")
+                print(f"[Gemini fallback]: {e}")
                 continue
 
-    # 2. Google Translate Backup
-    translated = direct_translate(clean, "ur", req.target_lang)
-    if translated and translated.lower() != clean.lower():
-        return {"translated_text": translated}
+    # 2. Google Translate Direct Fallbacks
+    res_ur = direct_translate(clean, "ur", req.target_lang)
+    if res_ur and res_ur.lower() != clean.lower():
+        return {"translated_text": res_ur}
 
-    translated_auto = direct_translate(clean, "auto", req.target_lang)
-    return {"translated_text": translated_auto}
+    res_auto = direct_translate(clean, "auto", req.target_lang)
+    if res_auto and res_auto.lower() != clean.lower():
+        return {"translated_text": res_auto}
+
+    # 3. Simple Roman-Urdu Dictionary Backup for common greetings
+    common_map = {
+        "ap kaisy hain": "How are you?",
+        "aap kaise ho": "How are you?",
+        "kya hal hai": "How are you?",
+        "theek": "Fine",
+        "shukriya": "Thank you"
+    }
+    clean_lower = clean.lower().strip("?.! ")
+    if clean_lower in common_map and req.target_lang == "en":
+        return {"translated_text": common_map[clean_lower]}
+
+    return {"translated_text": clean}
 
 @app.websocket("/ws/{phone}")
 async def socket_endpoint(websocket: WebSocket, phone: str):
