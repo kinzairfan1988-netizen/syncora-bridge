@@ -4,17 +4,15 @@ import sqlite3
 import urllib.request
 import urllib.parse
 from typing import Dict
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import google.generativeai as genai
 
-# Setup directories
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Database Initialization
 DB_PATH = "syncora.db"
 
 def init_db():
@@ -45,7 +43,6 @@ def init_db():
 
 init_db()
 
-# Gemini Configuration
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 if GEMINI_KEY:
     try:
@@ -58,7 +55,7 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 class TranslationRequest(BaseModel):
     text: str
-    source_lang: str = "ur"
+    source_lang: str = "auto"
     target_lang: str = "en"
 
 class UserRegister(BaseModel):
@@ -82,10 +79,8 @@ def direct_translate(text: str, sl: str, tl: str) -> str:
         print(f"[Direct Translate Error]: {e}")
     return text
 
-# WebSocket Session Router
 class ConnectionManager:
     def __init__(self):
-        # Map phone -> WebSocket
         self.active_sessions: Dict[str, WebSocket] = {}
 
     async def connect(self, phone: str, websocket: WebSocket):
@@ -168,14 +163,17 @@ async def translate_text(req: TranslationRequest):
     clean = req.text.strip()
     if not clean:
         return {"translated_text": ""}
-    translated = direct_translate(clean, req.source_lang, req.target_lang)
+    
+    sl = req.source_lang if req.source_lang else "auto"
+    translated = direct_translate(clean, sl, req.target_lang)
     if translated and translated.lower() != clean.lower():
         return {"translated_text": translated}
+        
     if GEMINI_KEY:
         try:
             model = genai.GenerativeModel("gemini-2.0-flash")
             resp = model.generate_content(
-                f"Translate from {req.source_lang} to {req.target_lang}. Return only translation:\n\n{clean}"
+                f"Translate from '{sl}' to '{req.target_lang}'. Output ONLY the direct translated sentence:\n\n{clean}"
             )
             if resp and resp.text:
                 return {"translated_text": resp.text.strip()}
@@ -199,7 +197,6 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                 translated = payload.get("translated", "")
                 chat_id = get_chat_id(phone, receiver)
 
-                # Save message
                 conn = sqlite3.connect(DB_PATH)
                 cursor = conn.cursor()
                 cursor.execute("""
@@ -218,11 +215,9 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                     "translated": translated,
                     "time": "now"
                 }
-                # Deliver to receiver if active
                 await manager.send_to_user(receiver, out_payload)
 
             elif action in ["call_signal", "ice_candidate"]:
-                # Real-time WebRTC / Live Signal routing
                 await manager.send_to_user(receiver, payload)
 
     except WebSocketDisconnect:
