@@ -393,6 +393,10 @@
         let recordingSeconds = 0;
         let recordingTimerInterval = null;
 
+        // Speech recognition variable for live voice-to-text
+        let recognition = null;
+        let liveTranscript = "";
+
         let pendingPayload = null;
 
         window.onload = () => {
@@ -406,7 +410,25 @@
                     selectChat(inviteHost);
                 }
             }
+            initSpeechEngine();
         };
+
+        function initSpeechEngine() {
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRec) {
+                recognition = new SpeechRec();
+                recognition.continuous = true;
+                recognition.interimResults = false;
+                recognition.lang = 'ur-PK'; // Primary Urdu/Roman Urdu listener
+                recognition.onresult = (event) => {
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            liveTranscript += event.results[i][0].transcript + " ";
+                        }
+                    }
+                };
+            }
+        }
 
         async function requestOTP() {
             const input = document.getElementById("my-phone-input").value.trim();
@@ -585,6 +607,11 @@
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
                 recordedChunks = [];
+                liveTranscript = "";
+
+                if (recognition) {
+                    try { recognition.start(); } catch(e){}
+                }
 
                 mediaRecorder.ondataavailable = e => {
                     if (e.data.size > 0) recordedChunks.push(e.data);
@@ -600,7 +627,8 @@
                     
                     pendingPayload = {
                         type: "voice",
-                        content: data.url
+                        content: data.url,
+                        transcript: liveTranscript.trim()
                     };
                     openSendModal("🎙️ Voice Note Ready");
                 };
@@ -629,13 +657,20 @@
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
             }
+            if (recognition) {
+                try { recognition.stop(); } catch(e){}
+            }
             resetRecordingUI();
         }
 
         function cancelRecording() {
             recordedChunks = [];
+            liveTranscript = "";
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
+            }
+            if (recognition) {
+                try { recognition.stop(); } catch(e){}
             }
             resetRecordingUI();
         }
@@ -693,7 +728,7 @@
 
             const btn = document.getElementById("btn-modal-confirm-trans");
             const origText = btn.innerText;
-            btn.innerText = "Translating Audio...";
+            btn.innerText = "Translating...";
             btn.disabled = true;
 
             let translated = "";
@@ -714,11 +749,11 @@
                     console.error("Translation error:", e);
                 }
             } else if (pendingPayload.type === "voice") {
-                // Audio Multimodal AI Translation
                 try {
                     const form = new FormData();
                     form.append("file_path", pendingPayload.content);
                     form.append("target_lang", targetLang);
+                    form.append("transcript_hint", pendingPayload.transcript || "");
 
                     const res = await fetch("/api/translate-audio", {
                         method: "POST",
