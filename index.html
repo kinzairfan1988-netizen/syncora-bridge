@@ -139,7 +139,6 @@
             border: 1px solid var(--border-graphite); border-bottom-left-radius: 2px;
         }
         
-        /* BUBBLE TRANSLATION STYLING */
         .bubble-translation {
             font-size: 12px; margin-top: 5px; padding-top: 5px; font-weight: 600;
             border-top: 1px dashed rgba(0, 0, 0, 0.25); color: #1e293b;
@@ -284,8 +283,8 @@
             <div class="lang-options-drawer" id="lang-drawer">
                 <label style="font-size: 11px; color: var(--text-muted);">Select Target Language:</label>
                 <select class="lang-dropdown" id="modal-target-lang">
-                    <option value="ur">Urdu (اردو)</option>
                     <option value="en">English (US)</option>
+                    <option value="ur">Urdu (اردو)</option>
                     <option value="ar">Arabic (العربية)</option>
                     <option value="de">German (Deutsch)</option>
                     <option value="fr">French (Français)</option>
@@ -568,6 +567,7 @@
             }
         });
 
+        /* --- ONE-TAP VOICE RECORDING --- */
         function toggleVoiceRecording() {
             if (!isRecording) {
                 startVoiceRecording();
@@ -602,7 +602,7 @@
                         type: "voice",
                         content: data.url
                     };
-                    openSendModal("Voice Note Ready");
+                    openSendModal("🎙️ Voice Note Ready");
                 };
 
                 mediaRecorder.start();
@@ -647,6 +647,7 @@
             document.getElementById("input-shell").style.display = "flex";
         }
 
+        /* --- STAGE & DISPATCH MODAL --- */
         function stageMessageForDispatch() {
             const input = document.getElementById("text-input");
             const text = input.value.trim();
@@ -688,11 +689,11 @@
         async function confirmDispatchTranslation() {
             if (!pendingPayload || !socket) return;
             const langSelect = document.getElementById("modal-target-lang");
-            const targetLang = langSelect ? langSelect.value : "ur";
+            const targetLang = langSelect ? langSelect.value : "en";
 
             const btn = document.getElementById("btn-modal-confirm-trans");
             const origText = btn.innerText;
-            btn.innerText = "Translating...";
+            btn.innerText = "Translating Audio...";
             btn.disabled = true;
 
             let translated = "";
@@ -712,13 +713,29 @@
                 } catch (e) {
                     console.error("Translation error:", e);
                 }
+            } else if (pendingPayload.type === "voice") {
+                // Audio Multimodal AI Translation
+                try {
+                    const form = new FormData();
+                    form.append("file_path", pendingPayload.content);
+                    form.append("target_lang", targetLang);
+
+                    const res = await fetch("/api/translate-audio", {
+                        method: "POST",
+                        body: form
+                    });
+                    const data = await res.json();
+                    translated = data.translated_text || "";
+                } catch (e) {
+                    console.error("Voice translation error:", e);
+                }
             }
 
             btn.innerText = origText;
             btn.disabled = false;
 
             if (!translated || translated.trim() === "") {
-                translated = pendingPayload.content;
+                translated = pendingPayload.type === "voice" ? "Voice Translation" : pendingPayload.content;
             }
 
             executeDispatch(pendingPayload.content, translated, pendingPayload.type);
@@ -749,9 +766,11 @@
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
             } else if (type === "voice") {
                 body = `
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span>🎙️ Voice Note</span>
-                        <audio controls src="${content}" style="max-width:200px; height:32px;"></audio>
+                    <div style="display:flex; flex-direction:column; gap:4px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:16px;">🎙️</span>
+                            <audio controls src="${content}" style="max-width:210px; height:34px;"></audio>
+                        </div>
                     </div>
                 `;
             } else if (type === "location") {
