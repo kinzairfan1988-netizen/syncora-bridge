@@ -2,7 +2,6 @@ import os
 import re
 import json
 import base64
-import random
 import sqlite3
 import urllib.request
 import urllib.parse
@@ -12,7 +11,6 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import google.generativeai as genai
-from twilio.rest import Client
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -31,7 +29,6 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Add column about_status if existing older table
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN about_status TEXT DEFAULT 'Hey there! I am using Syncora.'")
     except Exception:
@@ -46,13 +43,6 @@ def init_db():
             msg_type TEXT,
             content TEXT,
             translated_content TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS otp_store (
-            phone TEXT PRIMARY KEY,
-            otp TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -71,45 +61,12 @@ if GEMINI_KEY:
     except Exception as e:
         print(f"[Gemini Config Error]: {e}")
 
-TWILIO_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
-TWILIO_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
-TWILIO_FROM = os.environ.get("TWILIO_PHONE_NUMBER", "")
-
-def send_real_sms(phone: str, otp: str) -> bool:
-    if TWILIO_SID and TWILIO_TOKEN and TWILIO_FROM:
-        try:
-            client = Client(TWILIO_SID, TWILIO_TOKEN)
-            formatted_phone = phone.strip()
-            if not formatted_phone.startswith("+"):
-                if formatted_phone.startswith("0"):
-                    formatted_phone = "+92" + formatted_phone[1:]
-                else:
-                    formatted_phone = "+92" + formatted_phone
-
-            client.messages.create(
-                body=f"Your Syncora verification code is: {otp}. Do not share this code.",
-                from_=TWILIO_FROM,
-                to=formatted_phone
-            )
-            return True
-        except Exception as e:
-            print(f"[Twilio SMS Error]: {e}")
-            return False
-    else:
-        print(f"[SECURE LOG - DEV ONLY] OTP for {phone}: {otp}")
-        return True
+class DirectLoginRequest(BaseModel):
+    phone: str
 
 class TranslationRequest(BaseModel):
     text: str
     target_lang: str = "en"
-
-class OTPRequest(BaseModel):
-    phone: str
-
-class OTPVerify(BaseModel):
-    phone: str
-    otp: str
-    display_name: str = ""
 
 class ProfileUpdate(BaseModel):
     phone: str
@@ -163,7 +120,22 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# --- PROFILE & SETTINGS ENDPOINTS ---
+# --- DIRECT INSTANT LOGIN (NO OTP DELAYS) ---
+@app.post("/api/auth/login")
+async def direct_login(req: DirectLoginRequest):
+    phone = req.phone.strip()
+    if not phone or len(phone) < 7:
+        return JSONResponse(status_code=400, content={"error": "Valid mobile number required"})
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (phone, phone))
+    conn.commit()
+    conn.close()
+
+    return {"status": "ok", "phone": phone}
+
+# --- PROFILE & SETTINGS ---
 @app.get("/api/user/profile/{phone}")
 async def get_user_profile(phone: str):
     conn = sqlite3.connect(DB_PATH)
@@ -294,41 +266,6 @@ async def translate_audio_route(
         "target_lang": chosen_target,
         "file_path": file_path
     }
-
-# --- OTP ENDPOINTS ---
-@app.post("/api/otp/send")
-async def send_otp(req: OTPRequest):
-    phone = req.phone.strip()
-    if not phone or len(phone) < 10:
-        return JSONResponse(status_code=400, content={"error": "Valid phone number required"})
-    
-    otp_code = str(random.randint(1000, 9999))
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO otp_store (phone, otp) VALUES (?, ?)", (phone, otp_code))
-    conn.commit()
-    conn.close()
-
-    send_real_sms(phone, otp_code)
-    return {"status": "ok", "message": "Verification code has been sent to your mobile phone via SMS."}
-
-@app.post("/api/otp/verify")
-async def verify_otp(req: OTPVerify):
-    phone = req.phone.strip()
-    otp = req.otp.strip()
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT otp FROM otp_store WHERE phone = ?", (phone,))
-    row = cursor.fetchone()
-    if not row or row[0] != otp:
-        conn.close()
-        return JSONResponse(status_code=400, content={"error": "Invalid verification code!"})
-
-    cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (phone, req.display_name or phone))
-    cursor.execute("DELETE FROM otp_store WHERE phone = ?", (phone,))
-    conn.commit()
-    conn.close()
-    return {"status": "verified", "phone": phone}
 
 # --- CHAT & HISTORY ENDPOINTS ---
 @app.get("/api/chats/{phone}")
