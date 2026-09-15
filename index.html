@@ -38,7 +38,7 @@
             overflow: hidden;
         }
 
-        /* 1. AUTH OVERLAY */
+        /* SIMPLE 1-STEP LOGIN OVERLAY */
         .auth-overlay {
             position: fixed; inset: 0; background: rgba(9, 9, 11, 0.96);
             backdrop-filter: blur(12px); z-index: 999; display: flex;
@@ -60,25 +60,18 @@
         
         .auth-input {
             width: 100%; background: var(--surface-card); border: 1px solid var(--border-graphite);
-            padding: 14px 16px; border-radius: 12px; color: #fff; font-size: 15px; margin-bottom: 12px; outline: none;
+            padding: 14px 16px; border-radius: 12px; color: #fff; font-size: 15px; margin-bottom: 14px; outline: none;
             letter-spacing: 0.5px;
         }
         .auth-input:focus { border-color: var(--accent-amber); }
-        .otp-boxes { display: flex; gap: 8px; justify-content: center; margin: 16px 0; }
-        .otp-input {
-            width: 50px; height: 55px; background: var(--surface-card); border: 1px solid var(--border-graphite);
-            border-radius: 12px; color: var(--accent-amber); font-size: 22px; font-weight: 700; text-align: center;
-            outline: none; font-family: 'Space Grotesk', monospace;
-        }
-        .otp-input:focus { border-color: var(--accent-amber); box-shadow: 0 0 15px var(--accent-amber-glow); }
         
         .btn-auth {
             width: 100%; background: var(--accent-amber); color: #000; font-weight: 700;
             border: none; padding: 14px; border-radius: 12px; cursor: pointer; font-size: 14px;
-            margin-top: 6px; box-shadow: 0 4px 20px var(--accent-amber-glow);
+            box-shadow: 0 4px 20px var(--accent-amber-glow);
         }
 
-        /* 2. WORKSPACE 2-PANEL */
+        /* 2-PANEL WORKSPACE */
         .workspace { display: flex; width: 100%; height: 100%; }
 
         /* LEFT SIDEBAR */
@@ -151,7 +144,7 @@
         }
         .bubble-time { font-size: 9px; opacity: 0.6; margin-top: 4px; text-align: right; }
 
-        /* NATIVE PLAYABLE VOICE DOCK */
+        /* VOICE DOCK & PLAY */
         .voice-card-box {
             display: flex; align-items: center; gap: 10px; padding: 4px 0;
         }
@@ -243,7 +236,7 @@
             padding: 10px 12px; border-radius: 10px; color: #fff; font-size: 13px; outline: none;
         }
 
-        /* 3. SETTINGS & ACCOUNT DETAILS MODAL (WHATSAPP STYLE) */
+        /* SETTINGS MODAL */
         .settings-overlay {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88);
             backdrop-filter: blur(10px); z-index: 998; display: none;
@@ -312,36 +305,19 @@
 </head>
 <body>
 
-    <!-- AUTH OVERLAY -->
+    <!-- 1-STEP INSTANT LOGIN OVERLAY -->
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
             <div class="auth-badge">IA</div>
-            <h2 class="auth-title">Verify Phone Number</h2>
-            <p class="auth-desc" id="auth-desc">Syncora Terminal mein enter hone ke liye apna mobile number enter karein.</p>
+            <h2 class="auth-title">Welcome to Syncora</h2>
+            <p class="auth-desc">Chat aur live translation start karne ke liye apna mobile number enter karein.</p>
 
-            <div id="auth-step-phone">
-                <input type="tel" id="my-phone-input" class="auth-input" placeholder="Mobile Number (e.g. 03001234567)">
-                <button class="btn-auth" onclick="requestOTP()">Send OTP SMS</button>
-            </div>
-
-            <div id="auth-step-otp" style="display: none;">
-                <div class="otp-boxes">
-                    <input type="text" maxlength="1" class="otp-input" id="otp-1" oninput="focusNext(this, 'otp-2')">
-                    <input type="text" maxlength="1" class="otp-input" id="otp-2" oninput="focusNext(this, 'otp-3')">
-                    <input type="text" maxlength="1" class="otp-input" id="otp-3" oninput="focusNext(this, 'otp-4')">
-                    <input type="text" maxlength="1" class="otp-input" id="otp-4">
-                </div>
-                <button class="btn-auth" onclick="verifyOTPCode()">Verify & Connect</button>
-                <div style="margin-top: 12px;">
-                    <button onclick="backToPhoneStep()" style="background:transparent; border:none; color:var(--accent-amber); font-size:12px; cursor:pointer;">
-                        ← Change Number
-                    </button>
-                </div>
-            </div>
+            <input type="tel" id="my-phone-input" class="auth-input" placeholder="Mobile Number (e.g. 03001234567)" onkeydown="if(event.key==='Enter'){ executeDirectLogin(); }">
+            <button class="btn-auth" onclick="executeDirectLogin()">Continue to Chat →</button>
         </div>
     </div>
 
-    <!-- SETTINGS & ACCOUNT DETAILS MODAL (WHATSAPP STYLE) -->
+    <!-- SETTINGS & ACCOUNT DETAILS MODAL -->
     <div class="settings-overlay" id="settings-modal">
         <div class="settings-card">
             <div class="settings-header">
@@ -350,9 +326,7 @@
             </div>
 
             <div class="profile-avatar-row">
-                <div class="profile-avatar-large" id="settings-avatar-preview">
-                    --
-                </div>
+                <div class="profile-avatar-large" id="settings-avatar-preview">--</div>
                 <input type="file" id="settings-avatar-file" accept="image/*" style="display:none;" onchange="uploadAvatarImage(event)">
                 <button class="btn-change-avatar" onclick="document.getElementById('settings-avatar-file').click()">Change Profile Photo</button>
             </div>
@@ -363,7 +337,7 @@
             </div>
 
             <div class="settings-field">
-                <label>Phone Number (Verified)</label>
+                <label>Phone Number</label>
                 <input type="text" id="settings-phone-display" class="settings-input" disabled>
             </div>
 
@@ -424,7 +398,6 @@
                 <span class="app-brand">SYNCORA CORE</span>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <button onclick="copyMyInviteLink()" style="background: var(--accent-amber-dim); border: 1px solid rgba(245,158,11,0.4); color: var(--accent-amber); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Copy Invite Link for Friends">📋 Invite Link</button>
-                    <!-- SETTINGS GEAR BUTTON -->
                     <button onclick="openSettingsModal()" class="icon-btn" title="Settings & Account" style="font-size: 16px;">⚙️</button>
                     <span style="font-size: 12px; color: var(--online-green);" id="my-status-label">● Online</span>
                 </div>
@@ -451,7 +424,7 @@
 
             <div class="messages-container" id="messages-container"></div>
 
-            <!-- ATTACHMENT MENU POPUP -->
+            <!-- ATTACHMENT POPUP -->
             <div class="attach-popup-menu" id="attach-menu">
                 <div class="attach-menu-item" onclick="document.getElementById('file-picker-media').click()">
                     <span>🖼️</span> Photos / Videos
@@ -467,7 +440,7 @@
             <input type="file" id="file-picker-media" accept="image/*,video/*" style="display:none;" onchange="uploadAttachment(event, 'media')">
             <input type="file" id="file-picker-doc" accept="*/*" style="display:none;" onchange="uploadAttachment(event, 'document')">
 
-            <!-- DYNAMIC INPUT & VOICE DOCK -->
+            <!-- INPUT BAR & VOICE DOCK -->
             <footer class="stage-input-bar">
                 
                 <div class="input-shell" id="input-shell">
@@ -527,65 +500,22 @@
             }
         };
 
-        function playSpokenVoice(text, lang) {
-            if (!('speechSynthesis' in window)) return;
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = (lang === 'ur') ? 'ur-PK' : (lang === 'ar' ? 'ar-SA' : 'en-US');
-            utterance.rate = 0.95;
-            window.speechSynthesis.speak(utterance);
-        }
-
-        async function requestOTP() {
+        // 1-Step Instant Login Function
+        async function executeDirectLogin() {
             const input = document.getElementById("my-phone-input").value.trim();
-            if (!input || input.length < 10) {
+            if (!input || input.length < 7) {
                 alert("Please valid mobile number enter karein.");
                 return;
             }
 
-            const res = await fetch("/api/otp/send", {
+            const res = await fetch("/api/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ phone: input })
             });
             const data = await res.json();
             if (res.ok) {
-                document.getElementById("auth-step-phone").style.display = "none";
-                document.getElementById("auth-step-otp").style.display = "block";
-                document.getElementById("auth-desc").innerText = `4-digit OTP aapke number ${input} par SMS kar diya gaya hai.`;
-                document.getElementById("otp-1").focus();
-            } else {
-                alert("OTP send fail: " + data.error);
-            }
-        }
-
-        function focusNext(current, nextId) {
-            if (current.value.length >= 1) {
-                document.getElementById(nextId).focus();
-            }
-        }
-
-        async function verifyOTPCode() {
-            const o1 = document.getElementById("otp-1").value;
-            const o2 = document.getElementById("otp-2").value;
-            const o3 = document.getElementById("otp-3").value;
-            const o4 = document.getElementById("otp-4").value;
-            const fullOtp = `${o1}${o2}${o3}${o4}`;
-            const phone = document.getElementById("my-phone-input").value.trim();
-
-            if (fullOtp.length !== 4) {
-                alert("Poora 4-digit code enter karein.");
-                return;
-            }
-
-            const res = await fetch("/api/otp/verify", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone: phone, otp: fullOtp })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                myPhone = phone;
+                myPhone = input;
                 localStorage.setItem("syncora_user_phone", myPhone);
                 document.getElementById("auth-overlay").style.display = "none";
                 document.getElementById("my-status-label").innerText = `● ${myPhone}`;
@@ -597,17 +527,19 @@
                     selectChat(inviteHost);
                 }
             } else {
-                alert(data.error || "Verification failed");
+                alert(data.error || "Login failed");
             }
         }
 
-        function backToPhoneStep() {
-            document.getElementById("auth-step-otp").style.display = "none";
-            document.getElementById("auth-step-phone").style.display = "block";
-            document.getElementById("auth-desc").innerText = "Syncora Terminal mein enter hone ke liye apna mobile number enter karein.";
+        function playSpokenVoice(text, lang) {
+            if (!('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = (lang === 'ur') ? 'ur-PK' : (lang === 'ar' ? 'ar-SA' : 'en-US');
+            utterance.rate = 0.95;
+            window.speechSynthesis.speak(utterance);
         }
 
-        /* --- SETTINGS & ACCOUNT FUNCTIONS --- */
         async function loadUserProfileData() {
             if (!myPhone) return;
             try {
@@ -684,8 +616,6 @@
                 myPhone = "";
                 activePartner = "";
                 closeSettingsModal();
-                document.getElementById("auth-step-otp").style.display = "none";
-                document.getElementById("auth-step-phone").style.display = "block";
                 document.getElementById("my-phone-input").value = "";
                 document.getElementById("auth-overlay").style.display = "flex";
             }
@@ -695,7 +625,7 @@
             const origin = window.location.origin;
             const inviteUrl = `${origin}/?invite=${encodeURIComponent(myPhone)}`;
             navigator.clipboard.writeText(inviteUrl).then(() => {
-                alert("Invite link copy ho gaya hai! Dost ko bheinjein, wo OTP se register hotay hi seedha aapki chat mein open hoga.");
+                alert("Invite link copy ho gaya hai! Dost ko bheinjein, wo login hotay hi seedha aapki chat mein open hoga.");
             });
         }
 
