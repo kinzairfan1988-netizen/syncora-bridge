@@ -121,6 +121,19 @@
             border-bottom: 1px solid var(--border-graphite);
             display: flex; align-items: center; justify-content: space-between; z-index: 10;
         }
+        .call-buttons-group {
+            display: flex; align-items: center; gap: 10px;
+        }
+        .btn-call-action {
+            width: 36px; height: 36px; border-radius: 50%; background: var(--surface-card);
+            border: 1px solid var(--border-graphite); color: var(--accent-amber); display: flex;
+            align-items: center; justify-content: center; font-size: 16px; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-call-action:hover {
+            background: var(--accent-amber-dim); border-color: var(--accent-amber);
+        }
+
         .messages-container {
             flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
         }
@@ -144,7 +157,7 @@
         }
         .bubble-time { font-size: 9px; opacity: 0.6; margin-top: 4px; text-align: right; }
 
-        /* VOICE DOCK & PLAY */
+        /* VOICE DOCK */
         .voice-card-box {
             display: flex; align-items: center; gap: 10px; padding: 4px 0;
         }
@@ -295,6 +308,49 @@
         }
         .btn-logout:hover { background: rgba(239, 68, 68, 0.25); }
 
+        /* LIVE CALL OVERLAY MODAL */
+        .call-modal-overlay {
+            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.94);
+            backdrop-filter: blur(14px); z-index: 1000; display: none;
+            flex-direction: column; align-items: center; justify-content: space-between;
+            padding: 40px 20px;
+        }
+        .call-user-card {
+            display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 30px;
+        }
+        .call-avatar-circle {
+            width: 100px; height: 100px; border-radius: 50%; background: #222;
+            border: 2px solid var(--accent-amber); display: flex; align-items: center; justify-content: center;
+            font-size: 38px; color: var(--accent-amber); box-shadow: 0 0 30px var(--accent-amber-glow);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        .call-target-title { font-size: 20px; font-weight: 700; color: #fff; }
+        .call-status-label { font-size: 14px; color: var(--online-green); }
+
+        .call-videos-grid {
+            width: 100%; max-width: 600px; height: 320px; display: none; position: relative;
+            background: #000; border-radius: 18px; overflow: hidden; border: 1px solid var(--border-graphite);
+        }
+        .remote-video-feed { width: 100%; height: 100%; object-fit: cover; }
+        .local-video-feed {
+            width: 120px; height: 90px; position: absolute; bottom: 12px; right: 12px;
+            border-radius: 10px; border: 2px solid var(--accent-amber); object-fit: cover;
+            background: #111;
+        }
+
+        .call-controls-row {
+            display: flex; align-items: center; gap: 24px; margin-bottom: 30px;
+        }
+        .btn-call-btn {
+            width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 22px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+        }
+        .btn-call-end { background: var(--danger-red); color: #fff; }
+        .btn-call-accept { background: var(--online-green); color: #fff; }
+        .btn-call-mute { background: var(--surface-card); color: #fff; border: 1px solid var(--border-graphite); }
+
         @media (max-width: 768px) {
             .sidebar-panel { width: 100%; }
             .stage-panel { display: none; }
@@ -310,10 +366,30 @@
         <div class="auth-card">
             <div class="auth-badge">IA</div>
             <h2 class="auth-title">Welcome to Syncora</h2>
-            <p class="auth-desc">Chat aur live translation start karne ke liye apna mobile number enter karein.</p>
+            <p class="auth-desc">Chat, Call aur Live translation start karne ke liye apna mobile number enter karein.</p>
 
             <input type="tel" id="my-phone-input" class="auth-input" placeholder="Mobile Number (e.g. 03001234567)" onkeydown="if(event.key==='Enter'){ executeDirectLogin(); }">
             <button class="btn-auth" onclick="executeDirectLogin()">Continue to Chat →</button>
+        </div>
+    </div>
+
+    <!-- CALL OVERLAY SCREEN -->
+    <div class="call-modal-overlay" id="call-modal">
+        <div class="call-user-card">
+            <div class="call-avatar-circle" id="call-avatar-icon">📞</div>
+            <div class="call-target-title" id="call-partner-name">User</div>
+            <div class="call-status-label" id="call-status-text">Calling...</div>
+        </div>
+
+        <div class="call-videos-grid" id="call-video-container">
+            <video id="remote-video" class="remote-video-feed" autoplay playsinline></video>
+            <video id="local-video" class="local-video-feed" autoplay muted playsinline></video>
+        </div>
+
+        <div class="call-controls-row">
+            <button class="btn-call-btn btn-call-mute" id="btn-toggle-mic" onclick="toggleCallMic()" title="Mute/Unmute">🎤</button>
+            <button class="btn-call-btn btn-call-accept" id="btn-call-answer" style="display:none;" onclick="acceptIncomingCall()" title="Answer">📞</button>
+            <button class="btn-call-btn btn-call-end" onclick="endCurrentCall()" title="End Call">📵</button>
         </div>
     </div>
 
@@ -420,6 +496,12 @@
                         <div style="font-size: 11px; color: var(--online-green);">Direct Line Active</div>
                     </div>
                 </div>
+
+                <!-- CALL BUTTONS RESTORED -->
+                <div class="call-buttons-group" id="call-buttons-dock" style="display: none;">
+                    <button class="btn-call-action" onclick="startCallSession('audio')" title="Audio Call">📞</button>
+                    <button class="btn-call-action" onclick="startCallSession('video')" title="Video Call">📹</button>
+                </div>
             </header>
 
             <div class="messages-container" id="messages-container"></div>
@@ -486,6 +568,15 @@
         let pendingPayload = null;
         let currentAvatarUrl = "";
 
+        // WebRTC Call state
+        let peerConnection = null;
+        let localMediaStream = null;
+        let currentCallType = "audio";
+        let isMicMuted = false;
+        const rtcConfig = {
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+        };
+
         window.onload = () => {
             if (myPhone) {
                 document.getElementById("auth-overlay").style.display = "none";
@@ -500,7 +591,6 @@
             }
         };
 
-        // 1-Step Instant Login Function
         async function executeDirectLogin() {
             const input = document.getElementById("my-phone-input").value.trim();
             if (!input || input.length < 7) {
@@ -633,13 +723,23 @@
             const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
             socket = new WebSocket(`${proto}${window.location.host}/ws/${myPhone}`);
 
-            socket.onmessage = (event) => {
+            socket.onmessage = async (event) => {
                 const data = JSON.parse(event.data);
                 if (data.action === "new_message") {
                     if (data.sender === activePartner) {
                         appendBubble(data.content, "received", data.translated, data.msg_type, data.time);
                     }
                     loadRecentChats();
+                } else if (data.action === "call_signal") {
+                    handleIncomingCallSignal(data);
+                } else if (data.action === "ice_candidate") {
+                    if (peerConnection && data.candidate) {
+                        try {
+                            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                        } catch (e) {
+                            console.error("Error adding ice candidate", e);
+                        }
+                    }
                 }
             };
 
@@ -679,6 +779,9 @@
             document.getElementById("active-partner-label").innerText = partner;
             document.getElementById("active-avatar").innerText = partner.slice(-2);
             document.getElementById("mobile-back-btn").style.display = "inline-block";
+            
+            // SHOW CALL BUTTONS IN HEADER
+            document.getElementById("call-buttons-dock").style.display = "flex";
 
             const res = await fetch(`/api/messages/${myPhone}/${partner}`);
             const data = await res.json();
@@ -693,6 +796,175 @@
 
         function backToSidebar() {
             document.body.classList.remove("in-chat");
+        }
+
+        /* --- WEBRTC CALL ENGINE (AUDIO & VIDEO) --- */
+        async function startCallSession(type) {
+            if (!activePartner) {
+                alert("Pehle kisi user ko select karein call karne ke liye!");
+                return;
+            }
+            currentCallType = type;
+            document.getElementById("call-partner-name").innerText = activePartner;
+            document.getElementById("call-status-text").innerText = `Outgoing ${type.toUpperCase()} Call...`;
+            document.getElementById("call-avatar-icon").innerText = type === "video" ? "📹" : "📞";
+            document.getElementById("btn-call-answer").style.display = "none";
+            document.getElementById("call-modal").style.display = "flex";
+
+            if (type === "video") {
+                document.getElementById("call-video-container").style.display = "block";
+            } else {
+                document.getElementById("call-video-container").style.display = "none";
+            }
+
+            try {
+                localMediaStream = await navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                    video: type === "video"
+                });
+
+                if (type === "video") {
+                    document.getElementById("local-video").srcObject = localMediaStream;
+                }
+
+                initPeerConnection();
+                localMediaStream.getTracks().forEach(track => peerConnection.addTrack(track, localMediaStream));
+
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+
+                socket.send(JSON.stringify({
+                    action: "call_signal",
+                    receiver: activePartner,
+                    signal_type: "offer",
+                    call_type: type,
+                    sdp: offer
+                }));
+
+            } catch (err) {
+                alert("Media permission error: " + err.message);
+                endCurrentCall();
+            }
+        }
+
+        function initPeerConnection() {
+            peerConnection = new RTCPeerConnection(rtcConfig);
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.send(JSON.stringify({
+                        action: "ice_candidate",
+                        receiver: activePartner,
+                        candidate: event.candidate
+                    }));
+                }
+            };
+
+            peerConnection.ontrack = (event) => {
+                const remoteStream = event.streams[0];
+                if (currentCallType === "video") {
+                    document.getElementById("remote-video").srcObject = remoteStream;
+                } else {
+                    const audioEl = new Audio();
+                    audioEl.srcObject = remoteStream;
+                    audioEl.play();
+                }
+            };
+        }
+
+        let pendingCallOffer = null;
+
+        async function handleIncomingCallSignal(data) {
+            if (data.signal_type === "offer") {
+                pendingCallOffer = data;
+                activePartner = data.sender;
+                currentCallType = data.call_type || "audio";
+
+                document.getElementById("call-partner-name").innerText = data.sender;
+                document.getElementById("call-status-text").innerText = `Incoming ${currentCallType.toUpperCase()} Call...`;
+                document.getElementById("call-avatar-icon").innerText = currentCallType === "video" ? "📹" : "📞";
+                document.getElementById("btn-call-answer").style.display = "flex";
+                document.getElementById("call-modal").style.display = "flex";
+            } else if (data.signal_type === "answer") {
+                if (peerConnection) {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                    document.getElementById("call-status-text").innerText = "Call Connected";
+                }
+            } else if (data.signal_type === "end") {
+                closeCallUI();
+            }
+        }
+
+        async function acceptIncomingCall() {
+            if (!pendingCallOffer) return;
+            document.getElementById("btn-call-answer").style.display = "none";
+            document.getElementById("call-status-text").innerText = "Connecting...";
+
+            try {
+                localMediaStream = await navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                    video: currentCallType === "video"
+                });
+
+                if (currentCallType === "video") {
+                    document.getElementById("call-video-container").style.display = "block";
+                    document.getElementById("local-video").srcObject = localMediaStream;
+                }
+
+                initPeerConnection();
+                localMediaStream.getTracks().forEach(track => peerConnection.addTrack(track, localMediaStream));
+
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(pendingCallOffer.sdp));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+
+                socket.send(JSON.stringify({
+                    action: "call_signal",
+                    receiver: activePartner,
+                    signal_type: "answer",
+                    sdp: answer
+                }));
+
+                document.getElementById("call-status-text").innerText = "Call Connected";
+            } catch (err) {
+                alert("Call accept error: " + err.message);
+                endCurrentCall();
+            }
+        }
+
+        function endCurrentCall() {
+            if (activePartner && socket) {
+                socket.send(JSON.stringify({
+                    action: "call_signal",
+                    receiver: activePartner,
+                    signal_type: "end"
+                }));
+            }
+            closeCallUI();
+        }
+
+        function closeCallUI() {
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            if (localMediaStream) {
+                localMediaStream.getTracks().forEach(t => t.stop());
+                localMediaStream = null;
+            }
+            document.getElementById("call-modal").style.display = "none";
+            document.getElementById("call-video-container").style.display = "none";
+            pendingCallOffer = null;
+        }
+
+        function toggleCallMic() {
+            if (!localMediaStream) return;
+            const audioTrack = localMediaStream.getAudioTracks()[0];
+            if (audioTrack) {
+                isMicMuted = !isMicMuted;
+                audioTrack.enabled = !isMicMuted;
+                document.getElementById("btn-toggle-mic").innerText = isMicMuted ? "🔇" : "🎤";
+            }
         }
 
         function toggleAttachMenu() {
