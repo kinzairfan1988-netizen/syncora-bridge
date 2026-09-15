@@ -380,7 +380,7 @@
         let recordingSeconds = 0;
         let recordingTimerInterval = null;
 
-        let speechRec = null;
+        let liveSpeechInstance = null;
         let capturedLiveText = "";
         let pendingPayload = null;
 
@@ -556,7 +556,7 @@
             }
         });
 
-        /* --- ONE-TAP VOICE RECORDING --- */
+        /* --- RELIABLE VOICE RECORDING & LIVE CAPTURE --- */
         function toggleVoiceRecording() {
             if (!isRecording) {
                 startVoiceRecording();
@@ -576,22 +576,22 @@
                 recordedChunks = [];
                 capturedLiveText = "";
 
-                // Start Web Speech API in parallel
+                // Live speech recognition capture
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
-                        speechRec = new SR();
-                        speechRec.continuous = true;
-                        speechRec.interimResults = false;
-                        speechRec.lang = 'ur-PK';
-                        speechRec.onresult = (e) => {
+                        liveSpeechInstance = new SR();
+                        liveSpeechInstance.continuous = true;
+                        liveSpeechInstance.interimResults = false;
+                        liveSpeechInstance.lang = 'ur-PK';
+                        liveSpeechInstance.onresult = (e) => {
                             for (let i = e.resultIndex; i < e.results.length; ++i) {
                                 if (e.results[i].isFinal) {
                                     capturedLiveText += e.results[i][0].transcript + " ";
                                 }
                             }
                         };
-                        speechRec.start();
+                        liveSpeechInstance.start();
                     } catch(err) {}
                 }
 
@@ -631,7 +631,7 @@
                 }, 1000);
 
             } catch (err) {
-                alert("Microphone permission required: " + err.message);
+                alert("Microphone access error: " + err.message);
             }
         }
 
@@ -639,8 +639,8 @@
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
             }
-            if (speechRec) {
-                try { speechRec.stop(); } catch(e){}
+            if (liveSpeechInstance) {
+                try { liveSpeechInstance.stop(); } catch(e){}
             }
             resetRecordingUI();
         }
@@ -651,8 +651,8 @@
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
             }
-            if (speechRec) {
-                try { speechRec.stop(); } catch(e){}
+            if (liveSpeechInstance) {
+                try { liveSpeechInstance.stop(); } catch(e){}
             }
             resetRecordingUI();
         }
@@ -664,7 +664,7 @@
             document.getElementById("input-shell").style.display = "flex";
         }
 
-        /* --- MODAL & DISPATCH --- */
+        /* --- STAGE & DISPATCH MODAL --- */
         function stageMessageForDispatch() {
             const input = document.getElementById("text-input");
             const text = input.value.trim();
@@ -747,8 +747,8 @@
                     });
                     const data = await res.json();
                     translatedText = data.translated_text || "";
-                    
-                    // NAYI TRANSLATED AUDIO FILE KO CONTENT BANAYEIN
+
+                    // Generated Neural MP3 file becomes the audio source
                     if (data.translated_audio_url) {
                         finalDispatchContent = data.translated_audio_url;
                     }
@@ -792,7 +792,7 @@
                     <div style="display:flex; flex-direction:column; gap:4px;">
                         <div style="display:flex; align-items:center; gap:8px;">
                             <span style="font-size:16px;">🎙️</span>
-                            <audio controls src="${content}" style="max-width:210px; height:34px;"></audio>
+                            <audio controls src="${content}" preload="auto" style="max-width:210px; height:34px;"></audio>
                         </div>
                     </div>
                 `;
