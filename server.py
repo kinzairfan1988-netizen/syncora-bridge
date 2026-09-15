@@ -3,7 +3,6 @@ import re
 import json
 import base64
 import random
-import asyncio
 import sqlite3
 import urllib.request
 import urllib.parse
@@ -13,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import google.generativeai as genai
-import edge_tts
+from twilio.rest import Client
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -65,6 +64,38 @@ if GEMINI_KEY:
     except Exception as e:
         print(f"[Gemini Config Error]: {e}")
 
+# Twilio SMS Credentials
+TWILIO_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
+TWILIO_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
+TWILIO_FROM = os.environ.get("TWILIO_PHONE_NUMBER", "")
+
+def send_real_sms(phone: str, otp: str) -> bool:
+    """Sends real OTP to user SIM via Twilio if configured"""
+    if TWILIO_SID and TWILIO_TOKEN and TWILIO_FROM:
+        try:
+            client = Client(TWILIO_SID, TWILIO_TOKEN)
+            # Format number with country code if needed
+            formatted_phone = phone.strip()
+            if not formatted_phone.startswith("+"):
+                if formatted_phone.startswith("0"):
+                    formatted_phone = "+92" + formatted_phone[1:]
+                else:
+                    formatted_phone = "+92" + formatted_phone
+
+            client.messages.create(
+                body=f"Your Syncora verification code is: {otp}. Do not share this code.",
+                from_=TWILIO_FROM,
+                to=formatted_phone
+            )
+            return True
+        except Exception as e:
+            print(f"[Twilio SMS Error]: {e}")
+            return False
+    else:
+        # Development fallback: logged on server console only, never to frontend
+        print(f"[SECURE LOG - DEV ONLY] OTP for {phone}: {otp}")
+        return True
+
 class TranslationRequest(BaseModel):
     text: str
     target_lang: str = "en"
@@ -102,31 +133,6 @@ def translate_via_google(text: str, source: str, target: str) -> str:
         print(f"[Google GTX Error]: {e}")
     return ""
 
-async def generate_edge_tts_audio(text: str, target_lang: str) -> str:
-    """Production-grade TTS using Microsoft Edge Neural Engine (No IP blocking)"""
-    try:
-        voice_map = {
-            "en": "en-US-AriaNeural",
-            "ur": "ur-PK-UzmaNeural",
-            "ar": "ar-SA-ZariyahNeural",
-            "fr": "fr-FR-DeniseNeural",
-            "de": "de-DE-KatjaNeural",
-            "es": "es-ES-ElviraNeural",
-            "zh": "zh-CN-XiaoxiaoNeural"
-        }
-        chosen_voice = voice_map.get(target_lang.lower(), "en-US-AriaNeural")
-        filename = f"voice_{os.urandom(8).hex()}.mp3"
-        filepath = os.path.join(UPLOAD_DIR, filename)
-
-        communicate = edge_tts.Communicate(text.strip(), chosen_voice)
-        await communicate.save(filepath)
-
-        if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-            return f"/uploads/{filename}"
-    except Exception as e:
-        print(f"[Edge TTS Error]: {e}")
-    return ""
-
 class ConnectionManager:
     def __init__(self):
         self.active_sessions: Dict[str, WebSocket] = {}
@@ -158,17 +164,15 @@ async def translate_text(req: TranslationRequest):
     target_lang = req.target_lang.strip().lower() if req.target_lang else "en"
     has_script = is_urdu_or_arabic(clean)
 
-    # 1. Gemini Engine Call
     if GEMINI_KEY:
         for model_name in ["gemini-2.0-flash", "gemini-1.5-flash"]:
             try:
                 model = genai.GenerativeModel(model_name)
                 prompt = (
-                    f"You are a professional real-time translator.\n"
-                    f"Translate the following input directly into language code '{target_lang}'.\n"
-                    f"- If input is Roman Urdu or Urdu script and target is 'en', output natural English.\n"
-                    f"- If input is English and target is 'ur', output natural Urdu script.\n"
-                    f"Output ONLY the translated sentence, without any explanations or quotation marks:\n\n{clean}"
+                    f"Translate the following input directly into '{target_lang}'.\n"
+                    f"- If input is Roman Urdu or Urdu script and target is 'en', translate to clean natural English.\n"
+                    f"- If input is English and target is 'ur', translate to natural Urdu script.\n"
+                    f"Return ONLY the translated sentence, no quotes, no explanations:\n\n{clean}"
                 )
                 response = model.generate_content(prompt)
                 if response and hasattr(response, "text") and response.text:
@@ -179,7 +183,6 @@ async def translate_text(req: TranslationRequest):
                 print(f"[Gemini Text Translation Error]: {e}")
                 continue
 
-    # 2. Google GTX Engine Call
     source_param = "ur" if has_script else "auto"
     g_res = translate_via_google(clean, source_param, target_lang)
     if g_res and g_res.lower() != clean.lower():
@@ -192,7 +195,7 @@ async def translate_text(req: TranslationRequest):
 
     return {"translated_text": clean}
 
-# --- VOICE-TO-VOICE TRANSLATION ROUTE ---
+# --- VOICE TRANSLATION ROUTE ---
 @app.post("/api/translate-audio")
 async def translate_audio_route(
     file_path: str = Form(...),
@@ -204,7 +207,6 @@ async def translate_audio_route(
     local_filename = os.path.basename(file_path)
     actual_path = os.path.join(UPLOAD_DIR, local_filename)
 
-    # Priority 1: Agar live transcription mojood hai, foran translate karein
     if transcript_hint and transcript_hint.strip():
         req = TranslationRequest(text=transcript_hint.strip(), target_lang=chosen_target)
         res = await translate_text(req)
@@ -212,7 +214,6 @@ async def translate_audio_route(
         if cand and cand.lower() != transcript_hint.strip().lower():
             translated_text = cand
 
-    # Priority 2: Gemini direct audio listening
     if not translated_text and os.path.exists(actual_path) and GEMINI_KEY:
         try:
             with open(actual_path, "rb") as f:
@@ -226,10 +227,10 @@ async def translate_audio_route(
                         "data": base64.b64encode(audio_bytes).decode("utf-8")
                     }
                     prompt = (
-                        f"Listen carefully to this audio voice note spoken in Urdu, Roman Urdu, or Hindi. "
-                        f"Translate what the speaker is saying into '{chosen_target}'. "
-                        f"If the target is 'en', your output MUST be in English. "
-                        f"Provide ONLY the translated words. Do not include commentary, labels, or quotation marks."
+                        f"Listen to this audio note carefully. "
+                        f"Translate what the speaker says directly into '{chosen_target}'. "
+                        f"If the target is 'en', output must be in English. "
+                        f"Output ONLY the translated sentence. No preface, no quotes."
                     )
                     resp = model.generate_content([prompt, audio_part])
                     if resp and hasattr(resp, "text") and resp.text:
@@ -242,31 +243,34 @@ async def translate_audio_route(
         except Exception as e:
             print(f"[File Read Error]: {e}")
 
-    # Fallback text agar kuch capture na ho sake
     if not translated_text:
         translated_text = "How are you doing?" if chosen_target == "en" else "آپ کیسے ہیں؟"
 
-    # Priority 3: Generate Real Playable Audio File using Edge-TTS
-    generated_audio = await generate_edge_tts_audio(translated_text, chosen_target)
-
     return {
         "translated_text": translated_text,
-        "translated_audio_url": generated_audio if generated_audio else file_path
+        "target_lang": chosen_target,
+        "file_path": file_path
     }
 
-# --- OTP & MESSAGES ---
+# --- SECURE OTP ROUTE (NO FRONTEND LEAKAGE) ---
 @app.post("/api/otp/send")
 async def send_otp(req: OTPRequest):
     phone = req.phone.strip()
-    if not phone:
-        return JSONResponse(status_code=400, content={"error": "Phone number required"})
+    if not phone or len(phone) < 10:
+        return JSONResponse(status_code=400, content={"error": "Valid phone number required"})
+    
     otp_code = str(random.randint(1000, 9999))
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("INSERT OR REPLACE INTO otp_store (phone, otp) VALUES (?, ?)", (phone, otp_code))
     conn.commit()
     conn.close()
-    return {"status": "ok", "message": "OTP sent", "otp_preview": otp_code}
+
+    # Send SMS via gateway
+    send_real_sms(phone, otp_code)
+
+    # Secure response: NEVER return the OTP in the JSON response
+    return {"status": "ok", "message": "Verification code has been sent to your mobile phone via SMS."}
 
 @app.post("/api/otp/verify")
 async def verify_otp(req: OTPVerify):
@@ -278,7 +282,7 @@ async def verify_otp(req: OTPVerify):
     row = cursor.fetchone()
     if not row or row[0] != otp:
         conn.close()
-        return JSONResponse(status_code=400, content={"error": "Galat OTP code!"})
+        return JSONResponse(status_code=400, content={"error": "Invalid verification code!"})
 
     cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (phone, req.display_name or phone))
     cursor.execute("DELETE FROM otp_store WHERE phone = ?", (phone,))
