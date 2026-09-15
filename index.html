@@ -39,7 +39,7 @@
             overflow: hidden;
         }
 
-        /* 1-STEP LOGIN OVERLAY */
+        /* LOGIN OVERLAY */
         .auth-overlay {
             position: fixed; inset: 0; background: rgba(11, 14, 20, 0.96);
             backdrop-filter: blur(12px); z-index: 999; display: flex;
@@ -119,7 +119,7 @@
         }
         .fab-btn:active { transform: scale(0.92); }
 
-        /* BOTTOM NAV */
+        /* BOTTOM NAVIGATION BAR */
         .bottom-nav-bar {
             height: 56px; border-top: 1px solid var(--border-graphite); background: var(--surface-panel);
             display: flex; align-items: center; justify-content: space-around; width: 100%;
@@ -133,7 +133,7 @@
         .nav-tab-btn span.tab-icon { font-size: 18px; }
         .nav-tab-btn.active { color: var(--accent-amber); }
 
-        /* STAGE (RIGHT CHAT) */
+        /* RIGHT CHAT STAGE */
         .stage-panel {
             flex: 1; display: flex; flex-direction: column; background: var(--bg-obsidian); position: relative;
         }
@@ -142,9 +142,7 @@
             border-bottom: 1px solid var(--border-graphite);
             display: flex; align-items: center; justify-content: space-between; z-index: 10;
         }
-        .call-buttons-group {
-            display: flex; align-items: center; gap: 8px;
-        }
+        .call-buttons-group { display: flex; align-items: center; gap: 8px; }
         .btn-call-action {
             height: 36px; padding: 0 12px; border-radius: 18px; background: var(--surface-card);
             border: 1px solid var(--border-graphite); color: #fff; display: flex;
@@ -178,7 +176,6 @@
             border-top: 1px dashed var(--border-graphite); color: var(--online-green);
         }
         
-        /* TICK & TIME ROW */
         .bubble-meta-row {
             display: flex; align-items: center; justify-content: flex-end; gap: 4px;
             font-size: 9px; opacity: 0.75; margin-top: 4px;
@@ -347,7 +344,7 @@
             font-size: 14px;
         }
 
-        /* SEND MODAL */
+        /* SEND CONFIRMATION MODAL */
         .send-modal-backdrop {
             position: fixed; inset: 0; background: rgba(0,0,0,0.85);
             z-index: 999; display: none; align-items: center; justify-content: center; padding: 20px;
@@ -560,7 +557,6 @@
                     <div class="chat-avatar" id="active-avatar">--</div>
                     <div>
                         <div style="font-size: 15px; font-weight: 700;" id="active-partner-label">Select a conversation</div>
-                        <!-- REAL-TIME ONLINE / OFFLINE STATUS -->
                         <div style="font-size: 11px; color: var(--text-muted);" id="active-partner-status">Offline</div>
                     </div>
                 </div>
@@ -631,20 +627,20 @@
 
         let socket = null;
         let isConnectingSocket = false;
-        let reconnectAttempts = 0;
-        const MAX_RECONNECTS = 5;
+        let heartbeatInterval = null;
+        let statusPollInterval = null;
 
         let mediaRecorder = null;
         let recordedChunks = [];
         let isRecording = false;
         let recordingSeconds = 0;
         let recordingTimerInterval = null;
+        let chosenAudioMime = "audio/webm";
 
         let pendingPayload = null;
         let currentAvatarUrl = "";
-        let statusPollInterval = null;
 
-        // WebRTC State
+        // WebRTC
         let peerConnection = null;
         let localMediaStream = null;
         let currentCallType = "audio";
@@ -672,9 +668,10 @@
 
         window.onbeforeunload = () => {
             if (socket) { socket.close(); }
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+            if (statusPollInterval) clearInterval(statusPollInterval);
             if (localMediaStream) { localMediaStream.getTracks().forEach(t => t.stop()); }
             if (callSpeechRec) { try { callSpeechRec.stop(); } catch(e){} }
-            if (statusPollInterval) { clearInterval(statusPollInterval); }
         };
 
         async function executeDirectLogin() {
@@ -707,7 +704,7 @@
                     alert(data.error || "Login failed");
                 }
             } catch(err) {
-                alert("Network connection error: " + err.message);
+                alert("Network error: " + err.message);
             }
         }
 
@@ -840,7 +837,7 @@
             }
         }
 
-        /* --- SOCKET CONNECTION & TICK HANDLING --- */
+        /* --- STABLE SOCKET WITH HEARTBEAT (NEVER DROPS OFFLINE) --- */
         function initSocketSafe() {
             if (!myPhone || isConnectingSocket) return;
             if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
@@ -855,13 +852,21 @@
 
                 socket.onopen = () => {
                     isConnectingSocket = false;
-                    reconnectAttempts = 0;
                     document.getElementById("my-status-label").innerText = `● ${myPhone}`;
+                    
+                    // Keep-alive heartbeat every 15s so server never thinks user is offline
+                    if (heartbeatInterval) clearInterval(heartbeatInterval);
+                    heartbeatInterval = setInterval(() => {
+                        if (socket && socket.readyState === WebSocket.OPEN) {
+                            socket.send(JSON.stringify({ action: "ping" }));
+                        }
+                    }, 15000);
                 };
 
                 socket.onmessage = async (event) => {
                     try {
                         const data = JSON.parse(event.data);
+                        if (data.action === "pong") return; // Keepalive ack
                         
                         if (data.action === "new_message") {
                             if (data.sender === activePartner) {
@@ -870,11 +875,9 @@
                             loadRecentChats();
                         } 
                         else if (data.action === "message_sent_ack") {
-                            // Update tick on sender's bubble
                             updateBubbleStatus(data.id, data.status);
                         }
                         else if (data.action === "messages_delivered") {
-                            // Partner has come online and received our sent messages -> convert to double tick
                             if (data.delivered_to === activePartner) {
                                 markAllSentBubblesDelivered();
                             }
@@ -901,15 +904,13 @@
                 socket.onclose = () => {
                     isConnectingSocket = false;
                     socket = null;
-                    if (reconnectAttempts < MAX_RECONNECTS && myPhone) {
-                        reconnectAttempts++;
+                    if (myPhone) {
                         setTimeout(initSocketSafe, 3000);
                     }
                 };
 
                 socket.onerror = () => {
                     isConnectingSocket = false;
-                    if (socket) { socket.close(); }
                 };
 
             } catch(e) {
@@ -954,10 +955,10 @@
             document.getElementById("mobile-back-btn").style.display = "inline-block";
             document.getElementById("call-buttons-dock").style.display = "flex";
 
-            // Poll for live presence
+            // Check live online status immediately without breaking socket
             checkPartnerLiveStatus();
             if (statusPollInterval) clearInterval(statusPollInterval);
-            statusPollInterval = setInterval(checkPartnerLiveStatus, 5000);
+            statusPollInterval = setInterval(checkPartnerLiveStatus, 6000);
 
             try {
                 const res = await fetch(`/api/messages/${myPhone}/${partner}`);
@@ -1278,7 +1279,7 @@
             }
         });
 
-        /* --- ONE-TAP VOICE RECORDING --- */
+        /* --- CROSS-PLATFORM VOICE RECORDING (SAFARI + ANDROID FIX) --- */
         function toggleVoiceRecording() {
             if (!isRecording) {
                 startVoiceRecording();
@@ -1294,7 +1295,18 @@
             }
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                
+                // Smart MIME detection for Safari vs Android
+                chosenAudioMime = "audio/webm";
+                if (!MediaRecorder.isTypeSupported("audio/webm")) {
+                    if (MediaRecorder.isTypeSupported("audio/mp4")) {
+                        chosenAudioMime = "audio/mp4";
+                    } else {
+                        chosenAudioMime = "";
+                    }
+                }
+
+                mediaRecorder = chosenAudioMime ? new MediaRecorder(stream, { mimeType: chosenAudioMime }) : new MediaRecorder(stream);
                 recordedChunks = [];
 
                 mediaRecorder.ondataavailable = e => {
@@ -1303,9 +1315,10 @@
 
                 mediaRecorder.onstop = async () => {
                     if (recordedChunks.length === 0) return;
-                    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                    const ext = chosenAudioMime.includes("mp4") ? "m4a" : "webm";
+                    const blob = new Blob(recordedChunks, { type: chosenAudioMime || "audio/webm" });
                     const form = new FormData();
-                    form.append("file", blob, "voice.webm");
+                    form.append("file", blob, `voice.${ext}`);
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
                     
@@ -1332,7 +1345,7 @@
                 }, 1000);
 
             } catch (err) {
-                alert("Microphone access error: " + err.message);
+                alert("Microphone permission error: " + err.message);
             }
         }
 
@@ -1455,7 +1468,7 @@
 
         function executeDispatch(content, translated, msgType) {
             if (!socket || socket.readyState !== WebSocket.OPEN) {
-                alert("Server disconnected. Reconnecting...");
+                alert("Connection reconnecting... ek lamha wait karein.");
                 initSocketSafe();
                 return;
             }
@@ -1468,7 +1481,6 @@
             };
             socket.send(JSON.stringify(payload));
             
-            // Render locally as "sent" with single tick until ack
             const tempId = "msg_temp_" + Date.now();
             appendBubble(content, "sent", translated, msgType, "now", tempId, "sent");
             document.getElementById("text-input").value = "";
@@ -1516,7 +1528,6 @@
                 body += `<div class="bubble-translation">AI: ${translated}</div>`;
             }
 
-            // TICK RENDERING LOGIC
             let tickHtml = "";
             if (dir === "sent") {
                 const tickSymbol = (status === "delivered") ? "✓✓" : "✓";
@@ -1535,12 +1546,10 @@
         }
 
         function updateBubbleStatus(msgId, status) {
-            // Find bubble element or temporary sent bubble
             const tick = document.getElementById(`tick_${msgId}`);
             if (tick) {
                 tick.innerText = (status === "delivered") ? "✓✓" : "✓";
             } else {
-                // If sent ack, update the latest sent bubble
                 const sentTicks = document.querySelectorAll(".bubble.sent .tick-icon");
                 if (sentTicks.length > 0) {
                     const lastTick = sentTicks[sentTicks.length - 1];
