@@ -144,6 +144,18 @@
         }
         .bubble-time { font-size: 9px; opacity: 0.6; margin-top: 4px; text-align: right; }
 
+        .voice-card-box {
+            display: flex; align-items: center; gap: 10px; padding: 4px 0;
+        }
+        .btn-voice-speaker {
+            width: 38px; height: 38px; border-radius: 50%; background: #000; color: var(--accent-amber);
+            border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            font-size: 16px; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+        .bubble.received .btn-voice-speaker {
+            background: var(--accent-amber); color: #000;
+        }
+
         .stage-input-bar {
             padding: 10px 16px; background: var(--surface-panel);
             border-top: 1px solid var(--border-graphite); display: flex; align-items: center; gap: 8px; position: relative;
@@ -397,6 +409,15 @@
             }
         };
 
+        function playSpokenVoice(text, lang) {
+            if (!('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = (lang === 'ur') ? 'ur-PK' : (lang === 'ar' ? 'ar-SA' : 'en-US');
+            utterance.rate = 0.95;
+            window.speechSynthesis.speak(utterance);
+        }
+
         async function requestOTP() {
             const input = document.getElementById("my-phone-input").value.trim();
             if (!input || input.length < 10) {
@@ -411,10 +432,10 @@
             });
             const data = await res.json();
             if (res.ok) {
+                // UI switch without showing any code on screen
                 document.getElementById("auth-step-phone").style.display = "none";
                 document.getElementById("auth-step-otp").style.display = "block";
-                document.getElementById("auth-desc").innerText = `4-digit OTP aapke number ${input} par send kar diya gaya hai.`;
-                alert(`[SMS Gateway] Your Syncora verification code is: ${data.otp_preview}`);
+                document.getElementById("auth-desc").innerText = `4-digit OTP aapke number ${input} par SMS kar diya gaya hai. SMS inbox check karein.`;
                 document.getElementById("otp-1").focus();
             } else {
                 alert("OTP send fail: " + data.error);
@@ -556,7 +577,7 @@
             }
         });
 
-        /* --- RELIABLE VOICE RECORDING & LIVE CAPTURE --- */
+        /* --- ONE-TAP VOICE RECORDING --- */
         function toggleVoiceRecording() {
             if (!isRecording) {
                 startVoiceRecording();
@@ -576,7 +597,6 @@
                 recordedChunks = [];
                 capturedLiveText = "";
 
-                // Live speech recognition capture
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
@@ -748,10 +768,8 @@
                     const data = await res.json();
                     translatedText = data.translated_text || "";
 
-                    // Generated Neural MP3 file becomes the audio source
-                    if (data.translated_audio_url) {
-                        finalDispatchContent = data.translated_audio_url;
-                    }
+                    // Live Playable Native Voice Identifier
+                    finalDispatchContent = `translated_voice:${targetLang}:${encodeURIComponent(translatedText)}`;
                     finalDispatchType = "voice";
                 } catch (e) {
                     console.error("Voice translation error:", e);
@@ -788,14 +806,27 @@
             if (type === "media") {
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
             } else if (type === "voice") {
-                body = `
-                    <div style="display:flex; flex-direction:column; gap:4px;">
+                if (content.startsWith("translated_voice:")) {
+                    const parts = content.split(":");
+                    const vLang = parts[1];
+                    const vText = decodeURIComponent(parts.slice(2).join(":"));
+                    body = `
+                        <div class="voice-card-box">
+                            <button class="btn-voice-speaker" onclick="playSpokenVoice('${vText.replace(/'/g, "\\'")}', '${vLang}')" title="Play Voice Note">▶</button>
+                            <div style="display:flex; flex-direction:column;">
+                                <span style="font-size:13px; font-weight:700;">🎙️ AI Voice Note (${vLang.toUpperCase()})</span>
+                                <span style="font-size:11px; opacity:0.8;">Click ▶ to listen</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    body = `
                         <div style="display:flex; align-items:center; gap:8px;">
                             <span style="font-size:16px;">🎙️</span>
-                            <audio controls src="${content}" preload="auto" style="max-width:210px; height:34px;"></audio>
+                            <audio controls src="${content}" style="max-width:210px; height:34px;"></audio>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
             } else if (type === "location") {
                 body = `<a href="${content}" target="_blank" style="color:inherit; font-weight:700;">📍 Shared Location (Open Map)</a>`;
             } else if (type === "document") {
