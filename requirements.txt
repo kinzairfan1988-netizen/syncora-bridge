@@ -2,5 +2,5 @@ fastapi
 uvicorn
 python-multipart
 google-generativeai
-edge-tts
 websockets
+twilio
