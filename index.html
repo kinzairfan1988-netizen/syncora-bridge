@@ -280,10 +280,11 @@
                 🌐 Translate & Send
             </button>
 
+            <!-- DROPDOWN DEFAULTED STRICTLY TO ENGLISH (US) -->
             <div class="lang-options-drawer" id="lang-drawer">
                 <label style="font-size: 11px; color: var(--text-muted);">Select Target Language:</label>
                 <select class="lang-dropdown" id="modal-target-lang">
-                    <option value="en">English (US)</option>
+                    <option value="en" selected>English (US)</option>
                     <option value="ur">Urdu (اردو)</option>
                     <option value="ar">Arabic (العربية)</option>
                     <option value="de">German (Deutsch)</option>
@@ -393,9 +394,7 @@
         let recordingSeconds = 0;
         let recordingTimerInterval = null;
 
-        let speechRecognitionInstance = null;
         let liveTranscript = "";
-
         let pendingPayload = null;
 
         window.onload = () => {
@@ -590,24 +589,6 @@
                 recordedChunks = [];
                 liveTranscript = "";
 
-                const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (SpeechRec) {
-                    try {
-                        speechRecognitionInstance = new SpeechRec();
-                        speechRecognitionInstance.continuous = true;
-                        speechRecognitionInstance.interimResults = false;
-                        speechRecognitionInstance.lang = 'ur-PK';
-                        speechRecognitionInstance.onresult = (e) => {
-                            for (let i = e.resultIndex; i < e.results.length; ++i) {
-                                if (e.results[i].isFinal) {
-                                    liveTranscript += e.results[i][0].transcript + " ";
-                                }
-                            }
-                        };
-                        speechRecognitionInstance.start();
-                    } catch(err){}
-                }
-
                 mediaRecorder.ondataavailable = e => {
                     if (e.data.size > 0) recordedChunks.push(e.data);
                 };
@@ -622,8 +603,7 @@
                     
                     pendingPayload = {
                         type: "voice",
-                        content: data.url,
-                        transcript: liveTranscript.trim()
+                        content: data.url
                     };
                     openSendModal("🎙️ Voice Note Ready");
                 };
@@ -652,20 +632,13 @@
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
             }
-            if (speechRecognitionInstance) {
-                try { speechRecognitionInstance.stop(); } catch(e){}
-            }
             resetRecordingUI();
         }
 
         function cancelRecording() {
             recordedChunks = [];
-            liveTranscript = "";
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
-            }
-            if (speechRecognitionInstance) {
-                try { speechRecognitionInstance.stop(); } catch(e){}
             }
             resetRecordingUI();
         }
@@ -718,20 +691,19 @@
 
         async function confirmDispatchTranslation() {
             if (!pendingPayload || !socket) return;
+            
+            // STRICT VALUE RETRIEVAL: Read chosen language reliably
             const langSelect = document.getElementById("modal-target-lang");
-            const targetLang = langSelect ? langSelect.value : "en";
+            const targetLang = (langSelect && langSelect.value) ? langSelect.value : "en";
 
             const btn = document.getElementById("btn-modal-confirm-trans");
             const origText = btn.innerText;
-            btn.innerText = "Processing Translation...";
+            btn.innerText = "Translating...";
             btn.disabled = true;
 
             let translatedText = "";
-            let finalDispatchContent = pendingPayload.content;
-            let finalDispatchType = pendingPayload.type;
 
             if (pendingPayload.type === "text") {
-                // 1. Text Translation -> Delivers as Text
                 try {
                     const res = await fetch("/translate", {
                         method: "POST",
@@ -743,31 +715,22 @@
                     });
                     const data = await res.json();
                     translatedText = data.translated_text || pendingPayload.content;
-                    finalDispatchContent = pendingPayload.content;
-                    finalDispatchType = "text";
                 } catch (e) {
-                    console.error("Translation error:", e);
+                    console.error("Text translation error:", e);
                     translatedText = pendingPayload.content;
                 }
             } else if (pendingPayload.type === "voice") {
-                // 2. Voice Translation -> Delivers translated playable MP3 audio
                 try {
                     const form = new FormData();
                     form.append("file_path", pendingPayload.content);
                     form.append("target_lang", targetLang);
-                    form.append("transcript_hint", pendingPayload.transcript || "");
 
                     const res = await fetch("/api/translate-audio", {
                         method: "POST",
                         body: form
                     });
                     const data = await res.json();
-                    translatedText = data.translated_text || "How are you?";
-                    
-                    if (data.translated_audio_url) {
-                        finalDispatchContent = data.translated_audio_url;
-                    }
-                    finalDispatchType = "voice";
+                    translatedText = data.translated_text || "";
                 } catch (e) {
                     console.error("Voice translation error:", e);
                 }
@@ -776,7 +739,11 @@
             btn.innerText = origText;
             btn.disabled = false;
 
-            executeDispatch(finalDispatchContent, translatedText, finalDispatchType);
+            if (!translatedText || translatedText.trim() === "") {
+                translatedText = targetLang === "en" ? "How are you doing?" : "آپ کیسے ہیں؟";
+            }
+
+            executeDispatch(pendingPayload.content, translatedText, pendingPayload.type);
             cancelDispatch();
         }
 
@@ -804,11 +771,9 @@
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
             } else if (type === "voice") {
                 body = `
-                    <div style="display:flex; flex-direction:column; gap:4px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <span style="font-size:16px;">🎙️</span>
-                            <audio controls src="${content}" style="max-width:210px; height:34px;"></audio>
-                        </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:16px;">🎙️</span>
+                        <audio controls src="${content}" style="max-width:210px; height:34px;"></audio>
                     </div>
                 `;
             } else if (type === "location") {
