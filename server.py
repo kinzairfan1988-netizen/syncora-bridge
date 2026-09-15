@@ -26,10 +26,17 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             phone TEXT PRIMARY KEY,
             display_name TEXT,
-            avatar_url TEXT,
+            about_status TEXT DEFAULT 'Hey there! I am using Syncora.',
+            avatar_url TEXT DEFAULT '',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Add column about_status if existing older table
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN about_status TEXT DEFAULT 'Hey there! I am using Syncora.'")
+    except Exception:
+        pass
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,17 +71,14 @@ if GEMINI_KEY:
     except Exception as e:
         print(f"[Gemini Config Error]: {e}")
 
-# Twilio SMS Credentials
 TWILIO_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
 TWILIO_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
 TWILIO_FROM = os.environ.get("TWILIO_PHONE_NUMBER", "")
 
 def send_real_sms(phone: str, otp: str) -> bool:
-    """Sends real OTP to user SIM via Twilio if configured"""
     if TWILIO_SID and TWILIO_TOKEN and TWILIO_FROM:
         try:
             client = Client(TWILIO_SID, TWILIO_TOKEN)
-            # Format number with country code if needed
             formatted_phone = phone.strip()
             if not formatted_phone.startswith("+"):
                 if formatted_phone.startswith("0"):
@@ -92,7 +96,6 @@ def send_real_sms(phone: str, otp: str) -> bool:
             print(f"[Twilio SMS Error]: {e}")
             return False
     else:
-        # Development fallback: logged on server console only, never to frontend
         print(f"[SECURE LOG - DEV ONLY] OTP for {phone}: {otp}")
         return True
 
@@ -107,6 +110,12 @@ class OTPVerify(BaseModel):
     phone: str
     otp: str
     display_name: str = ""
+
+class ProfileUpdate(BaseModel):
+    phone: str
+    display_name: str
+    about_status: str
+    avatar_url: str = ""
 
 def get_chat_id(u1: str, u2: str) -> str:
     cleaned = sorted([u1.strip(), u2.strip()])
@@ -153,6 +162,40 @@ class ConnectionManager:
                 self.disconnect(phone)
 
 manager = ConnectionManager()
+
+# --- PROFILE & SETTINGS ENDPOINTS ---
+@app.get("/api/user/profile/{phone}")
+async def get_user_profile(phone: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT phone, display_name, about_status, avatar_url, created_at FROM users WHERE phone = ?", (phone,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return {"phone": phone, "display_name": phone, "about_status": "Hey there! I am using Syncora.", "avatar_url": "", "created_at": "Recent"}
+    return {
+        "phone": row[0],
+        "display_name": row[1] if row[1] else row[0],
+        "about_status": row[2] if row[2] else "Hey there! I am using Syncora.",
+        "avatar_url": row[3] if row[3] else "",
+        "created_at": str(row[4])
+    }
+
+@app.post("/api/user/profile/update")
+async def update_user_profile(req: ProfileUpdate):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO users (phone, display_name, about_status, avatar_url)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(phone) DO UPDATE SET
+            display_name=excluded.display_name,
+            about_status=excluded.about_status,
+            avatar_url=CASE WHEN excluded.avatar_url != '' THEN excluded.avatar_url ELSE users.avatar_url END
+    """, (req.phone.strip(), req.display_name.strip(), req.about_status.strip(), req.avatar_url.strip()))
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "message": "Profile updated successfully"}
 
 # --- TEXT TRANSLATION ROUTE ---
 @app.post("/translate")
@@ -252,7 +295,7 @@ async def translate_audio_route(
         "file_path": file_path
     }
 
-# --- SECURE OTP ROUTE (NO FRONTEND LEAKAGE) ---
+# --- OTP ENDPOINTS ---
 @app.post("/api/otp/send")
 async def send_otp(req: OTPRequest):
     phone = req.phone.strip()
@@ -266,10 +309,7 @@ async def send_otp(req: OTPRequest):
     conn.commit()
     conn.close()
 
-    # Send SMS via gateway
     send_real_sms(phone, otp_code)
-
-    # Secure response: NEVER return the OTP in the JSON response
     return {"status": "ok", "message": "Verification code has been sent to your mobile phone via SMS."}
 
 @app.post("/api/otp/verify")
@@ -290,6 +330,7 @@ async def verify_otp(req: OTPVerify):
     conn.close()
     return {"status": "verified", "phone": phone}
 
+# --- CHAT & HISTORY ENDPOINTS ---
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
     conn = sqlite3.connect(DB_PATH)
@@ -333,6 +374,7 @@ async def upload_media(file: UploadFile = File(...)):
         f.write(await file.read())
     return {"url": f"/uploads/{filename}"}
 
+# --- WEBSOCKET ROUTING ---
 @app.websocket("/ws/{phone}")
 async def socket_endpoint(websocket: WebSocket, phone: str):
     await manager.connect(phone, websocket)
