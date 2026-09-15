@@ -120,7 +120,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# --- DIRECT INSTANT LOGIN (NO OTP DELAYS) ---
+# --- DIRECT INSTANT LOGIN ---
 @app.post("/api/auth/login")
 async def direct_login(req: DirectLoginRequest):
     phone = req.phone.strip()
@@ -135,7 +135,7 @@ async def direct_login(req: DirectLoginRequest):
 
     return {"status": "ok", "phone": phone}
 
-# --- PROFILE & SETTINGS ---
+# --- PROFILE API ---
 @app.get("/api/user/profile/{phone}")
 async def get_user_profile(phone: str):
     conn = sqlite3.connect(DB_PATH)
@@ -169,7 +169,7 @@ async def update_user_profile(req: ProfileUpdate):
     conn.close()
     return {"status": "ok", "message": "Profile updated successfully"}
 
-# --- TEXT TRANSLATION ROUTE ---
+# --- TEXT TRANSLATE ROUTE ---
 @app.post("/translate")
 async def translate_text(req: TranslationRequest):
     clean = req.text.strip()
@@ -180,37 +180,33 @@ async def translate_text(req: TranslationRequest):
     has_script = is_urdu_or_arabic(clean)
 
     if GEMINI_KEY:
-        for model_name in ["gemini-2.0-flash", "gemini-1.5-flash"]:
+        for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
             try:
                 model = genai.GenerativeModel(model_name)
                 prompt = (
-                    f"Translate the following input directly into '{target_lang}'.\n"
-                    f"- If input is Roman Urdu or Urdu script and target is 'en', translate to clean natural English.\n"
+                    f"Translate the following input directly into language code '{target_lang}'.\n"
+                    f"Input may be Roman Urdu, Urdu script, or Hindi.\n"
+                    f"- If input is Urdu/Roman Urdu and target is 'en', translate to natural English.\n"
                     f"- If input is English and target is 'ur', translate to natural Urdu script.\n"
-                    f"Return ONLY the translated sentence, no quotes, no explanations:\n\n{clean}"
+                    f"Output ONLY the translated sentence, no extra notes or quotes:\n\n{clean}"
                 )
                 response = model.generate_content(prompt)
                 if response and hasattr(response, "text") and response.text:
                     out = response.text.strip().replace('"', '').replace("'", "")
-                    if out and out.lower() != clean.lower():
+                    if out:
                         return {"translated_text": out}
             except Exception as e:
-                print(f"[Gemini Text Translation Error]: {e}")
+                print(f"[Gemini Translation Error]: {e}")
                 continue
 
     source_param = "ur" if has_script else "auto"
     g_res = translate_via_google(clean, source_param, target_lang)
-    if g_res and g_res.lower() != clean.lower():
+    if g_res:
         return {"translated_text": g_res}
-
-    if target_lang == "en":
-        g_res_ur = translate_via_google(clean, "ur", "en")
-        if g_res_ur and g_res_ur.lower() != clean.lower():
-            return {"translated_text": g_res_ur}
 
     return {"translated_text": clean}
 
-# --- VOICE TRANSLATION ROUTE ---
+# --- AUDIO TRANSLATE ROUTE ---
 @app.post("/api/translate-audio")
 async def translate_audio_route(
     file_path: str = Form(...),
@@ -222,19 +218,12 @@ async def translate_audio_route(
     local_filename = os.path.basename(file_path)
     actual_path = os.path.join(UPLOAD_DIR, local_filename)
 
-    if transcript_hint and transcript_hint.strip():
-        req = TranslationRequest(text=transcript_hint.strip(), target_lang=chosen_target)
-        res = await translate_text(req)
-        cand = res.get("translated_text", "")
-        if cand and cand.lower() != transcript_hint.strip().lower():
-            translated_text = cand
-
-    if not translated_text and os.path.exists(actual_path) and GEMINI_KEY:
+    if os.path.exists(actual_path) and GEMINI_KEY:
         try:
             with open(actual_path, "rb") as f:
                 audio_bytes = f.read()
 
-            for model_name in ["gemini-2.0-flash", "gemini-1.5-flash"]:
+            for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
                 try:
                     model = genai.GenerativeModel(model_name)
                     audio_part = {
@@ -242,10 +231,9 @@ async def translate_audio_route(
                         "data": base64.b64encode(audio_bytes).decode("utf-8")
                     }
                     prompt = (
-                        f"Listen to this audio note carefully. "
-                        f"Translate what the speaker says directly into '{chosen_target}'. "
-                        f"If the target is 'en', output must be in English. "
-                        f"Output ONLY the translated sentence. No preface, no quotes."
+                        f"Listen to this audio note carefully. Transcribe what is actually spoken (Urdu/Hindi/English) "
+                        f"and translate it directly into target '{chosen_target}'. "
+                        f"Output ONLY the exact translated sentence without any quotes or explanations."
                     )
                     resp = model.generate_content([prompt, audio_part])
                     if resp and hasattr(resp, "text") and resp.text:
@@ -254,12 +242,17 @@ async def translate_audio_route(
                             translated_text = out
                             break
                 except Exception as e:
-                    print(f"[Gemini Audio API Error]: {e}")
+                    print(f"[Gemini Audio Error]: {e}")
         except Exception as e:
-            print(f"[File Read Error]: {e}")
+            print(f"[Audio File Read Error]: {e}")
+
+    if not translated_text and transcript_hint and transcript_hint.strip():
+        req = TranslationRequest(text=transcript_hint.strip(), target_lang=chosen_target)
+        res = await translate_text(req)
+        translated_text = res.get("translated_text", "")
 
     if not translated_text:
-        translated_text = "How are you doing?" if chosen_target == "en" else "آپ کیسے ہیں؟"
+        translated_text = "Audio recorded (Translation unclear)"
 
     return {
         "translated_text": translated_text,
@@ -267,7 +260,7 @@ async def translate_audio_route(
         "file_path": file_path
     }
 
-# --- CHAT & HISTORY ENDPOINTS ---
+# --- CHATS & MESSAGES ---
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
     conn = sqlite3.connect(DB_PATH)
@@ -311,7 +304,7 @@ async def upload_media(file: UploadFile = File(...)):
         f.write(await file.read())
     return {"url": f"/uploads/{filename}"}
 
-# --- WEBSOCKET ROUTING ---
+# --- WEBSOCKET WITH CALL LIVE TRANSLATION DISPATCH ---
 @app.websocket("/ws/{phone}")
 async def socket_endpoint(websocket: WebSocket, phone: str):
     await manager.connect(phone, websocket)
@@ -347,8 +340,22 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                     "time": "now"
                 }
                 await manager.send_to_user(receiver, out_payload)
+
             elif action in ["call_signal", "ice_candidate"]:
+                payload["sender"] = phone
                 await manager.send_to_user(receiver, payload)
+
+            # REAL-TIME CALL SUBTITLES / TRANSLATION RELAY
+            elif action == "call_live_caption":
+                out_payload = {
+                    "action": "call_live_caption",
+                    "sender": phone,
+                    "original": payload.get("original", ""),
+                    "translated": payload.get("translated", ""),
+                    "lang": payload.get("lang", "en")
+                }
+                await manager.send_to_user(receiver, out_payload)
+
     except WebSocketDisconnect:
         manager.disconnect(phone)
     except Exception:
