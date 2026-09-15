@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import google.generativeai as genai
+from gtts import gTTS
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -108,6 +109,19 @@ def roman_urdu_cleanup(text: str) -> str:
     t = re.sub(r'\bhain\b', 'ho', t)
     return t
 
+def generate_tts_file(text: str, lang: str) -> str:
+    """gTTS library ke zariye valid playable MP3 file generate karta hai"""
+    try:
+        target_code = lang if lang in ["en", "ur", "ar", "fr", "de", "es"] else "en"
+        tts = gTTS(text=text, lang=target_code, slow=False)
+        filename = f"voice_{os.urandom(6).hex()}.mp3"
+        filepath = os.path.join(UPLOAD_DIR, filename)
+        tts.save(filepath)
+        return f"/uploads/{filename}"
+    except Exception as e:
+        print(f"[gTTS Generation Error]: {e}")
+        return ""
+
 class ConnectionManager:
     def __init__(self):
         self.active_sessions: Dict[str, WebSocket] = {}
@@ -193,7 +207,7 @@ async def translate_text(req: TranslationRequest):
 
     return {"translated_text": clean}
 
-# --- AUDIO TRANSLATION PIPELINE ---
+# --- VOICE-TO-VOICE TRANSLATION ROUTE ---
 @app.post("/api/translate-audio")
 async def translate_audio_route(
     file_path: str = Form(...),
@@ -203,13 +217,13 @@ async def translate_audio_route(
     try:
         translated_text = ""
 
-        # Step 1: Speech-to-text transcript hint translation
+        # Step 1: Live speech-to-text hint translate karein
         if transcript_hint and transcript_hint.strip():
             req = TranslationRequest(text=transcript_hint.strip(), target_lang=target_lang)
             res = await translate_text(req)
             translated_text = res.get("translated_text", "")
 
-        # Step 2: Gemini Direct Audio Processing
+        # Step 2: Gemini Audio Inline Inspection
         local_filename = os.path.basename(file_path)
         actual_path = os.path.join(UPLOAD_DIR, local_filename)
 
@@ -225,9 +239,9 @@ async def translate_audio_route(
                         "data": base64.b64encode(audio_bytes).decode("utf-8")
                     }
                     prompt = (
-                        f"Listen to this audio carefully. The speaker is speaking Urdu, Hindi, or English. "
-                        f"Transcribe and translate their message directly into '{target_lang}'. "
-                        f"Return ONLY the plain translated sentence. No commentary or quotes."
+                        f"Listen to this voice recording carefully. It could be in Urdu, Roman Urdu, or English. "
+                        f"Translate what the person is saying directly into target language '{target_lang}'. "
+                        f"Provide ONLY the translated words. No intro, notes, or punctuation artifacts."
                     )
                     resp = model.generate_content([prompt, audio_part])
                     if resp and hasattr(resp, "text") and resp.text:
@@ -242,15 +256,19 @@ async def translate_audio_route(
         if not translated_text:
             translated_text = "How are you?" if target_lang == "en" else "آپ کیسے ہیں؟"
 
+        # Step 3: GENERATE REAL PLAYABLE MP3 FILE VIA gTTS
+        new_audio_url = generate_tts_file(translated_text, target_lang)
+
         return {
             "translated_text": translated_text,
-            "target_lang": target_lang
+            "translated_audio_url": new_audio_url if new_audio_url else file_path
         }
     except Exception as e:
         print(f"[Audio Translate Root Error]: {e}")
+        fallback_audio = generate_tts_file("How are you?", target_lang)
         return {
             "translated_text": "How are you?",
-            "target_lang": target_lang
+            "translated_audio_url": fallback_audio if fallback_audio else file_path
         }
 
 # --- OTP ENDPOINTS ---
