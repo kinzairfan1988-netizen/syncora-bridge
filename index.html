@@ -37,7 +37,6 @@
             overflow: hidden;
         }
 
-        /* 1. AUTH OVERLAY */
         .auth-overlay {
             position: fixed; inset: 0; background: rgba(9, 9, 11, 0.96);
             backdrop-filter: blur(12px); z-index: 999; display: flex;
@@ -77,10 +76,8 @@
             margin-top: 6px; box-shadow: 0 4px 20px var(--accent-amber-glow);
         }
 
-        /* 2. WORKSPACE 2-PANEL */
         .workspace { display: flex; width: 100%; height: 100%; }
 
-        /* LEFT SIDEBAR */
         .sidebar-panel {
             width: 380px; border-right: 1px solid var(--border-graphite);
             background: var(--surface-panel); display: flex; flex-direction: column; flex-shrink: 0;
@@ -116,7 +113,6 @@
         .chat-title { font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
         .chat-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
-        /* RIGHT STAGE */
         .stage-panel {
             flex: 1; display: flex; flex-direction: column; background: var(--bg-obsidian); position: relative;
         }
@@ -148,7 +144,6 @@
         }
         .bubble-time { font-size: 9px; opacity: 0.6; margin-top: 4px; text-align: right; }
 
-        /* INPUT BAR & VOICE DOCK */
         .stage-input-bar {
             padding: 10px 16px; background: var(--surface-panel);
             border-top: 1px solid var(--border-graphite); display: flex; align-items: center; gap: 8px; position: relative;
@@ -204,7 +199,6 @@
         }
         .attach-menu-item:hover { background: var(--surface-hover); color: var(--accent-amber); }
 
-        /* SEND OPTION MODAL */
         .send-modal-backdrop {
             position: fixed; inset: 0; background: rgba(0,0,0,0.85);
             z-index: 999; display: none; align-items: center; justify-content: center; padding: 20px;
@@ -238,7 +232,6 @@
 </head>
 <body>
 
-    <!-- AUTH OVERLAY -->
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
             <div class="auth-badge">IA</div>
@@ -267,7 +260,6 @@
         </div>
     </div>
 
-    <!-- SEND CONFIRMATION MODAL -->
     <div class="send-modal-backdrop" id="send-modal">
         <div class="send-modal-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Dispatch Mode</h3>
@@ -280,7 +272,6 @@
                 🌐 Translate & Send
             </button>
 
-            <!-- DROPDOWN DEFAULTED STRICTLY TO ENGLISH (US) -->
             <div class="lang-options-drawer" id="lang-drawer">
                 <label style="font-size: 11px; color: var(--text-muted);">Select Target Language:</label>
                 <select class="lang-dropdown" id="modal-target-lang">
@@ -303,10 +294,8 @@
         </div>
     </div>
 
-    <!-- 2-PANEL WORKSPACE -->
     <div class="workspace">
         
-        <!-- SIDEBAR -->
         <aside class="sidebar-panel">
             <div class="sidebar-header">
                 <span class="app-brand">SYNCORA CORE</span>
@@ -322,7 +311,6 @@
             <div class="chat-list" id="chat-list"></div>
         </aside>
 
-        <!-- ACTIVE STAGE -->
         <main class="stage-panel" id="stage-panel">
             <header class="stage-header">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -337,7 +325,6 @@
 
             <div class="messages-container" id="messages-container"></div>
 
-            <!-- ATTACHMENT MENU POPUP -->
             <div class="attach-popup-menu" id="attach-menu">
                 <div class="attach-menu-item" onclick="document.getElementById('file-picker-media').click()">
                     <span>🖼️</span> Photos / Videos
@@ -353,7 +340,6 @@
             <input type="file" id="file-picker-media" accept="image/*,video/*" style="display:none;" onchange="uploadAttachment(event, 'media')">
             <input type="file" id="file-picker-doc" accept="*/*" style="display:none;" onchange="uploadAttachment(event, 'document')">
 
-            <!-- DYNAMIC INPUT & VOICE DOCK -->
             <footer class="stage-input-bar">
                 
                 <div class="input-shell" id="input-shell">
@@ -394,7 +380,8 @@
         let recordingSeconds = 0;
         let recordingTimerInterval = null;
 
-        let liveTranscript = "";
+        let speechRec = null;
+        let capturedLiveText = "";
         let pendingPayload = null;
 
         window.onload = () => {
@@ -587,7 +574,26 @@
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
                 recordedChunks = [];
-                liveTranscript = "";
+                capturedLiveText = "";
+
+                // Start Web Speech API in parallel
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (SR) {
+                    try {
+                        speechRec = new SR();
+                        speechRec.continuous = true;
+                        speechRec.interimResults = false;
+                        speechRec.lang = 'ur-PK';
+                        speechRec.onresult = (e) => {
+                            for (let i = e.resultIndex; i < e.results.length; ++i) {
+                                if (e.results[i].isFinal) {
+                                    capturedLiveText += e.results[i][0].transcript + " ";
+                                }
+                            }
+                        };
+                        speechRec.start();
+                    } catch(err) {}
+                }
 
                 mediaRecorder.ondataavailable = e => {
                     if (e.data.size > 0) recordedChunks.push(e.data);
@@ -603,7 +609,8 @@
                     
                     pendingPayload = {
                         type: "voice",
-                        content: data.url
+                        content: data.url,
+                        transcript: capturedLiveText.trim()
                     };
                     openSendModal("🎙️ Voice Note Ready");
                 };
@@ -624,7 +631,7 @@
                 }, 1000);
 
             } catch (err) {
-                alert("Microphone permission required for voice notes: " + err.message);
+                alert("Microphone permission required: " + err.message);
             }
         }
 
@@ -632,13 +639,20 @@
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
             }
+            if (speechRec) {
+                try { speechRec.stop(); } catch(e){}
+            }
             resetRecordingUI();
         }
 
         function cancelRecording() {
             recordedChunks = [];
+            capturedLiveText = "";
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
+            }
+            if (speechRec) {
+                try { speechRec.stop(); } catch(e){}
             }
             resetRecordingUI();
         }
@@ -650,7 +664,7 @@
             document.getElementById("input-shell").style.display = "flex";
         }
 
-        /* --- STAGE & DISPATCH MODAL --- */
+        /* --- MODAL & DISPATCH --- */
         function stageMessageForDispatch() {
             const input = document.getElementById("text-input");
             const text = input.value.trim();
@@ -692,16 +706,17 @@
         async function confirmDispatchTranslation() {
             if (!pendingPayload || !socket) return;
             
-            // STRICT VALUE RETRIEVAL: Read chosen language reliably
             const langSelect = document.getElementById("modal-target-lang");
             const targetLang = (langSelect && langSelect.value) ? langSelect.value : "en";
 
             const btn = document.getElementById("btn-modal-confirm-trans");
             const origText = btn.innerText;
-            btn.innerText = "Translating...";
+            btn.innerText = "Processing Translation...";
             btn.disabled = true;
 
             let translatedText = "";
+            let finalDispatchContent = pendingPayload.content;
+            let finalDispatchType = pendingPayload.type;
 
             if (pendingPayload.type === "text") {
                 try {
@@ -724,6 +739,7 @@
                     const form = new FormData();
                     form.append("file_path", pendingPayload.content);
                     form.append("target_lang", targetLang);
+                    form.append("transcript_hint", pendingPayload.transcript || "");
 
                     const res = await fetch("/api/translate-audio", {
                         method: "POST",
@@ -731,6 +747,12 @@
                     });
                     const data = await res.json();
                     translatedText = data.translated_text || "";
+                    
+                    // NAYI TRANSLATED AUDIO FILE KO CONTENT BANAYEIN
+                    if (data.translated_audio_url) {
+                        finalDispatchContent = data.translated_audio_url;
+                    }
+                    finalDispatchType = "voice";
                 } catch (e) {
                     console.error("Voice translation error:", e);
                 }
@@ -739,11 +761,7 @@
             btn.innerText = origText;
             btn.disabled = false;
 
-            if (!translatedText || translatedText.trim() === "") {
-                translatedText = targetLang === "en" ? "How are you doing?" : "آپ کیسے ہیں؟";
-            }
-
-            executeDispatch(pendingPayload.content, translatedText, pendingPayload.type);
+            executeDispatch(finalDispatchContent, translatedText, finalDispatchType);
             cancelDispatch();
         }
 
@@ -771,9 +789,11 @@
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
             } else if (type === "voice") {
                 body = `
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-size:16px;">🎙️</span>
-                        <audio controls src="${content}" style="max-width:210px; height:34px;"></audio>
+                    <div style="display:flex; flex-direction:column; gap:4px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:16px;">🎙️</span>
+                            <audio controls src="${content}" style="max-width:210px; height:34px;"></audio>
+                        </div>
                     </div>
                 `;
             } else if (type === "location") {
