@@ -42,7 +42,6 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Migration safeguard for status column in existing DBs
     try:
         cursor.execute("ALTER TABLE messages ADD COLUMN status TEXT DEFAULT 'sent'")
     except Exception:
@@ -114,7 +113,7 @@ class ConnectionManager:
             del self.active_sessions[phone]
 
     def is_online(self, phone: str) -> bool:
-        return phone in self.active_sessions
+        return phone.strip() in self.active_sessions
 
     async def send_to_user(self, phone: str, payload: dict):
         if phone in self.active_sessions:
@@ -140,10 +139,11 @@ async def direct_login(req: DirectLoginRequest):
 
     return {"status": "ok", "phone": phone}
 
-# --- PRESENCE API ---
+# --- PRESENCE STATUS ---
 @app.get("/api/user/status/{phone}")
 async def get_user_status(phone: str):
-    return {"phone": phone, "online": manager.is_online(phone.strip())}
+    is_on = manager.is_online(phone.strip())
+    return {"phone": phone, "online": is_on}
 
 # --- PROFILE API ---
 @app.get("/api/user/profile/{phone}")
@@ -194,9 +194,11 @@ async def translate_text(req: TranslationRequest):
             try:
                 model = genai.GenerativeModel(model_name)
                 prompt = (
-                    f"Translate the following input accurately into '{target_lang}'.\n"
-                    f"- Input may be Roman Urdu, Urdu script, or Hindi.\n"
-                    f"Output ONLY the translated sentence, without any quotes or explanations:\n\n{clean}"
+                    f"Translate the following user input accurately and strictly into language code '{target_lang}'.\n"
+                    f"The input could be Roman Urdu, Urdu script, or Hindi.\n"
+                    f"- If input is Roman Urdu or Urdu script and target is 'en', translate to natural English.\n"
+                    f"- If input is English and target is 'ur', translate to Urdu script.\n"
+                    f"Do NOT guess or add generic greetings. Output ONLY the exact translated sentence without quotes:\n\n{clean}"
                 )
                 response = model.generate_content(prompt)
                 if response and hasattr(response, "text") and response.text:
@@ -204,7 +206,7 @@ async def translate_text(req: TranslationRequest):
                     if out:
                         return {"translated_text": out}
             except Exception as e:
-                print(f"[Gemini Error]: {e}")
+                print(f"[Gemini Text Translation Error {model_name}]: {e}")
                 continue
 
     source_param = "ur" if has_script else "auto"
@@ -214,7 +216,7 @@ async def translate_text(req: TranslationRequest):
 
     return {"translated_text": clean}
 
-# --- AUDIO TRANSLATE ROUTE ---
+# --- ACCURATE AUDIO TRANSLATION ---
 @app.post("/api/translate-audio")
 async def translate_audio_route(
     file_path: str = Form(...),
@@ -234,25 +236,27 @@ async def translate_audio_route(
             for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
                 try:
                     model = genai.GenerativeModel(model_name)
+                    # Support audio webm or mp4
+                    mime_type = "audio/mp4" if local_filename.endswith(".mp4") else "audio/webm"
                     audio_part = {
-                        "mime_type": "audio/webm",
+                        "mime_type": mime_type,
                         "data": base64.b64encode(audio_bytes).decode("utf-8")
                     }
                     prompt = (
-                        f"Listen to this audio note carefully. Transcribe what is actually spoken (Urdu/Hindi/English) "
-                        f"and translate it directly into '{chosen_target}'. "
-                        f"Output ONLY the translated sentence without quotes."
+                        f"Listen carefully to this voice message. The speaker is talking in Urdu, Roman Urdu, or Hindi. "
+                        f"Transcribe what they actually said and translate it into '{chosen_target}'. "
+                        f"Do NOT invent words. Output ONLY the translated sentence, without any explanations or quotes."
                     )
                     resp = model.generate_content([prompt, audio_part])
                     if resp and hasattr(resp, "text") and resp.text:
-                        out = resp.text.strip().replace('"', '').replace("'", "")
-                        if out:
-                            translated_text = out
+                        cand = resp.text.strip().replace('"', '').replace("'", "")
+                        if cand:
+                            translated_text = cand
                             break
                 except Exception as e:
-                    print(f"[Gemini Audio Error]: {e}")
+                    print(f"[Gemini Audio Error {model_name}]: {e}")
         except Exception as e:
-            print(f"[Audio Read Error]: {e}")
+            print(f"[File Read Error]: {e}")
 
     if not translated_text and transcript_hint and transcript_hint.strip():
         req = TranslationRequest(text=transcript_hint.strip(), target_lang=chosen_target)
@@ -260,7 +264,7 @@ async def translate_audio_route(
         translated_text = res.get("translated_text", "")
 
     if not translated_text:
-        translated_text = "Audio recorded (Translation unclear)"
+        translated_text = "Audio received"
 
     return {
         "translated_text": translated_text,
@@ -268,7 +272,7 @@ async def translate_audio_route(
         "file_path": file_path
     }
 
-# --- CHATS & MESSAGES WITH STATUS (TICKS) ---
+# --- CHATS & MESSAGES ---
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
     conn = sqlite3.connect(DB_PATH)
@@ -287,7 +291,7 @@ async def get_conversation(phone: str, partner: str):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Automatically mark unread messages as delivered when receiver opens chat
+    # Safely mark unread messages as delivered
     cursor.execute("""
         UPDATE messages SET status = 'delivered'
         WHERE chat_id = ? AND receiver = ? AND status = 'sent'
@@ -321,26 +325,28 @@ async def upload_media(file: UploadFile = File(...)):
         f.write(await file.read())
     return {"url": f"/uploads/{filename}"}
 
-# --- REAL-TIME WEBSOCKET: TICK ENGINE & LIVE PRESENCE ---
+# --- WEBSOCKET ENGINE WITH HEARTBEAT & RELIABILITY ---
 @app.websocket("/ws/{phone}")
 async def socket_endpoint(websocket: WebSocket, phone: str):
     await manager.connect(phone, websocket)
     
-    # 1. On connect: deliver any pending sent messages to this user
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT sender FROM messages WHERE receiver = ? AND status = 'sent'", (phone,))
-    pending_senders = [row[0] for row in cursor.fetchall()]
-    cursor.execute("UPDATE messages SET status = 'delivered' WHERE receiver = ? AND status = 'sent'", (phone,))
-    conn.commit()
-    conn.close()
+    # Mark messages as delivered for this online user
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT sender FROM messages WHERE receiver = ? AND status = 'sent'", (phone,))
+        senders = [row[0] for row in cursor.fetchall()]
+        cursor.execute("UPDATE messages SET status = 'delivered' WHERE receiver = ? AND status = 'sent'", (phone,))
+        conn.commit()
+        conn.close()
 
-    # Notify online senders that their messages are now Double-Ticked (Delivered)
-    for sender_phone in pending_senders:
-        await manager.send_to_user(sender_phone, {
-            "action": "messages_delivered",
-            "delivered_to": phone
-        })
+        for s in senders:
+            await manager.send_to_user(s, {
+                "action": "messages_delivered",
+                "delivered_to": phone
+            })
+    except Exception as e:
+        print(f"[Delivered Update Error]: {e}")
 
     try:
         while True:
@@ -349,14 +355,19 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
             action = payload.get("action")
             receiver = payload.get("receiver")
 
+            # Heartbeat ping/pong to keep connection perpetually alive
+            if action == "ping":
+                await websocket.send_text(json.dumps({"action": "pong"}))
+                continue
+
             if action == "chat_message":
                 msg_type = payload.get("msg_type", "text")
                 content = payload.get("content", "")
                 translated = payload.get("translated", "")
                 chat_id = get_chat_id(phone, receiver)
 
-                # Determine initial status: delivered if receiver is online, else sent
-                initial_status = "delivered" if manager.is_online(receiver) else "sent"
+                is_rec_online = manager.is_online(receiver)
+                initial_status = "delivered" if is_rec_online else "sent"
 
                 conn = sqlite3.connect(DB_PATH)
                 cursor = conn.cursor()
@@ -368,7 +379,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                 conn.commit()
                 conn.close()
 
-                # Confirm to Sender (ack with msg_id & status)
+                # Ack back to sender
                 await manager.send_to_user(phone, {
                     "action": "message_sent_ack",
                     "id": msg_id,
@@ -376,8 +387,8 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                     "status": initial_status
                 })
 
-                # Deliver to Receiver
-                out_payload = {
+                # Forward to receiver
+                await manager.send_to_user(receiver, {
                     "action": "new_message",
                     "id": msg_id,
                     "sender": phone,
@@ -387,8 +398,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                     "translated": translated,
                     "status": initial_status,
                     "time": "now"
-                }
-                await manager.send_to_user(receiver, out_payload)
+                })
 
             elif action in ["call_signal", "ice_candidate"]:
                 payload["sender"] = phone
