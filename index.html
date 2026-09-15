@@ -38,7 +38,6 @@
             overflow: hidden;
         }
 
-        /* SIMPLE 1-STEP LOGIN OVERLAY */
         .auth-overlay {
             position: fixed; inset: 0; background: rgba(9, 9, 11, 0.96);
             backdrop-filter: blur(12px); z-index: 999; display: flex;
@@ -71,10 +70,8 @@
             box-shadow: 0 4px 20px var(--accent-amber-glow);
         }
 
-        /* 2-PANEL WORKSPACE */
         .workspace { display: flex; width: 100%; height: 100%; }
 
-        /* LEFT SIDEBAR */
         .sidebar-panel {
             width: 380px; border-right: 1px solid var(--border-graphite);
             background: var(--surface-panel); display: flex; flex-direction: column; flex-shrink: 0;
@@ -112,7 +109,6 @@
         .chat-title { font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
         .chat-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
-        /* RIGHT STAGE */
         .stage-panel {
             flex: 1; display: flex; flex-direction: column; background: var(--bg-obsidian); position: relative;
         }
@@ -157,7 +153,6 @@
         }
         .bubble-time { font-size: 9px; opacity: 0.6; margin-top: 4px; text-align: right; }
 
-        /* VOICE DOCK */
         .voice-card-box {
             display: flex; align-items: center; gap: 10px; padding: 4px 0;
         }
@@ -225,7 +220,6 @@
         }
         .attach-menu-item:hover { background: var(--surface-hover); color: var(--accent-amber); }
 
-        /* SEND OPTION MODAL */
         .send-modal-backdrop {
             position: fixed; inset: 0; background: rgba(0,0,0,0.85);
             z-index: 999; display: none; align-items: center; justify-content: center; padding: 20px;
@@ -249,7 +243,6 @@
             padding: 10px 12px; border-radius: 10px; color: #fff; font-size: 13px; outline: none;
         }
 
-        /* SETTINGS MODAL */
         .settings-overlay {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88);
             backdrop-filter: blur(10px); z-index: 998; display: none;
@@ -308,7 +301,7 @@
         }
         .btn-logout:hover { background: rgba(239, 68, 68, 0.25); }
 
-        /* LIVE CALL OVERLAY MODAL */
+        /* LIVE CALL OVERLAY */
         .call-modal-overlay {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.94);
             backdrop-filter: blur(14px); z-index: 1000; display: none;
@@ -361,19 +354,19 @@
 </head>
 <body>
 
-    <!-- 1-STEP INSTANT LOGIN OVERLAY -->
+    <!-- 1-STEP LOGIN OVERLAY -->
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
             <div class="auth-badge">IA</div>
             <h2 class="auth-title">Welcome to Syncora</h2>
-            <p class="auth-desc">Chat, Call aur Live translation start karne ke liye apna mobile number enter karein.</p>
+            <p class="auth-desc">Direct chat aur live translation ke liye apna number enter karein.</p>
 
             <input type="tel" id="my-phone-input" class="auth-input" placeholder="Mobile Number (e.g. 03001234567)" onkeydown="if(event.key==='Enter'){ executeDirectLogin(); }">
             <button class="btn-auth" onclick="executeDirectLogin()">Continue to Chat →</button>
         </div>
     </div>
 
-    <!-- CALL OVERLAY SCREEN -->
+    <!-- CALL MODAL -->
     <div class="call-modal-overlay" id="call-modal">
         <div class="call-user-card">
             <div class="call-avatar-circle" id="call-avatar-icon">📞</div>
@@ -393,7 +386,7 @@
         </div>
     </div>
 
-    <!-- SETTINGS & ACCOUNT DETAILS MODAL -->
+    <!-- SETTINGS MODAL -->
     <div class="settings-overlay" id="settings-modal">
         <div class="settings-card">
             <div class="settings-header">
@@ -465,15 +458,14 @@
         </div>
     </div>
 
-    <!-- 2-PANEL WORKSPACE -->
+    <!-- WORKSPACE -->
     <div class="workspace">
         
-        <!-- SIDEBAR -->
         <aside class="sidebar-panel">
             <div class="sidebar-header">
                 <span class="app-brand">SYNCORA CORE</span>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <button onclick="copyMyInviteLink()" style="background: var(--accent-amber-dim); border: 1px solid rgba(245,158,11,0.4); color: var(--accent-amber); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Copy Invite Link for Friends">📋 Invite Link</button>
+                    <button onclick="copyMyInviteLink()" style="background: var(--accent-amber-dim); border: 1px solid rgba(245,158,11,0.4); color: var(--accent-amber); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Copy Direct Chat Link">📋 Copy My Link</button>
                     <button onclick="openSettingsModal()" class="icon-btn" title="Settings & Account" style="font-size: 16px;">⚙️</button>
                     <span style="font-size: 12px; color: var(--online-green);" id="my-status-label">● Online</span>
                 </div>
@@ -485,7 +477,6 @@
             <div class="chat-list" id="chat-list"></div>
         </aside>
 
-        <!-- ACTIVE STAGE -->
         <main class="stage-panel" id="stage-panel">
             <header class="stage-header">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -497,7 +488,6 @@
                     </div>
                 </div>
 
-                <!-- CALL BUTTONS RESTORED -->
                 <div class="call-buttons-group" id="call-buttons-dock" style="display: none;">
                     <button class="btn-call-action" onclick="startCallSession('audio')" title="Audio Call">📞</button>
                     <button class="btn-call-action" onclick="startCallSession('video')" title="Video Call">📹</button>
@@ -506,7 +496,6 @@
 
             <div class="messages-container" id="messages-container"></div>
 
-            <!-- ATTACHMENT POPUP -->
             <div class="attach-popup-menu" id="attach-menu">
                 <div class="attach-menu-item" onclick="document.getElementById('file-picker-media').click()">
                     <span>🖼️</span> Photos / Videos
@@ -522,7 +511,6 @@
             <input type="file" id="file-picker-media" accept="image/*,video/*" style="display:none;" onchange="uploadAttachment(event, 'media')">
             <input type="file" id="file-picker-doc" accept="*/*" style="display:none;" onchange="uploadAttachment(event, 'document')">
 
-            <!-- INPUT BAR & VOICE DOCK -->
             <footer class="stage-input-bar">
                 
                 <div class="input-shell" id="input-shell">
@@ -552,43 +540,52 @@
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        let inviteHost = urlParams.get('invite') || "";
+        let directChatParam = urlParams.get('chat') || urlParams.get('invite') || "";
         
         let myPhone = localStorage.getItem("syncora_user_phone") || "";
-        let activePartner = "";
+        let activePartner = localStorage.getItem("syncora_active_partner") || "";
+        
         let socket = null;
+        let isConnectingSocket = false;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECTS = 5;
+
         let mediaRecorder = null;
         let recordedChunks = [];
         let isRecording = false;
         let recordingSeconds = 0;
         let recordingTimerInterval = null;
 
-        let liveSpeechInstance = null;
-        let capturedLiveText = "";
         let pendingPayload = null;
         let currentAvatarUrl = "";
 
-        // WebRTC Call state
+        // WebRTC Safe State
         let peerConnection = null;
         let localMediaStream = null;
         let currentCallType = "audio";
         let isMicMuted = false;
-        const rtcConfig = {
-            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-        };
+        const rtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
         window.onload = () => {
             if (myPhone) {
                 document.getElementById("auth-overlay").style.display = "none";
                 document.getElementById("my-status-label").innerText = `● ${myPhone}`;
-                initSocket();
+                initSocketSafe();
                 loadRecentChats();
                 loadUserProfileData();
-                
-                if (inviteHost && inviteHost !== myPhone) {
-                    selectChat(inviteHost);
+
+                if (directChatParam && directChatParam !== myPhone) {
+                    selectChat(directChatParam);
+                } else if (activePartner && activePartner !== myPhone) {
+                    selectChat(activePartner);
                 }
             }
+        };
+
+        // CLEAN MEMORY ON WINDOW UNLOAD
+        window.onbeforeunload = () => {
+            if (socket) { socket.close(); }
+            if (localMediaStream) { localMediaStream.getTracks().forEach(t => t.stop()); }
         };
 
         async function executeDirectLogin() {
@@ -598,26 +595,30 @@
                 return;
             }
 
-            const res = await fetch("/api/auth/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone: input })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                myPhone = input;
-                localStorage.setItem("syncora_user_phone", myPhone);
-                document.getElementById("auth-overlay").style.display = "none";
-                document.getElementById("my-status-label").innerText = `● ${myPhone}`;
-                initSocket();
-                loadRecentChats();
-                loadUserProfileData();
+            try {
+                const res = await fetch("/api/auth/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ phone: input })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    myPhone = input;
+                    localStorage.setItem("syncora_user_phone", myPhone);
+                    document.getElementById("auth-overlay").style.display = "none";
+                    document.getElementById("my-status-label").innerText = `● ${myPhone}`;
+                    initSocketSafe();
+                    loadRecentChats();
+                    loadUserProfileData();
 
-                if (inviteHost && inviteHost !== myPhone) {
-                    selectChat(inviteHost);
+                    if (directChatParam && directChatParam !== myPhone) {
+                        selectChat(directChatParam);
+                    }
+                } else {
+                    alert(data.error || "Login failed");
                 }
-            } else {
-                alert(data.error || "Login failed");
+            } catch(err) {
+                alert("Network connection error: " + err.message);
             }
         }
 
@@ -700,9 +701,12 @@
         function executeLogout() {
             if (confirm("Kiya aap waqai Syncora se Logout karna chahte hain?")) {
                 if (socket) {
+                    socket.onclose = null; // Prevent loop
                     socket.close();
+                    socket = null;
                 }
                 localStorage.removeItem("syncora_user_phone");
+                localStorage.removeItem("syncora_active_partner");
                 myPhone = "";
                 activePartner = "";
                 closeSettingsModal();
@@ -713,58 +717,91 @@
 
         function copyMyInviteLink() {
             const origin = window.location.origin;
-            const inviteUrl = `${origin}/?invite=${encodeURIComponent(myPhone)}`;
-            navigator.clipboard.writeText(inviteUrl).then(() => {
-                alert("Invite link copy ho gaya hai! Dost ko bheinjein, wo login hotay hi seedha aapki chat mein open hoga.");
+            const directLink = `${origin}/?chat=${encodeURIComponent(myPhone)}`;
+            navigator.clipboard.writeText(directLink).then(() => {
+                alert(`Direct link copied!\n\nLink: ${directLink}\n\nDost ko bheinjein, wo click karte hi seedha aapki chat screen mein enter ho jayega!`);
             });
         }
 
-        function initSocket() {
+        // SAFE SOCKET INITIALIZATION (ZERO MEMORY LEAK / ZERO TAB CRASH)
+        function initSocketSafe() {
+            if (!myPhone || isConnectingSocket) return;
+            if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+                return;
+            }
+
+            isConnectingSocket = true;
             const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
-            socket = new WebSocket(`${proto}${window.location.host}/ws/${myPhone}`);
+            
+            try {
+                socket = new WebSocket(`${proto}${window.location.host}/ws/${myPhone}`);
 
-            socket.onmessage = async (event) => {
-                const data = JSON.parse(event.data);
-                if (data.action === "new_message") {
-                    if (data.sender === activePartner) {
-                        appendBubble(data.content, "received", data.translated, data.msg_type, data.time);
-                    }
-                    loadRecentChats();
-                } else if (data.action === "call_signal") {
-                    handleIncomingCallSignal(data);
-                } else if (data.action === "ice_candidate") {
-                    if (peerConnection && data.candidate) {
-                        try {
-                            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-                        } catch (e) {
-                            console.error("Error adding ice candidate", e);
+                socket.onopen = () => {
+                    isConnectingSocket = false;
+                    reconnectAttempts = 0;
+                    document.getElementById("my-status-label").innerText = `● ${myPhone}`;
+                };
+
+                socket.onmessage = async (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.action === "new_message") {
+                            if (data.sender === activePartner) {
+                                appendBubble(data.content, "received", data.translated, data.msg_type, data.time);
+                            }
+                            loadRecentChats();
+                        } else if (data.action === "call_signal") {
+                            handleIncomingCallSignal(data);
+                        } else if (data.action === "ice_candidate") {
+                            if (peerConnection && data.candidate) {
+                                try {
+                                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                                } catch (e) {}
+                            }
                         }
-                    }
-                }
-            };
+                    } catch(e){}
+                };
 
-            socket.onclose = () => { setTimeout(initSocket, 2000); };
+                socket.onclose = () => {
+                    isConnectingSocket = false;
+                    socket = null;
+                    if (reconnectAttempts < MAX_RECONNECTS && myPhone) {
+                        reconnectAttempts++;
+                        setTimeout(initSocketSafe, 3000);
+                    }
+                };
+
+                socket.onerror = () => {
+                    isConnectingSocket = false;
+                    if (socket) { socket.close(); }
+                };
+
+            } catch(e) {
+                isConnectingSocket = false;
+            }
         }
 
         async function loadRecentChats() {
             if (!myPhone) return;
-            const res = await fetch(`/api/chats/${myPhone}`);
-            const data = await res.json();
-            const list = document.getElementById("chat-list");
-            list.innerHTML = "";
-            data.chats.forEach(partner => {
-                const item = document.createElement("div");
-                item.className = `chat-item ${partner === activePartner ? 'active' : ''}`;
-                item.onclick = () => selectChat(partner);
-                item.innerHTML = `
-                    <div class="chat-avatar">${partner.slice(-2)}</div>
-                    <div class="chat-info">
-                        <div class="chat-title">${partner}</div>
-                        <div class="chat-subtitle">Direct line active</div>
-                    </div>
-                `;
-                list.appendChild(item);
-            });
+            try {
+                const res = await fetch(`/api/chats/${myPhone}`);
+                const data = await res.json();
+                const list = document.getElementById("chat-list");
+                list.innerHTML = "";
+                data.chats.forEach(partner => {
+                    const item = document.createElement("div");
+                    item.className = `chat-item ${partner === activePartner ? 'active' : ''}`;
+                    item.onclick = () => selectChat(partner);
+                    item.innerHTML = `
+                        <div class="chat-avatar">${partner.slice(-2)}</div>
+                        <div class="chat-info">
+                            <div class="chat-title">${partner}</div>
+                            <div class="chat-subtitle">Direct line active</div>
+                        </div>
+                    `;
+                    list.appendChild(item);
+                });
+            } catch(e){}
         }
 
         function openDirectChat() {
@@ -775,30 +812,32 @@
 
         async function selectChat(partner) {
             activePartner = partner;
+            localStorage.setItem("syncora_active_partner", activePartner);
+
             document.body.classList.add("in-chat");
             document.getElementById("active-partner-label").innerText = partner;
             document.getElementById("active-avatar").innerText = partner.slice(-2);
             document.getElementById("mobile-back-btn").style.display = "inline-block";
-            
-            // SHOW CALL BUTTONS IN HEADER
             document.getElementById("call-buttons-dock").style.display = "flex";
 
-            const res = await fetch(`/api/messages/${myPhone}/${partner}`);
-            const data = await res.json();
-            const box = document.getElementById("messages-container");
-            box.innerHTML = "";
-            data.messages.forEach(m => {
-                const type = m.sender === myPhone ? "sent" : "received";
-                appendBubble(m.content, type, m.translated_content, m.msg_type, m.time);
-            });
-            loadRecentChats();
+            try {
+                const res = await fetch(`/api/messages/${myPhone}/${partner}`);
+                const data = await res.json();
+                const box = document.getElementById("messages-container");
+                box.innerHTML = "";
+                data.messages.forEach(m => {
+                    const type = m.sender === myPhone ? "sent" : "received";
+                    appendBubble(m.content, type, m.translated_content, m.msg_type, m.time);
+                });
+                loadRecentChats();
+            } catch(e){}
         }
 
         function backToSidebar() {
             document.body.classList.remove("in-chat");
         }
 
-        /* --- WEBRTC CALL ENGINE (AUDIO & VIDEO) --- */
+        /* --- WEBRTC CALL ENGINE (LEAK-PROOF) --- */
         async function startCallSession(type) {
             if (!activePartner) {
                 alert("Pehle kisi user ko select karein call karne ke liye!");
@@ -833,13 +872,15 @@
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
 
-                socket.send(JSON.stringify({
-                    action: "call_signal",
-                    receiver: activePartner,
-                    signal_type: "offer",
-                    call_type: type,
-                    sdp: offer
-                }));
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        action: "call_signal",
+                        receiver: activePartner,
+                        signal_type: "offer",
+                        call_type: type,
+                        sdp: offer
+                    }));
+                }
 
             } catch (err) {
                 alert("Media permission error: " + err.message);
@@ -848,10 +889,13 @@
         }
 
         function initPeerConnection() {
+            if (peerConnection) {
+                peerConnection.close();
+            }
             peerConnection = new RTCPeerConnection(rtcConfig);
 
             peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
+                if (event.candidate && socket && socket.readyState === WebSocket.OPEN) {
                     socket.send(JSON.stringify({
                         action: "ice_candidate",
                         receiver: activePartner,
@@ -867,7 +911,7 @@
                 } else {
                     const audioEl = new Audio();
                     audioEl.srcObject = remoteStream;
-                    audioEl.play();
+                    audioEl.play().catch(()=>{});
                 }
             };
         }
@@ -918,12 +962,14 @@
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
 
-                socket.send(JSON.stringify({
-                    action: "call_signal",
-                    receiver: activePartner,
-                    signal_type: "answer",
-                    sdp: answer
-                }));
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        action: "call_signal",
+                        receiver: activePartner,
+                        signal_type: "answer",
+                        sdp: answer
+                    }));
+                }
 
                 document.getElementById("call-status-text").innerText = "Call Connected";
             } catch (err) {
@@ -933,7 +979,7 @@
         }
 
         function endCurrentCall() {
-            if (activePartner && socket) {
+            if (activePartner && socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({
                     action: "call_signal",
                     receiver: activePartner,
@@ -999,25 +1045,6 @@
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
                 recordedChunks = [];
-                capturedLiveText = "";
-
-                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (SR) {
-                    try {
-                        liveSpeechInstance = new SR();
-                        liveSpeechInstance.continuous = true;
-                        liveSpeechInstance.interimResults = false;
-                        liveSpeechInstance.lang = 'ur-PK';
-                        liveSpeechInstance.onresult = (e) => {
-                            for (let i = e.resultIndex; i < e.results.length; ++i) {
-                                if (e.results[i].isFinal) {
-                                    capturedLiveText += e.results[i][0].transcript + " ";
-                                }
-                            }
-                        };
-                        liveSpeechInstance.start();
-                    } catch(err) {}
-                }
 
                 mediaRecorder.ondataavailable = e => {
                     if (e.data.size > 0) recordedChunks.push(e.data);
@@ -1033,8 +1060,7 @@
                     
                     pendingPayload = {
                         type: "voice",
-                        content: data.url,
-                        transcript: capturedLiveText.trim()
+                        content: data.url
                     };
                     openSendModal("🎙️ Voice Note Ready");
                 };
@@ -1063,20 +1089,13 @@
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
             }
-            if (liveSpeechInstance) {
-                try { liveSpeechInstance.stop(); } catch(e){}
-            }
             resetRecordingUI();
         }
 
         function cancelRecording() {
             recordedChunks = [];
-            capturedLiveText = "";
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
-            }
-            if (liveSpeechInstance) {
-                try { liveSpeechInstance.stop(); } catch(e){}
             }
             resetRecordingUI();
         }
@@ -1155,7 +1174,6 @@
                     const data = await res.json();
                     translatedText = data.translated_text || pendingPayload.content;
                 } catch (e) {
-                    console.error("Text translation error:", e);
                     translatedText = pendingPayload.content;
                 }
             } else if (pendingPayload.type === "voice") {
@@ -1163,7 +1181,7 @@
                     const form = new FormData();
                     form.append("file_path", pendingPayload.content);
                     form.append("target_lang", targetLang);
-                    form.append("transcript_hint", pendingPayload.transcript || "");
+                    form.append("transcript_hint", "");
 
                     const res = await fetch("/api/translate-audio", {
                         method: "POST",
@@ -1174,9 +1192,7 @@
 
                     finalDispatchContent = `translated_voice:${targetLang}:${encodeURIComponent(translatedText)}`;
                     finalDispatchType = "voice";
-                } catch (e) {
-                    console.error("Voice translation error:", e);
-                }
+                } catch (e) {}
             }
 
             btn.innerText = origText;
@@ -1187,6 +1203,11 @@
         }
 
         function executeDispatch(content, translated, msgType) {
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                alert("Server disconnected. Refreshing connection...");
+                initSocketSafe();
+                return;
+            }
             const payload = {
                 action: "chat_message",
                 receiver: activePartner,
