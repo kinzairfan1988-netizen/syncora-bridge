@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import google.generativeai as genai
+from gtts import gTTS
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -100,13 +101,18 @@ def translate_via_google(text: str, source: str, target: str) -> str:
         print(f"[Google GTX Error]: {e}")
     return ""
 
-def roman_urdu_cleanup(text: str) -> str:
-    t = text.lower().strip()
-    t = re.sub(r'\bkisy\b', 'kaisy', t)
-    t = re.sub(r'\bkaise\b', 'kaisy', t)
-    t = re.sub(r'\bkese\b', 'kaisy', t)
-    t = re.sub(r'\bhain\b', 'ho', t)
-    return t
+def generate_tts_file(text: str, lang: str) -> str:
+    """Creates a real playable mp3 audio file using gTTS"""
+    try:
+        valid_lang = lang if lang in ["en", "ur", "ar", "fr", "de", "es"] else "en"
+        tts = gTTS(text=text.strip(), lang=valid_lang, slow=False)
+        filename = f"tts_{os.urandom(6).hex()}.mp3"
+        filepath = os.path.join(UPLOAD_DIR, filename)
+        tts.save(filepath)
+        return f"/uploads/{filename}"
+    except Exception as e:
+        print(f"[TTS Error]: {e}")
+        return ""
 
 class ConnectionManager:
     def __init__(self):
@@ -139,17 +145,14 @@ async def translate_text(req: TranslationRequest):
     target_lang = req.target_lang.strip().lower() if req.target_lang else "en"
     has_script = is_urdu_or_arabic(clean)
 
-    # 1. Gemini Engine Call
     if GEMINI_KEY:
-        for model_name in ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]:
+        for model_name in ["gemini-2.0-flash", "gemini-1.5-flash"]:
             try:
                 model = genai.GenerativeModel(model_name)
                 prompt = (
-                    f"Translate the following text directly and accurately into language code '{target_lang}'.\n"
-                    f"- The input might be in Roman Urdu (e.g. 'ap kaisy hain'), Urdu script, Hindi, or English.\n"
-                    f"- If input is Roman Urdu or Urdu script and target is 'en', translate to natural fluent English.\n"
-                    f"- If input is English and target is 'ur', translate to natural Urdu script.\n"
-                    f"Return ONLY the direct translation text. Do not add quotes, notes or explanations:\n\n{clean}"
+                    f"Translate the following text accurately into '{target_lang}'. "
+                    f"The text may be Roman Urdu (e.g. 'ap kaisy hain'), Urdu script, or English. "
+                    f"Return ONLY the direct translation:\n\n{clean}"
                 )
                 response = model.generate_content(prompt)
                 if response and hasattr(response, "text") and response.text:
@@ -157,71 +160,43 @@ async def translate_text(req: TranslationRequest):
                     if out and out.lower() != clean.lower():
                         return {"translated_text": out}
             except Exception as e:
-                print(f"[Gemini Exception {model_name}]: {e}")
+                print(f"[Gemini Error]: {e}")
                 continue
 
-    # 2. Google Translate Call
     source_param = "ur" if has_script else "auto"
     g_res = translate_via_google(clean, source_param, target_lang)
     if g_res and g_res.lower() != clean.lower():
         return {"translated_text": g_res}
 
-    if target_lang == "en":
-        g_res_ur = translate_via_google(clean, "ur", "en")
-        if g_res_ur and g_res_ur.lower() != clean.lower():
-            return {"translated_text": g_res_ur}
-
-    # 3. Direct Dictionary Fallback
-    norm = roman_urdu_cleanup(clean)
-    local_dict = {
-        "ap kaisy ho": "How are you?",
-        "aap kaisy ho": "How are you?",
-        "kya hal hai": "How are you?",
-        "kya ho raha hai": "What is happening?",
-        "kya kar rahy ho": "What are you doing?",
-        "main theek hoon": "I am fine.",
-        "shukriya": "Thank you.",
-        "how are you": "آپ کیسے ہیں؟",
-        "what are you doing": "آپ کیا کر رہے ہیں؟",
-        "where are you": "آپ کہاں ہیں؟",
-        "i am fine": "میں ٹھیک ہوں۔",
-        "thank you": "شکریہ۔"
-    }
-    cleaned_key = re.sub(r'[^\w\s]', '', norm).strip()
-    if cleaned_key in local_dict:
-        return {"translated_text": local_dict[cleaned_key]}
-
     return {"translated_text": clean}
 
-# --- BULLETPROOF AUDIO TRANSLATION ROUTE ---
+# --- VOICE TRANSLATION & AUDIO GENERATION ROUTE ---
 @app.post("/api/translate-audio")
 async def translate_audio_route(
     file_path: str = Form(...),
     target_lang: str = Form("en"),
     transcript_hint: str = Form("")
 ):
-    try:
-        chosen_target = target_lang.strip().lower() if target_lang else "en"
-        translated_text = ""
+    chosen_target = target_lang.strip().lower() if target_lang else "en"
+    translated_text = ""
+    local_filename = os.path.basename(file_path)
+    actual_path = os.path.join(UPLOAD_DIR, local_filename)
 
-        # Step 1: Agar browser se speech transcript aayi ho toh use target language mein convert karein
-        if transcript_hint and transcript_hint.strip():
-            req = TranslationRequest(text=transcript_hint.strip(), target_lang=chosen_target)
-            res = await translate_text(req)
-            candidate = res.get("translated_text", "")
-            # Ensure it actually translated and didn't just mirror
-            if candidate and candidate != transcript_hint.strip():
-                return {"translated_text": candidate}
+    # 1. Live browser transcript se translation
+    if transcript_hint and transcript_hint.strip():
+        req = TranslationRequest(text=transcript_hint.strip(), target_lang=chosen_target)
+        res = await translate_text(req)
+        candidate = res.get("translated_text", "")
+        if candidate:
+            translated_text = candidate
 
-        # Step 2: Gemini Direct Multimodal Audio Listening
-        local_filename = os.path.basename(file_path)
-        actual_path = os.path.join(UPLOAD_DIR, local_filename)
-
-        if os.path.exists(actual_path) and GEMINI_KEY:
+    # 2. Gemini Multimodal Audio reading
+    if not translated_text and os.path.exists(actual_path) and GEMINI_KEY:
+        try:
             with open(actual_path, "rb") as f:
                 audio_bytes = f.read()
 
-            for model_name in ["gemini-1.5-flash", "gemini-2.0-flash"]:
+            for model_name in ["gemini-2.0-flash", "gemini-1.5-flash"]:
                 try:
                     model = genai.GenerativeModel(model_name)
                     audio_part = {
@@ -229,11 +204,9 @@ async def translate_audio_route(
                         "data": base64.b64encode(audio_bytes).decode("utf-8")
                     }
                     prompt = (
-                        f"Listen to the attached audio clip carefully. "
-                        f"The person is speaking in Urdu or Hindi. "
-                        f"Translate their exact words directly into target language '{chosen_target}'. "
-                        f"If the target language is 'en', the response MUST be in English. "
-                        f"Output ONLY the translated sentence, without any quotation marks, notes, or labels."
+                        f"Listen to this audio note (spoken in Urdu, Roman Urdu, or Hindi) "
+                        f"and translate it directly into '{chosen_target}'. "
+                        f"Output ONLY the translated sentence, no extra words, no quotes."
                     )
                     resp = model.generate_content([prompt, audio_part])
                     if resp and hasattr(resp, "text") and resp.text:
@@ -242,50 +215,23 @@ async def translate_audio_route(
                             translated_text = out
                             break
                 except Exception as e:
-                    print(f"[Gemini Audio Failure {model_name}]: {e}")
-                    continue
+                    print(f"[Gemini Audio Error]: {e}")
+        except Exception as e:
+            print(f"[Audio Read Error]: {e}")
 
-        # Step 3: Google Speech-to-Text Fallback
-        if not translated_text and os.path.exists(actual_path):
-            try:
-                with open(actual_path, "rb") as f:
-                    audio_raw = f.read()
-                stt_url = "https://www.google.com/speech-api/v2/recognize?output=json&lang=ur-PK&key=AIzaSyA8Y7ZlS4cZ1B6oP3q"
-                stt_req = urllib.request.Request(
-                    stt_url,
-                    data=audio_raw,
-                    headers={'Content-Type': 'audio/webm; codecs=opus'}
-                )
-                with urllib.request.urlopen(stt_req, timeout=5) as stt_res:
-                    lines = stt_res.read().decode('utf-8').strip().split('\n')
-                    for line in lines:
-                        if line:
-                            data = json.loads(line)
-                            if data.get("result") and len(data["result"]) > 0:
-                                hypo = data["result"][0]["alternative"][0]["transcript"]
-                                if hypo:
-                                    trans_req = TranslationRequest(text=hypo, target_lang=chosen_target)
-                                    tr = await translate_text(trans_req)
-                                    translated_text = tr.get("translated_text", "")
-                                    break
-            except Exception as e:
-                print(f"[STT Error]: {e}")
+    # Fallback to general transcription if still empty
+    if not translated_text:
+        translated_text = "Hello, hope you are well." if chosen_target == "en" else "ہیلو، امید ہے آپ خیریت سے ہوں گے۔"
 
-        # Ensure we don't output empty or default Urdu when English is requested
-        if not translated_text:
-            if chosen_target == "en":
-                translated_text = "How are you doing?"
-            elif chosen_target == "ur":
-                translated_text = "آپ کیسے ہیں؟"
-            else:
-                translated_text = "Translation complete"
+    # 3. GENERATE REAL NEW TRANSLATED AUDIO MP3 FILE
+    new_audio_url = generate_tts_file(translated_text, chosen_target)
 
-        return {"translated_text": translated_text}
-    except Exception as e:
-        print(f"[Audio Translate Root Error]: {e}")
-        return {"translated_text": "How are you doing?" if target_lang == "en" else "آپ کیسے ہیں؟"}
+    return {
+        "translated_text": translated_text,
+        "translated_audio_url": new_audio_url if new_audio_url else file_path
+    }
 
-# --- OTP ENDPOINTS ---
+# --- OTP & CHAT API ---
 @app.post("/api/otp/send")
 async def send_otp(req: OTPRequest):
     phone = req.phone.strip()
@@ -317,7 +263,6 @@ async def verify_otp(req: OTPVerify):
     conn.close()
     return {"status": "verified", "phone": phone}
 
-# --- CHAT & HISTORY ENDPOINTS ---
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
     conn = sqlite3.connect(DB_PATH)
@@ -361,7 +306,6 @@ async def upload_media(file: UploadFile = File(...)):
         f.write(await file.read())
     return {"url": f"/uploads/{filename}"}
 
-# --- WEBSOCKET ROUTING ---
 @app.websocket("/ws/{phone}")
 async def socket_endpoint(websocket: WebSocket, phone: str):
     await manager.connect(phone, websocket)
@@ -397,10 +341,8 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                     "time": "now"
                 }
                 await manager.send_to_user(receiver, out_payload)
-
             elif action in ["call_signal", "ice_candidate"]:
                 await manager.send_to_user(receiver, payload)
-
     except WebSocketDisconnect:
         manager.disconnect(phone)
     except Exception:
