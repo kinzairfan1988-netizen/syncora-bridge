@@ -117,17 +117,25 @@
             border-bottom: 1px solid var(--border-graphite);
             display: flex; align-items: center; justify-content: space-between; z-index: 10;
         }
+        
+        /* SEPARATED CALL ACTIONS BAR */
         .call-buttons-group {
-            display: flex; align-items: center; gap: 10px;
+            display: flex; align-items: center; gap: 8px;
         }
         .btn-call-action {
-            width: 36px; height: 36px; border-radius: 50%; background: var(--surface-card);
-            border: 1px solid var(--border-graphite); color: var(--accent-amber); display: flex;
-            align-items: center; justify-content: center; font-size: 16px; cursor: pointer;
+            height: 36px; padding: 0 12px; border-radius: 18px; background: var(--surface-card);
+            border: 1px solid var(--border-graphite); color: #fff; display: flex;
+            align-items: center; gap: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
             transition: all 0.2s;
         }
         .btn-call-action:hover {
-            background: var(--accent-amber-dim); border-color: var(--accent-amber);
+            border-color: var(--accent-amber); color: var(--accent-amber);
+        }
+        .btn-call-action.trans-call-btn {
+            background: var(--accent-amber-dim); border-color: rgba(245, 158, 11, 0.4); color: var(--accent-amber);
+        }
+        .btn-call-action.trans-call-btn:hover {
+            background: var(--accent-amber); color: #000;
         }
 
         .messages-container {
@@ -220,7 +228,7 @@
         }
         .attach-menu-item:hover { background: var(--surface-hover); color: var(--accent-amber); }
 
-        /* SEND OPTION MODAL */
+        /* SEND MODAL */
         .send-modal-backdrop {
             position: fixed; inset: 0; background: rgba(0,0,0,0.85);
             z-index: 999; display: none; align-items: center; justify-content: center; padding: 20px;
@@ -303,7 +311,7 @@
         }
         .btn-logout:hover { background: rgba(239, 68, 68, 0.25); }
 
-        /* LIVE CALL WITH REAL-TIME SUBTITLES / TRANSLATION DOCK */
+        /* MODAL SCREEN FOR ALL CALLS */
         .call-modal-overlay {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95);
             backdrop-filter: blur(14px); z-index: 1000; display: none;
@@ -334,26 +342,22 @@
             background: #111;
         }
 
-        /* LIVE SUBTITLES DOCK IN ACTIVE CALL */
+        /* LIVE TRANSLATION SUBTITLES (ONLY IN TRANSLATE CALL) */
         .call-subtitles-dock {
             width: 100%; max-width: 540px; min-height: 80px;
             background: rgba(24, 24, 28, 0.85); border: 1px solid var(--border-graphite);
-            border-radius: 16px; padding: 12px 16px; display: flex; flex-direction: column;
+            border-radius: 16px; padding: 12px 16px; display: none; flex-direction: column;
             gap: 6px; text-align: center; justify-content: center; backdrop-filter: blur(8px);
         }
         .subtitles-header {
             font-size: 11px; font-weight: 700; color: var(--accent-amber); text-transform: uppercase; letter-spacing: 0.5px;
             display: flex; align-items: center; justify-content: space-between;
         }
-        .subtitles-live-text {
-            font-size: 14px; font-weight: 600; color: #fff; line-height: 1.4;
-        }
-        .subtitles-translated-text {
-            font-size: 15px; font-weight: 700; color: var(--online-green); line-height: 1.4;
-        }
+        .subtitles-live-text { font-size: 14px; font-weight: 600; color: #fff; }
+        .subtitles-translated-text { font-size: 15px; font-weight: 700; color: var(--online-green); }
 
         .call-controls-row {
-            display: flex; align-items: center; gap: 16px; margin-bottom: 20px;
+            display: flex; align-items: center; gap: 20px; margin-bottom: 20px;
         }
         .btn-call-btn {
             width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer;
@@ -363,8 +367,6 @@
         .btn-call-end { background: var(--danger-red); color: #fff; }
         .btn-call-accept { background: var(--online-green); color: #fff; }
         .btn-call-mute { background: var(--surface-card); color: #fff; border: 1px solid var(--border-graphite); }
-        .btn-call-trans { background: var(--surface-card); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
-        .btn-call-trans.active { background: var(--accent-amber); color: #000; }
 
         @media (max-width: 768px) {
             .sidebar-panel { width: 100%; }
@@ -381,14 +383,14 @@
         <div class="auth-card">
             <div class="auth-badge">IA</div>
             <h2 class="auth-title">Welcome to Syncora</h2>
-            <p class="auth-desc">Direct chat, Live Call Translation ke liye apna mobile number enter karein.</p>
+            <p class="auth-desc">Chat, Normal Call ya Live Translation ke liye apna number enter karein.</p>
 
             <input type="tel" id="my-phone-input" class="auth-input" placeholder="Mobile Number (e.g. 03001234567)" onkeydown="if(event.key==='Enter'){ executeDirectLogin(); }">
             <button class="btn-auth" onclick="executeDirectLogin()">Continue to Chat →</button>
         </div>
     </div>
 
-    <!-- CALL MODAL WITH LIVE TRANSLATION OVERLAY -->
+    <!-- CALL MODAL -->
     <div class="call-modal-overlay" id="call-modal">
         <div class="call-user-card">
             <div class="call-avatar-circle" id="call-avatar-icon">📞</div>
@@ -401,22 +403,18 @@
             <video id="local-video" class="local-video-feed" autoplay muted playsinline></video>
         </div>
 
-        <!-- LIVE SUBTITLES DOCK -->
+        <!-- TRANSLATION SUBTITLES (ONLY VISIBLE IN TRANSLATION CALL) -->
         <div class="call-subtitles-dock" id="call-subtitles-dock">
             <div class="subtitles-header">
-                <span>🌐 Live Call Translation</span>
-                <span id="call-trans-indicator" style="color:var(--online-green);">● Active</span>
+                <span>🌐 Live AI Translation</span>
+                <span style="color:var(--online-green);">● Active</span>
             </div>
             <div class="subtitles-live-text" id="call-original-subtitle">Speaking...</div>
-            <div class="subtitles-translated-text" id="call-translated-subtitle">Translation will appear here in real-time...</div>
+            <div class="subtitles-translated-text" id="call-translated-subtitle">Translation will stream here...</div>
         </div>
 
         <div class="call-controls-row">
             <button class="btn-call-btn btn-call-mute" id="btn-toggle-mic" onclick="toggleCallMic()" title="Mute/Unmute">🎤</button>
-            
-            <!-- LIVE CALL TRANSLATION TOGGLE -->
-            <button class="btn-call-btn btn-call-trans active" id="btn-toggle-trans" onclick="toggleCallLiveTranslation()" title="Live Call Translation ON/OFF">🌐</button>
-            
             <button class="btn-call-btn btn-call-accept" id="btn-call-answer" style="display:none;" onclick="acceptIncomingCall()" title="Answer">📞</button>
             <button class="btn-call-btn btn-call-end" onclick="endCurrentCall()" title="End Call">📵</button>
         </div>
@@ -459,7 +457,7 @@
         </div>
     </div>
 
-    <!-- SEND CONFIRMATION MODAL -->
+    <!-- SEND MODAL -->
     <div class="send-modal-backdrop" id="send-modal">
         <div class="send-modal-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Dispatch Mode</h3>
@@ -501,7 +499,7 @@
             <div class="sidebar-header">
                 <span class="app-brand">SYNCORA CORE</span>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <button onclick="copyMyInviteLink()" style="background: var(--accent-amber-dim); border: 1px solid rgba(245,158,11,0.4); color: var(--accent-amber); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Copy Direct Chat Link">📋 Copy My Link</button>
+                    <button onclick="copyMyInviteLink()" style="background: var(--accent-amber-dim); border: 1px solid rgba(245,158,11,0.4); color: var(--accent-amber); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Copy Direct Chat Link">📋 Copy Link</button>
                     <button onclick="openSettingsModal()" class="icon-btn" title="Settings & Account" style="font-size: 16px;">⚙️</button>
                     <span style="font-size: 12px; color: var(--online-green);" id="my-status-label">● Online</span>
                 </div>
@@ -524,10 +522,20 @@
                     </div>
                 </div>
 
-                <!-- CALL BUTTONS WITH TRANSLATION ENGINE -->
+                <!-- SEPARATED CALL ACTIONS (NORMAL VS TRANSLATE) -->
                 <div class="call-buttons-group" id="call-buttons-dock" style="display: none;">
-                    <button class="btn-call-action" onclick="startCallSession('audio')" title="Audio Call with Live Translation">📞</button>
-                    <button class="btn-call-action" onclick="startCallSession('video')" title="Video Call with Live Translation">📹</button>
+                    <!-- 1. Normal Audio Call -->
+                    <button class="btn-call-action" onclick="startCallSession('audio', false)" title="Normal Audio Call">
+                        📞 Audio
+                    </button>
+                    <!-- 2. Normal Video Call -->
+                    <button class="btn-call-action" onclick="startCallSession('video', false)" title="Normal Video Call">
+                        📹 Video
+                    </button>
+                    <!-- 3. Dedicated Translation Call -->
+                    <button class="btn-call-action trans-call-btn" onclick="startCallSession('audio', true)" title="Call with Live AI Translation">
+                        🌐 Translate Call
+                    </button>
                 </div>
             </header>
 
@@ -596,12 +604,12 @@
         let pendingPayload = null;
         let currentAvatarUrl = "";
 
-        // WebRTC & Call Translation State
+        // WebRTC & Call Type Separation State
         let peerConnection = null;
         let localMediaStream = null;
         let currentCallType = "audio";
+        let isTranslationCallMode = false; // TRUE only for Translate Call
         let isMicMuted = false;
-        let isCallTranslationActive = true;
         let callSpeechRec = null;
 
         const rtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
@@ -798,9 +806,10 @@
                                 } catch (e) {}
                             }
                         } else if (data.action === "call_live_caption") {
-                            // DISPLAY LIVE TRANSLATED SUBTITLE FROM CALLER
-                            document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
-                            document.getElementById("call-translated-subtitle").innerText = `🌐 ${data.translated}`;
+                            if (isTranslationCallMode) {
+                                document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
+                                document.getElementById("call-translated-subtitle").innerText = `🌐 ${data.translated}`;
+                            }
                         }
                     } catch(e){}
                 };
@@ -880,20 +889,29 @@
             document.body.classList.remove("in-chat");
         }
 
-        /* --- LIVE CALL WITH REAL-TIME TRANSLATION ENGINE --- */
-        async function startCallSession(type) {
+        /* --- CALL ENGINE: SEPARATE NORMAL VS TRANSLATE CALL --- */
+        async function startCallSession(type, isTranslateMode = false) {
             if (!activePartner) {
                 alert("Pehle kisi user ko select karein call karne ke liye!");
                 return;
             }
             currentCallType = type;
+            isTranslationCallMode = isTranslateMode;
+
             document.getElementById("call-partner-name").innerText = activePartner;
-            document.getElementById("call-status-text").innerText = `Outgoing ${type.toUpperCase()} Call...`;
-            document.getElementById("call-avatar-icon").innerText = type === "video" ? "📹" : "📞";
+            document.getElementById("call-avatar-icon").innerText = type === "video" ? "📹" : (isTranslateMode ? "🌐" : "📞");
             document.getElementById("btn-call-answer").style.display = "none";
-            document.getElementById("call-original-subtitle").innerText = "Listening...";
-            document.getElementById("call-translated-subtitle").innerText = "Live translation active...";
             document.getElementById("call-modal").style.display = "flex";
+
+            if (isTranslateMode) {
+                document.getElementById("call-status-text").innerText = "Outgoing AI Translation Call...";
+                document.getElementById("call-subtitles-dock").style.display = "flex";
+                document.getElementById("call-original-subtitle").innerText = "Listening to your voice...";
+                document.getElementById("call-translated-subtitle").innerText = "Translation will appear here...";
+            } else {
+                document.getElementById("call-status-text").innerText = `Outgoing Normal ${type.toUpperCase()} Call...`;
+                document.getElementById("call-subtitles-dock").style.display = "none";
+            }
 
             if (type === "video") {
                 document.getElementById("call-video-container").style.display = "block";
@@ -923,12 +941,15 @@
                         receiver: activePartner,
                         signal_type: "offer",
                         call_type: type,
+                        is_translation_call: isTranslateMode,
                         sdp: offer
                     }));
                 }
 
-                // Start Live Call Translation
-                startLiveCallSpeechEngine();
+                // AI Speech Engine starts ONLY if user explicitly chose Translate Call
+                if (isTranslateMode) {
+                    startLiveCallSpeechEngine();
+                }
 
             } catch (err) {
                 alert("Media permission error: " + err.message);
@@ -969,18 +990,28 @@
                 pendingCallOffer = data;
                 activePartner = data.sender;
                 currentCallType = data.call_type || "audio";
+                isTranslationCallMode = !!data.is_translation_call;
 
                 document.getElementById("call-partner-name").innerText = data.sender;
-                document.getElementById("call-status-text").innerText = `Incoming ${currentCallType.toUpperCase()} Call...`;
-                document.getElementById("call-avatar-icon").innerText = currentCallType === "video" ? "📹" : "📞";
                 document.getElementById("btn-call-answer").style.display = "flex";
-                document.getElementById("call-original-subtitle").innerText = "Incoming Call...";
-                document.getElementById("call-translated-subtitle").innerText = "Accept to start call & live translation";
                 document.getElementById("call-modal").style.display = "flex";
+
+                if (isTranslationCallMode) {
+                    document.getElementById("call-status-text").innerText = "Incoming AI Translation Call...";
+                    document.getElementById("call-avatar-icon").innerText = "🌐";
+                    document.getElementById("call-subtitles-dock").style.display = "flex";
+                    document.getElementById("call-original-subtitle").innerText = "Incoming Translate Call...";
+                    document.getElementById("call-translated-subtitle").innerText = "Accept to start live translation";
+                } else {
+                    document.getElementById("call-status-text").innerText = `Incoming Normal ${currentCallType.toUpperCase()} Call...`;
+                    document.getElementById("call-avatar-icon").innerText = currentCallType === "video" ? "📹" : "📞";
+                    document.getElementById("call-subtitles-dock").style.display = "none";
+                }
+
             } else if (data.signal_type === "answer") {
                 if (peerConnection) {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-                    document.getElementById("call-status-text").innerText = "Call Connected ● Live Translation ON";
+                    document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected";
                 }
             } else if (data.signal_type === "end") {
                 closeCallUI();
@@ -1019,10 +1050,12 @@
                     }));
                 }
 
-                document.getElementById("call-status-text").innerText = "Call Connected ● Live Translation ON";
+                document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected";
                 
-                // Start Live Call Translation
-                startLiveCallSpeechEngine();
+                // Start speech translation ONLY for translate call
+                if (isTranslationCallMode) {
+                    startLiveCallSpeechEngine();
+                }
 
             } catch (err) {
                 alert("Call accept error: " + err.message);
@@ -1030,7 +1063,7 @@
             }
         }
 
-        /* CONTINUOUS LIVE SPEECH TRANSLATION ON CALL */
+        /* SPEECH TRANSLATION: ONLY RUNS IF IN TRANSLATE CALL MODE */
         function startLiveCallSpeechEngine() {
             const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SR) return;
@@ -1042,7 +1075,7 @@
                 callSpeechRec.lang = 'ur-PK';
 
                 callSpeechRec.onresult = async (event) => {
-                    if (!isCallTranslationActive) return;
+                    if (!isTranslationCallMode) return;
                     for (let i = event.resultIndex; i < event.results.length; ++i) {
                         if (event.results[i].isFinal) {
                             const spokenText = event.results[i][0].transcript.trim();
@@ -1050,7 +1083,6 @@
 
                             document.getElementById("call-original-subtitle").innerText = `You: ${spokenText}`;
 
-                            // Translate live spoken phrase
                             try {
                                 const res = await fetch("/translate", {
                                     method: "POST",
@@ -1065,7 +1097,6 @@
 
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${translated}`;
 
-                                // Broadcast live subtitle to partner
                                 if (socket && socket.readyState === WebSocket.OPEN && activePartner) {
                                     socket.send(JSON.stringify({
                                         action: "call_live_caption",
@@ -1082,31 +1113,13 @@
 
                 callSpeechRec.onerror = () => {};
                 callSpeechRec.onend = () => {
-                    // Auto-restart during active call
-                    if (peerConnection && isCallTranslationActive) {
+                    if (peerConnection && isTranslationCallMode) {
                         try { callSpeechRec.start(); } catch(e){}
                     }
                 };
 
                 callSpeechRec.start();
             } catch(e){}
-        }
-
-        function toggleCallLiveTranslation() {
-            isCallTranslationActive = !isCallTranslationActive;
-            const btn = document.getElementById("btn-toggle-trans");
-            const indicator = document.getElementById("call-trans-indicator");
-            if (isCallTranslationActive) {
-                btn.classList.add("active");
-                indicator.innerText = "● Active";
-                indicator.style.color = "var(--online-green)";
-                if (callSpeechRec) { try { callSpeechRec.start(); } catch(e){} }
-            } else {
-                btn.classList.remove("active");
-                indicator.innerText = "○ Paused";
-                indicator.style.color = "var(--danger-red)";
-                if (callSpeechRec) { try { callSpeechRec.stop(); } catch(e){} }
-            }
         }
 
         function endCurrentCall() {
@@ -1135,6 +1148,8 @@
             }
             document.getElementById("call-modal").style.display = "none";
             document.getElementById("call-video-container").style.display = "none";
+            document.getElementById("call-subtitles-dock").style.display = "none";
+            isTranslationCallMode = false;
             pendingCallOffer = null;
         }
 
