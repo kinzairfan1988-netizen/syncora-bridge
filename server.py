@@ -29,11 +29,6 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    try:
-        cursor.execute("ALTER TABLE users ADD COLUMN about_status TEXT DEFAULT 'Hey there! I am using Syncora.'")
-    except Exception:
-        pass
-
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,9 +38,16 @@ def init_db():
             msg_type TEXT,
             content TEXT,
             translated_content TEXT,
+            status TEXT DEFAULT 'sent',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Migration safeguard for status column in existing DBs
+    try:
+        cursor.execute("ALTER TABLE messages ADD COLUMN status TEXT DEFAULT 'sent'")
+    except Exception:
+        pass
+
     conn.commit()
     conn.close()
 
@@ -111,6 +113,9 @@ class ConnectionManager:
         if phone in self.active_sessions:
             del self.active_sessions[phone]
 
+    def is_online(self, phone: str) -> bool:
+        return phone in self.active_sessions
+
     async def send_to_user(self, phone: str, payload: dict):
         if phone in self.active_sessions:
             try:
@@ -120,7 +125,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# --- DIRECT INSTANT LOGIN ---
+# --- AUTH & DIRECT LOGIN ---
 @app.post("/api/auth/login")
 async def direct_login(req: DirectLoginRequest):
     phone = req.phone.strip()
@@ -134,6 +139,11 @@ async def direct_login(req: DirectLoginRequest):
     conn.close()
 
     return {"status": "ok", "phone": phone}
+
+# --- PRESENCE API ---
+@app.get("/api/user/status/{phone}")
+async def get_user_status(phone: str):
+    return {"phone": phone, "online": manager.is_online(phone.strip())}
 
 # --- PROFILE API ---
 @app.get("/api/user/profile/{phone}")
@@ -184,11 +194,9 @@ async def translate_text(req: TranslationRequest):
             try:
                 model = genai.GenerativeModel(model_name)
                 prompt = (
-                    f"Translate the following input directly into language code '{target_lang}'.\n"
-                    f"Input may be Roman Urdu, Urdu script, or Hindi.\n"
-                    f"- If input is Urdu/Roman Urdu and target is 'en', translate to natural English.\n"
-                    f"- If input is English and target is 'ur', translate to natural Urdu script.\n"
-                    f"Output ONLY the translated sentence, no extra notes or quotes:\n\n{clean}"
+                    f"Translate the following input accurately into '{target_lang}'.\n"
+                    f"- Input may be Roman Urdu, Urdu script, or Hindi.\n"
+                    f"Output ONLY the translated sentence, without any quotes or explanations:\n\n{clean}"
                 )
                 response = model.generate_content(prompt)
                 if response and hasattr(response, "text") and response.text:
@@ -196,7 +204,7 @@ async def translate_text(req: TranslationRequest):
                     if out:
                         return {"translated_text": out}
             except Exception as e:
-                print(f"[Gemini Translation Error]: {e}")
+                print(f"[Gemini Error]: {e}")
                 continue
 
     source_param = "ur" if has_script else "auto"
@@ -232,8 +240,8 @@ async def translate_audio_route(
                     }
                     prompt = (
                         f"Listen to this audio note carefully. Transcribe what is actually spoken (Urdu/Hindi/English) "
-                        f"and translate it directly into target '{chosen_target}'. "
-                        f"Output ONLY the exact translated sentence without any quotes or explanations."
+                        f"and translate it directly into '{chosen_target}'. "
+                        f"Output ONLY the translated sentence without quotes."
                     )
                     resp = model.generate_content([prompt, audio_part])
                     if resp and hasattr(resp, "text") and resp.text:
@@ -244,7 +252,7 @@ async def translate_audio_route(
                 except Exception as e:
                     print(f"[Gemini Audio Error]: {e}")
         except Exception as e:
-            print(f"[Audio File Read Error]: {e}")
+            print(f"[Audio Read Error]: {e}")
 
     if not translated_text and transcript_hint and transcript_hint.strip():
         req = TranslationRequest(text=transcript_hint.strip(), target_lang=chosen_target)
@@ -260,7 +268,7 @@ async def translate_audio_route(
         "file_path": file_path
     }
 
-# --- CHATS & MESSAGES ---
+# --- CHATS & MESSAGES WITH STATUS (TICKS) ---
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
     conn = sqlite3.connect(DB_PATH)
@@ -278,16 +286,25 @@ async def get_conversation(phone: str, partner: str):
     chat_id = get_chat_id(phone, partner)
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+
+    # Automatically mark unread messages as delivered when receiver opens chat
     cursor.execute("""
-        SELECT sender, receiver, msg_type, content, translated_content, created_at
+        UPDATE messages SET status = 'delivered'
+        WHERE chat_id = ? AND receiver = ? AND status = 'sent'
+    """, (chat_id, phone))
+    conn.commit()
+
+    cursor.execute("""
+        SELECT id, sender, receiver, msg_type, content, translated_content, status, created_at
         FROM messages WHERE chat_id = ? ORDER BY id ASC
     """, (chat_id,))
     rows = cursor.fetchall()
     conn.close()
+
     messages = [
         {
-            "sender": r[0], "receiver": r[1], "msg_type": r[2],
-            "content": r[3], "translated_content": r[4], "time": r[5]
+            "id": r[0], "sender": r[1], "receiver": r[2], "msg_type": r[3],
+            "content": r[4], "translated_content": r[5], "status": r[6], "time": r[7]
         }
         for r in rows
     ]
@@ -304,10 +321,27 @@ async def upload_media(file: UploadFile = File(...)):
         f.write(await file.read())
     return {"url": f"/uploads/{filename}"}
 
-# --- WEBSOCKET WITH CALL LIVE TRANSLATION DISPATCH ---
+# --- REAL-TIME WEBSOCKET: TICK ENGINE & LIVE PRESENCE ---
 @app.websocket("/ws/{phone}")
 async def socket_endpoint(websocket: WebSocket, phone: str):
     await manager.connect(phone, websocket)
+    
+    # 1. On connect: deliver any pending sent messages to this user
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT sender FROM messages WHERE receiver = ? AND status = 'sent'", (phone,))
+    pending_senders = [row[0] for row in cursor.fetchall()]
+    cursor.execute("UPDATE messages SET status = 'delivered' WHERE receiver = ? AND status = 'sent'", (phone,))
+    conn.commit()
+    conn.close()
+
+    # Notify online senders that their messages are now Double-Ticked (Delivered)
+    for sender_phone in pending_senders:
+        await manager.send_to_user(sender_phone, {
+            "action": "messages_delivered",
+            "delivered_to": phone
+        })
+
     try:
         while True:
             raw_data = await websocket.receive_text()
@@ -321,22 +355,37 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                 translated = payload.get("translated", "")
                 chat_id = get_chat_id(phone, receiver)
 
+                # Determine initial status: delivered if receiver is online, else sent
+                initial_status = "delivered" if manager.is_online(receiver) else "sent"
+
                 conn = sqlite3.connect(DB_PATH)
                 cursor = conn.cursor()
                 cursor.execute("""
-                    INSERT INTO messages (chat_id, sender, receiver, msg_type, content, translated_content)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (chat_id, phone, receiver, msg_type, content, translated))
+                    INSERT INTO messages (chat_id, sender, receiver, msg_type, content, translated_content, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (chat_id, phone, receiver, msg_type, content, translated, initial_status))
+                msg_id = cursor.lastrowid
                 conn.commit()
                 conn.close()
 
+                # Confirm to Sender (ack with msg_id & status)
+                await manager.send_to_user(phone, {
+                    "action": "message_sent_ack",
+                    "id": msg_id,
+                    "receiver": receiver,
+                    "status": initial_status
+                })
+
+                # Deliver to Receiver
                 out_payload = {
                     "action": "new_message",
+                    "id": msg_id,
                     "sender": phone,
                     "receiver": receiver,
                     "msg_type": msg_type,
                     "content": content,
                     "translated": translated,
+                    "status": initial_status,
                     "time": "now"
                 }
                 await manager.send_to_user(receiver, out_payload)
@@ -345,16 +394,14 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                 payload["sender"] = phone
                 await manager.send_to_user(receiver, payload)
 
-            # REAL-TIME CALL SUBTITLES / TRANSLATION RELAY
             elif action == "call_live_caption":
-                out_payload = {
+                await manager.send_to_user(receiver, {
                     "action": "call_live_caption",
                     "sender": phone,
                     "original": payload.get("original", ""),
                     "translated": payload.get("translated", ""),
                     "lang": payload.get("lang", "en")
-                }
-                await manager.send_to_user(receiver, out_payload)
+                })
 
     except WebSocketDisconnect:
         manager.disconnect(phone)
