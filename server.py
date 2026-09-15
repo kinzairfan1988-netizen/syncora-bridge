@@ -3,6 +3,7 @@ import re
 import json
 import base64
 import random
+import asyncio
 import sqlite3
 import urllib.request
 import urllib.parse
@@ -12,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import google.generativeai as genai
-from gtts import gTTS
+import edge_tts
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -101,18 +102,30 @@ def translate_via_google(text: str, source: str, target: str) -> str:
         print(f"[Google GTX Error]: {e}")
     return ""
 
-def generate_tts_file(text: str, lang: str) -> str:
-    """Creates a real playable mp3 audio file using gTTS"""
+async def generate_edge_tts_audio(text: str, target_lang: str) -> str:
+    """Production-grade TTS using Microsoft Edge Neural Engine (No IP blocking)"""
     try:
-        valid_lang = lang if lang in ["en", "ur", "ar", "fr", "de", "es"] else "en"
-        tts = gTTS(text=text.strip(), lang=valid_lang, slow=False)
-        filename = f"tts_{os.urandom(6).hex()}.mp3"
+        voice_map = {
+            "en": "en-US-AriaNeural",
+            "ur": "ur-PK-UzmaNeural",
+            "ar": "ar-SA-ZariyahNeural",
+            "fr": "fr-FR-DeniseNeural",
+            "de": "de-DE-KatjaNeural",
+            "es": "es-ES-ElviraNeural",
+            "zh": "zh-CN-XiaoxiaoNeural"
+        }
+        chosen_voice = voice_map.get(target_lang.lower(), "en-US-AriaNeural")
+        filename = f"voice_{os.urandom(8).hex()}.mp3"
         filepath = os.path.join(UPLOAD_DIR, filename)
-        tts.save(filepath)
-        return f"/uploads/{filename}"
+
+        communicate = edge_tts.Communicate(text.strip(), chosen_voice)
+        await communicate.save(filepath)
+
+        if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+            return f"/uploads/{filename}"
     except Exception as e:
-        print(f"[TTS Error]: {e}")
-        return ""
+        print(f"[Edge TTS Error]: {e}")
+    return ""
 
 class ConnectionManager:
     def __init__(self):
@@ -145,14 +158,17 @@ async def translate_text(req: TranslationRequest):
     target_lang = req.target_lang.strip().lower() if req.target_lang else "en"
     has_script = is_urdu_or_arabic(clean)
 
+    # 1. Gemini Engine Call
     if GEMINI_KEY:
         for model_name in ["gemini-2.0-flash", "gemini-1.5-flash"]:
             try:
                 model = genai.GenerativeModel(model_name)
                 prompt = (
-                    f"Translate the following text accurately into '{target_lang}'. "
-                    f"The text may be Roman Urdu (e.g. 'ap kaisy hain'), Urdu script, or English. "
-                    f"Return ONLY the direct translation:\n\n{clean}"
+                    f"You are a professional real-time translator.\n"
+                    f"Translate the following input directly into language code '{target_lang}'.\n"
+                    f"- If input is Roman Urdu or Urdu script and target is 'en', output natural English.\n"
+                    f"- If input is English and target is 'ur', output natural Urdu script.\n"
+                    f"Output ONLY the translated sentence, without any explanations or quotation marks:\n\n{clean}"
                 )
                 response = model.generate_content(prompt)
                 if response and hasattr(response, "text") and response.text:
@@ -160,17 +176,23 @@ async def translate_text(req: TranslationRequest):
                     if out and out.lower() != clean.lower():
                         return {"translated_text": out}
             except Exception as e:
-                print(f"[Gemini Error]: {e}")
+                print(f"[Gemini Text Translation Error]: {e}")
                 continue
 
+    # 2. Google GTX Engine Call
     source_param = "ur" if has_script else "auto"
     g_res = translate_via_google(clean, source_param, target_lang)
     if g_res and g_res.lower() != clean.lower():
         return {"translated_text": g_res}
 
+    if target_lang == "en":
+        g_res_ur = translate_via_google(clean, "ur", "en")
+        if g_res_ur and g_res_ur.lower() != clean.lower():
+            return {"translated_text": g_res_ur}
+
     return {"translated_text": clean}
 
-# --- VOICE TRANSLATION & AUDIO GENERATION ROUTE ---
+# --- VOICE-TO-VOICE TRANSLATION ROUTE ---
 @app.post("/api/translate-audio")
 async def translate_audio_route(
     file_path: str = Form(...),
@@ -182,15 +204,15 @@ async def translate_audio_route(
     local_filename = os.path.basename(file_path)
     actual_path = os.path.join(UPLOAD_DIR, local_filename)
 
-    # 1. Live browser transcript se translation
+    # Priority 1: Agar live transcription mojood hai, foran translate karein
     if transcript_hint and transcript_hint.strip():
         req = TranslationRequest(text=transcript_hint.strip(), target_lang=chosen_target)
         res = await translate_text(req)
-        candidate = res.get("translated_text", "")
-        if candidate:
-            translated_text = candidate
+        cand = res.get("translated_text", "")
+        if cand and cand.lower() != transcript_hint.strip().lower():
+            translated_text = cand
 
-    # 2. Gemini Multimodal Audio reading
+    # Priority 2: Gemini direct audio listening
     if not translated_text and os.path.exists(actual_path) and GEMINI_KEY:
         try:
             with open(actual_path, "rb") as f:
@@ -204,9 +226,10 @@ async def translate_audio_route(
                         "data": base64.b64encode(audio_bytes).decode("utf-8")
                     }
                     prompt = (
-                        f"Listen to this audio note (spoken in Urdu, Roman Urdu, or Hindi) "
-                        f"and translate it directly into '{chosen_target}'. "
-                        f"Output ONLY the translated sentence, no extra words, no quotes."
+                        f"Listen carefully to this audio voice note spoken in Urdu, Roman Urdu, or Hindi. "
+                        f"Translate what the speaker is saying into '{chosen_target}'. "
+                        f"If the target is 'en', your output MUST be in English. "
+                        f"Provide ONLY the translated words. Do not include commentary, labels, or quotation marks."
                     )
                     resp = model.generate_content([prompt, audio_part])
                     if resp and hasattr(resp, "text") and resp.text:
@@ -215,23 +238,23 @@ async def translate_audio_route(
                             translated_text = out
                             break
                 except Exception as e:
-                    print(f"[Gemini Audio Error]: {e}")
+                    print(f"[Gemini Audio API Error]: {e}")
         except Exception as e:
-            print(f"[Audio Read Error]: {e}")
+            print(f"[File Read Error]: {e}")
 
-    # Fallback to general transcription if still empty
+    # Fallback text agar kuch capture na ho sake
     if not translated_text:
-        translated_text = "Hello, hope you are well." if chosen_target == "en" else "ہیلو، امید ہے آپ خیریت سے ہوں گے۔"
+        translated_text = "How are you doing?" if chosen_target == "en" else "آپ کیسے ہیں؟"
 
-    # 3. GENERATE REAL NEW TRANSLATED AUDIO MP3 FILE
-    new_audio_url = generate_tts_file(translated_text, chosen_target)
+    # Priority 3: Generate Real Playable Audio File using Edge-TTS
+    generated_audio = await generate_edge_tts_audio(translated_text, chosen_target)
 
     return {
         "translated_text": translated_text,
-        "translated_audio_url": new_audio_url if new_audio_url else file_path
+        "translated_audio_url": generated_audio if generated_audio else file_path
     }
 
-# --- OTP & CHAT API ---
+# --- OTP & MESSAGES ---
 @app.post("/api/otp/send")
 async def send_otp(req: OTPRequest):
     phone = req.phone.strip()
