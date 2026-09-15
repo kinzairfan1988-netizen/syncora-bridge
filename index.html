@@ -19,6 +19,7 @@
             --accent-amber-dim: rgba(245, 158, 11, 0.12);
             --accent-amber-glow: rgba(245, 158, 11, 0.25);
             --danger-red: #ef4444;
+            --danger-red-dim: rgba(239, 68, 68, 0.15);
             --text-primary: #fafafa;
             --text-secondary: #a1a1aa;
             --text-muted: #71717a;
@@ -37,6 +38,7 @@
             overflow: hidden;
         }
 
+        /* 1. AUTH OVERLAY */
         .auth-overlay {
             position: fixed; inset: 0; background: rgba(9, 9, 11, 0.96);
             backdrop-filter: blur(12px); z-index: 999; display: flex;
@@ -76,8 +78,10 @@
             margin-top: 6px; box-shadow: 0 4px 20px var(--accent-amber-glow);
         }
 
+        /* 2. WORKSPACE 2-PANEL */
         .workspace { display: flex; width: 100%; height: 100%; }
 
+        /* LEFT SIDEBAR */
         .sidebar-panel {
             width: 380px; border-right: 1px solid var(--border-graphite);
             background: var(--surface-panel); display: flex; flex-direction: column; flex-shrink: 0;
@@ -108,11 +112,14 @@
             width: 44px; height: 44px; border-radius: 50%; background: #1f1f24;
             border: 1px solid var(--border-graphite); display: flex; align-items: center;
             justify-content: center; font-weight: 700; color: var(--accent-amber); flex-shrink: 0;
+            overflow: hidden;
         }
+        .chat-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .chat-info { flex: 1; overflow: hidden; }
         .chat-title { font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
         .chat-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
+        /* RIGHT STAGE */
         .stage-panel {
             flex: 1; display: flex; flex-direction: column; background: var(--bg-obsidian); position: relative;
         }
@@ -144,6 +151,7 @@
         }
         .bubble-time { font-size: 9px; opacity: 0.6; margin-top: 4px; text-align: right; }
 
+        /* NATIVE PLAYABLE VOICE DOCK */
         .voice-card-box {
             display: flex; align-items: center; gap: 10px; padding: 4px 0;
         }
@@ -211,6 +219,7 @@
         }
         .attach-menu-item:hover { background: var(--surface-hover); color: var(--accent-amber); }
 
+        /* SEND OPTION MODAL */
         .send-modal-backdrop {
             position: fixed; inset: 0; background: rgba(0,0,0,0.85);
             z-index: 999; display: none; align-items: center; justify-content: center; padding: 20px;
@@ -234,6 +243,65 @@
             padding: 10px 12px; border-radius: 10px; color: #fff; font-size: 13px; outline: none;
         }
 
+        /* 3. SETTINGS & ACCOUNT DETAILS MODAL (WHATSAPP STYLE) */
+        .settings-overlay {
+            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88);
+            backdrop-filter: blur(10px); z-index: 998; display: none;
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .settings-card {
+            background: var(--surface-panel); border: 1px solid var(--border-graphite);
+            border-radius: 24px; width: 100%; max-width: 440px; padding: 28px;
+            display: flex; flex-direction: column; gap: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+        }
+        .settings-header {
+            display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-subtle);
+            padding-bottom: 14px;
+        }
+        .settings-title { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; color: var(--accent-amber); }
+        
+        .profile-avatar-row {
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+            position: relative; margin: 6px 0;
+        }
+        .profile-avatar-large {
+            width: 86px; height: 86px; border-radius: 50%; background: #1f1f24;
+            border: 2px solid var(--accent-amber); display: flex; align-items: center; justify-content: center;
+            font-size: 32px; font-weight: 700; color: var(--accent-amber); overflow: hidden; position: relative;
+            box-shadow: 0 0 20px var(--accent-amber-glow);
+        }
+        .profile-avatar-large img { width: 100%; height: 100%; object-fit: cover; }
+        .btn-change-avatar {
+            font-size: 12px; color: var(--accent-amber); background: transparent; border: none; cursor: pointer; text-decoration: underline;
+        }
+
+        .settings-field {
+            display: flex; flex-direction: column; gap: 6px; text-align: left;
+        }
+        .settings-field label {
+            font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .settings-input {
+            width: 100%; background: var(--surface-card); border: 1px solid var(--border-graphite);
+            padding: 12px 14px; border-radius: 12px; color: #fff; font-size: 14px; outline: none;
+        }
+        .settings-input:focus { border-color: var(--accent-amber); }
+        .settings-input:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .btn-save-settings {
+            width: 100%; background: var(--accent-amber); color: #000; font-weight: 700;
+            border: none; padding: 13px; border-radius: 12px; cursor: pointer; font-size: 14px;
+            box-shadow: 0 4px 15px var(--accent-amber-glow); margin-top: 6px;
+        }
+        .btn-logout {
+            width: 100%; background: var(--danger-red-dim); color: var(--danger-red); font-weight: 700;
+            border: 1px solid rgba(239, 68, 68, 0.4); padding: 13px; border-radius: 12px; cursor: pointer;
+            font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: 0.2s;
+        }
+        .btn-logout:hover { background: rgba(239, 68, 68, 0.25); }
+
         @media (max-width: 768px) {
             .sidebar-panel { width: 100%; }
             .stage-panel { display: none; }
@@ -244,6 +312,7 @@
 </head>
 <body>
 
+    <!-- AUTH OVERLAY -->
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
             <div class="auth-badge">IA</div>
@@ -272,6 +341,46 @@
         </div>
     </div>
 
+    <!-- SETTINGS & ACCOUNT DETAILS MODAL (WHATSAPP STYLE) -->
+    <div class="settings-overlay" id="settings-modal">
+        <div class="settings-card">
+            <div class="settings-header">
+                <div class="settings-title">⚙️ Profile & Account</div>
+                <button class="icon-btn" onclick="closeSettingsModal()">✕</button>
+            </div>
+
+            <div class="profile-avatar-row">
+                <div class="profile-avatar-large" id="settings-avatar-preview">
+                    --
+                </div>
+                <input type="file" id="settings-avatar-file" accept="image/*" style="display:none;" onchange="uploadAvatarImage(event)">
+                <button class="btn-change-avatar" onclick="document.getElementById('settings-avatar-file').click()">Change Profile Photo</button>
+            </div>
+
+            <div class="settings-field">
+                <label>Your Name</label>
+                <input type="text" id="settings-name-input" class="settings-input" placeholder="Enter your display name">
+            </div>
+
+            <div class="settings-field">
+                <label>Phone Number (Verified)</label>
+                <input type="text" id="settings-phone-display" class="settings-input" disabled>
+            </div>
+
+            <div class="settings-field">
+                <label>About / Bio</label>
+                <input type="text" id="settings-status-input" class="settings-input" placeholder="Hey there! I am using Syncora.">
+            </div>
+
+            <button class="btn-save-settings" onclick="saveProfileChanges()">Save Changes</button>
+            
+            <button class="btn-logout" onclick="executeLogout()">
+                🚪 Log Out
+            </button>
+        </div>
+    </div>
+
+    <!-- SEND CONFIRMATION MODAL -->
     <div class="send-modal-backdrop" id="send-modal">
         <div class="send-modal-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Dispatch Mode</h3>
@@ -306,13 +415,17 @@
         </div>
     </div>
 
+    <!-- 2-PANEL WORKSPACE -->
     <div class="workspace">
         
+        <!-- SIDEBAR -->
         <aside class="sidebar-panel">
             <div class="sidebar-header">
                 <span class="app-brand">SYNCORA CORE</span>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <button onclick="copyMyInviteLink()" style="background: var(--accent-amber-dim); border: 1px solid rgba(245,158,11,0.4); color: var(--accent-amber); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Copy Invite Link for Friends">📋 Invite Link</button>
+                    <!-- SETTINGS GEAR BUTTON -->
+                    <button onclick="openSettingsModal()" class="icon-btn" title="Settings & Account" style="font-size: 16px;">⚙️</button>
                     <span style="font-size: 12px; color: var(--online-green);" id="my-status-label">● Online</span>
                 </div>
             </div>
@@ -323,6 +436,7 @@
             <div class="chat-list" id="chat-list"></div>
         </aside>
 
+        <!-- ACTIVE STAGE -->
         <main class="stage-panel" id="stage-panel">
             <header class="stage-header">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -337,6 +451,7 @@
 
             <div class="messages-container" id="messages-container"></div>
 
+            <!-- ATTACHMENT MENU POPUP -->
             <div class="attach-popup-menu" id="attach-menu">
                 <div class="attach-menu-item" onclick="document.getElementById('file-picker-media').click()">
                     <span>🖼️</span> Photos / Videos
@@ -352,6 +467,7 @@
             <input type="file" id="file-picker-media" accept="image/*,video/*" style="display:none;" onchange="uploadAttachment(event, 'media')">
             <input type="file" id="file-picker-doc" accept="*/*" style="display:none;" onchange="uploadAttachment(event, 'document')">
 
+            <!-- DYNAMIC INPUT & VOICE DOCK -->
             <footer class="stage-input-bar">
                 
                 <div class="input-shell" id="input-shell">
@@ -395,6 +511,7 @@
         let liveSpeechInstance = null;
         let capturedLiveText = "";
         let pendingPayload = null;
+        let currentAvatarUrl = "";
 
         window.onload = () => {
             if (myPhone) {
@@ -402,6 +519,7 @@
                 document.getElementById("my-status-label").innerText = `● ${myPhone}`;
                 initSocket();
                 loadRecentChats();
+                loadUserProfileData();
                 
                 if (inviteHost && inviteHost !== myPhone) {
                     selectChat(inviteHost);
@@ -432,10 +550,9 @@
             });
             const data = await res.json();
             if (res.ok) {
-                // UI switch without showing any code on screen
                 document.getElementById("auth-step-phone").style.display = "none";
                 document.getElementById("auth-step-otp").style.display = "block";
-                document.getElementById("auth-desc").innerText = `4-digit OTP aapke number ${input} par SMS kar diya gaya hai. SMS inbox check karein.`;
+                document.getElementById("auth-desc").innerText = `4-digit OTP aapke number ${input} par SMS kar diya gaya hai.`;
                 document.getElementById("otp-1").focus();
             } else {
                 alert("OTP send fail: " + data.error);
@@ -474,6 +591,7 @@
                 document.getElementById("my-status-label").innerText = `● ${myPhone}`;
                 initSocket();
                 loadRecentChats();
+                loadUserProfileData();
 
                 if (inviteHost && inviteHost !== myPhone) {
                     selectChat(inviteHost);
@@ -487,6 +605,90 @@
             document.getElementById("auth-step-otp").style.display = "none";
             document.getElementById("auth-step-phone").style.display = "block";
             document.getElementById("auth-desc").innerText = "Syncora Terminal mein enter hone ke liye apna mobile number enter karein.";
+        }
+
+        /* --- SETTINGS & ACCOUNT FUNCTIONS --- */
+        async function loadUserProfileData() {
+            if (!myPhone) return;
+            try {
+                const res = await fetch(`/api/user/profile/${myPhone}`);
+                const profile = await res.json();
+                document.getElementById("settings-phone-display").value = profile.phone;
+                document.getElementById("settings-name-input").value = profile.display_name || "";
+                document.getElementById("settings-status-input").value = profile.about_status || "";
+                currentAvatarUrl = profile.avatar_url || "";
+                
+                const preview = document.getElementById("settings-avatar-preview");
+                if (currentAvatarUrl) {
+                    preview.innerHTML = `<img src="${currentAvatarUrl}" alt="Avatar">`;
+                } else {
+                    preview.innerText = myPhone.slice(-2);
+                }
+            } catch (e) {
+                console.error("Profile fetch error:", e);
+            }
+        }
+
+        function openSettingsModal() {
+            loadUserProfileData();
+            document.getElementById("settings-modal").style.display = "flex";
+        }
+
+        function closeSettingsModal() {
+            document.getElementById("settings-modal").style.display = "none";
+        }
+
+        async function uploadAvatarImage(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const form = new FormData();
+            form.append("file", file);
+            try {
+                const res = await fetch("/api/upload", { method: "POST", body: form });
+                const data = await res.json();
+                currentAvatarUrl = data.url;
+                document.getElementById("settings-avatar-preview").innerHTML = `<img src="${currentAvatarUrl}" alt="Avatar">`;
+            } catch (err) {
+                alert("Avatar upload failed: " + err.message);
+            }
+        }
+
+        async function saveProfileChanges() {
+            const name = document.getElementById("settings-name-input").value.trim();
+            const status = document.getElementById("settings-status-input").value.trim();
+
+            const res = await fetch("/api/user/profile/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    phone: myPhone,
+                    display_name: name,
+                    about_status: status,
+                    avatar_url: currentAvatarUrl
+                })
+            });
+            if (res.ok) {
+                alert("Settings saved successfully!");
+                closeSettingsModal();
+            } else {
+                alert("Profile save failed.");
+            }
+        }
+
+        function executeLogout() {
+            if (confirm("Kiya aap waqai Syncora se Logout karna chahte hain?")) {
+                if (socket) {
+                    socket.close();
+                }
+                localStorage.removeItem("syncora_user_phone");
+                myPhone = "";
+                activePartner = "";
+                closeSettingsModal();
+                document.getElementById("auth-step-otp").style.display = "none";
+                document.getElementById("auth-step-phone").style.display = "block";
+                document.getElementById("my-phone-input").value = "";
+                document.getElementById("auth-overlay").style.display = "flex";
+            }
         }
 
         function copyMyInviteLink() {
@@ -768,7 +970,6 @@
                     const data = await res.json();
                     translatedText = data.translated_text || "";
 
-                    // Live Playable Native Voice Identifier
                     finalDispatchContent = `translated_voice:${targetLang}:${encodeURIComponent(translatedText)}`;
                     finalDispatchType = "voice";
                 } catch (e) {
