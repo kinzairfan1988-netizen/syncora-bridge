@@ -55,13 +55,15 @@ init_db()
 app = FastAPI(title="Syncora Terminal Core Engine")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
-GEMINI_KEY = "AIzaSy..." 
+# --- APNI ASLI GEMINI API KEY YAHAN QUOTES MEIN LIKHEIN ---
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSy...")
 
-if GEMINI_KEY:
+if GEMINI_KEY and GEMINI_KEY != "AIzaSy...":
     try:
         genai.configure(api_key=GEMINI_KEY)
     except Exception as e:
         print(f"[Gemini Config Error]: {e}")
+
 class DirectLoginRequest(BaseModel):
     phone: str
 
@@ -189,7 +191,7 @@ async def translate_text(req: TranslationRequest):
     target_lang = req.target_lang.strip().lower() if req.target_lang else "en"
     has_script = is_urdu_or_arabic(clean)
 
-    if GEMINI_KEY:
+    if GEMINI_KEY and GEMINI_KEY != "AIzaSy...":
         for model_name in ["gemini-1.5-flash"]:
             try:
                 model = genai.GenerativeModel(model_name)
@@ -225,29 +227,49 @@ async def translate_audio_route(
 ):
     chosen_target = target_lang.strip().lower() if target_lang else "en"
     translated_text = ""
+    error_detail = ""
+    
     local_filename = os.path.basename(file_path)
     actual_path = os.path.join(UPLOAD_DIR, local_filename)
 
-    if os.path.exists(actual_path) and GEMINI_KEY:
+    if not GEMINI_KEY or GEMINI_KEY == "AIzaSy...":
+        return {
+            "translated_text": "Error: GEMINI_API_KEY is not configured",
+            "target_lang": chosen_target,
+            "file_path": file_path
+        }
+
+    if os.path.exists(actual_path):
         try:
-            audio_file = genai.upload_file(path=actual_path)
+            with open(actual_path, "rb") as f:
+                audio_bytes = f.read()
+
+            mime_type = "audio/webm"
+            if local_filename.lower().endswith(".mp4") or local_filename.lower().endswith(".m4a"):
+                mime_type = "audio/mp4"
+            elif local_filename.lower().endswith(".wav"):
+                mime_type = "audio/wav"
+            elif local_filename.lower().endswith(".mp3"):
+                mime_type = "audio/mp3"
+
+            audio_part = {
+                "mime_type": mime_type,
+                "data": audio_bytes
+            }
+
             model = genai.GenerativeModel("gemini-1.5-flash")
             prompt = (
                 f"Listen carefully to this voice note. The speaker is talking in Urdu, Roman Urdu, or Hindi. "
-                f"Accurately translate their spoken words into language: '{chosen_target}'. "
-                f"Do not invent facts or add commentary. Return ONLY the translation."
+                f"Translate their spoken meaning accurately and naturally into language '{chosen_target}'. "
+                f"Output ONLY the translated sentence. Do not add quotes, brackets, or explanation."
             )
-            response = model.generate_content([audio_file, prompt])
-            
-            try:
-                genai.delete_file(audio_file.name)
-            except Exception:
-                pass
 
+            response = model.generate_content([prompt, audio_part])
             if response and hasattr(response, "text") and response.text:
                 translated_text = response.text.strip().replace('"', '').replace("'", "")
         except Exception as e:
-            print(f"[Gemini Audio API Error]: {e}")
+            error_detail = str(e)
+            print(f"[Gemini Audio Direct Error]: {e}")
 
     if not translated_text and transcript_hint and transcript_hint.strip():
         req = TranslationRequest(text=transcript_hint.strip(), target_lang=chosen_target)
@@ -255,7 +277,7 @@ async def translate_audio_route(
         translated_text = res.get("translated_text", "")
 
     if not translated_text:
-        translated_text = "Translation failed (Check GEMINI_API_KEY or Audio Format)"
+        translated_text = f"Translation error: {error_detail or 'Audio could not be decoded'}"
 
     return {
         "translated_text": translated_text,
