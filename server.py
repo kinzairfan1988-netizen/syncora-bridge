@@ -51,7 +51,7 @@ def init_db():
 
 init_db()
 
-app = FastAPI(title="Syncora Core Engine")
+app = FastAPI(title="Syncora Terminal Core Engine")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 class DirectLoginRequest(BaseModel):
@@ -74,26 +74,57 @@ def get_chat_id(u1: str, u2: str) -> str:
 def is_urdu_or_arabic(text: str) -> bool:
     return bool(re.search(r'[\u0600-\u06FF]', text))
 
-def translate_via_google(text: str, source: str, target: str) -> str:
+# MULTI-TIER ROTARY TRANSLATION (ZERO 429 BLOCK)
+def translate_robust(text: str, source_lang: str, target_lang: str) -> str:
+    clean = text.strip()
+    if not clean:
+        return ""
+
+    # 1. Tier 1: MyMemory Fast Public API (Never blocks IP)
     try:
-        clean_text = text.strip()
-        if not clean_text:
-            return ""
-        encoded = urllib.parse.quote(clean_text.encode('utf-8'))
-        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source}&tl={target}&dt=t&q={encoded}"
-        req = urllib.request.Request(
-            url, 
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-        )
-        with urllib.request.urlopen(req, timeout=7) as response:
+        q_enc = urllib.parse.quote(clean.encode('utf-8'))
+        pair = f"{source_lang}|{target_lang}" if source_lang != "auto" else f"ur|{target_lang}"
+        url_mm = f"https://api.mymemory.translated.net/get?q={q_enc}&langpair={pair}"
+        req_mm = urllib.request.Request(url_mm, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req_mm, timeout=4) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            if res_data and "responseData" in res_data and res_data["responseData"]["translatedText"]:
+                out_text = res_data["responseData"]["translatedText"].strip()
+                if out_text and not out_text.startswith("MYMEMORY WARNING"):
+                    return out_text
+    except Exception as e:
+        print(f"[Tier 1 MM Fallback]: {e}")
+
+    # 2. Tier 2: Google Alternate Single API
+    try:
+        q_enc = urllib.parse.quote(clean.encode('utf-8'))
+        url_g = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source_lang}&tl={target_lang}&dt=t&q={q_enc}"
+        req_g = urllib.request.Request(url_g, headers={
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36'
+        })
+        with urllib.request.urlopen(req_g, timeout=4) as response:
             res_json = json.loads(response.read().decode('utf-8'))
             if res_json and isinstance(res_json, list) and len(res_json) > 0 and res_json[0]:
                 out = "".join([part[0] for part in res_json[0] if part and part[0]]).strip()
                 if out:
                     return out
     except Exception as e:
-        print(f"[Translation Engine Error]: {e}")
-    return text
+        print(f"[Tier 2 Google Error]: {e}")
+
+    # 3. Tier 3: Lingva Public Relay
+    try:
+        q_enc = urllib.parse.quote(clean.encode('utf-8'))
+        src = "ur" if source_lang == "auto" else source_lang
+        url_l = f"https://lingva.ml/api/v1/{src}/{target_lang}/{q_enc}"
+        req_l = urllib.request.Request(url_l, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req_l, timeout=4) as response:
+            res_json = json.loads(response.read().decode('utf-8'))
+            if "translation" in res_json and res_json["translation"]:
+                return res_json["translation"].strip()
+    except Exception as e:
+        print(f"[Tier 3 Lingva Fallback]: {e}")
+
+    return clean
 
 class ConnectionManager:
     def __init__(self):
@@ -178,7 +209,7 @@ async def translate_text(req: TranslationRequest):
 
     target_lang = req.target_lang.strip().lower() if req.target_lang else "en"
     source_param = "ur" if is_urdu_or_arabic(clean) else "auto"
-    translated = translate_via_google(clean, source_param, target_lang)
+    translated = translate_robust(clean, source_param, target_lang)
     return {"translated_text": translated}
 
 @app.get("/api/chats/{phone}")
