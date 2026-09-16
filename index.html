@@ -104,7 +104,6 @@
             justify-content: center; font-weight: 700; color: var(--accent-amber); flex-shrink: 0;
             overflow: hidden;
         }
-        .chat-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .chat-info { flex: 1; overflow: hidden; }
         .chat-title { font-size: 15px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
         .chat-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
@@ -378,7 +377,6 @@
 </head>
 <body>
 
-    <!-- HIDDEN AUDIO FEED FOR CALLS -->
     <audio id="remote-audio-sink" autoplay playsinline style="display:none;"></audio>
 
     <!-- 1-STEP LOGIN OVERLAY -->
@@ -643,7 +641,7 @@
         let pendingPayload = null;
         let currentAvatarUrl = "";
 
-        // WebRTC
+        // WebRTC Config with reliable Google STUN servers
         let peerConnection = null;
         let localMediaStream = null;
         let currentCallType = "audio";
@@ -667,6 +665,7 @@
                 loadRecentChats();
                 loadUserProfileData();
 
+                // Auto-restore chat on reload
                 if (directChatParam && directChatParam !== myPhone) {
                     selectChat(directChatParam);
                 } else if (activePartner && activePartner !== myPhone) {
@@ -846,7 +845,7 @@
             }
         }
 
-        /* --- STABLE SOCKET WITH HEARTBEAT --- */
+        /* --- STABLE SOCKET ENGINE --- */
         function initSocketSafe() {
             if (!myPhone || isConnectingSocket) return;
             if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
@@ -1001,7 +1000,7 @@
             if (statusPollInterval) clearInterval(statusPollInterval);
         }
 
-        /* --- STABLE WEBRTC CALL ENGINE --- */
+        /* --- STABLE WEBRTC ENGINE --- */
         async function startCallSession(type, isTranslateMode = false) {
             if (!activePartner) {
                 alert("Pehle kisi contact ko select karein!");
