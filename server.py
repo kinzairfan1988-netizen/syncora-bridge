@@ -51,7 +51,7 @@ def init_db():
 
 init_db()
 
-app = FastAPI(title="Syncora Terminal Core Engine")
+app = FastAPI(title="Syncora Core Engine")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 class DirectLoginRequest(BaseModel):
@@ -76,7 +76,10 @@ def is_urdu_or_arabic(text: str) -> bool:
 
 def translate_via_google(text: str, source: str, target: str) -> str:
     try:
-        encoded = urllib.parse.quote(text.strip().encode('utf-8'))
+        clean_text = text.strip()
+        if not clean_text:
+            return ""
+        encoded = urllib.parse.quote(clean_text.encode('utf-8'))
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source}&tl={target}&dt=t&q={encoded}"
         req = urllib.request.Request(
             url, 
@@ -90,7 +93,7 @@ def translate_via_google(text: str, source: str, target: str) -> str:
                     return out
     except Exception as e:
         print(f"[Translation Engine Error]: {e}")
-    return ""
+    return text
 
 class ConnectionManager:
     def __init__(self):
@@ -116,7 +119,6 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# --- AUTH & DIRECT LOGIN ---
 @app.post("/api/auth/login")
 async def direct_login(req: DirectLoginRequest):
     phone = req.phone.strip()
@@ -131,13 +133,10 @@ async def direct_login(req: DirectLoginRequest):
 
     return {"status": "ok", "phone": phone}
 
-# --- PRESENCE STATUS ---
 @app.get("/api/user/status/{phone}")
 async def get_user_status(phone: str):
-    is_on = manager.is_online(phone.strip())
-    return {"phone": phone, "online": is_on}
+    return {"phone": phone, "online": manager.is_online(phone.strip())}
 
-# --- PROFILE API ---
 @app.get("/api/user/profile/{phone}")
 async def get_user_profile(phone: str):
     conn = sqlite3.connect(DB_PATH)
@@ -171,7 +170,6 @@ async def update_user_profile(req: ProfileUpdate):
     conn.close()
     return {"status": "ok", "message": "Profile updated successfully"}
 
-# --- TEXT TRANSLATE ROUTE ---
 @app.post("/translate")
 async def translate_text(req: TranslationRequest):
     clean = req.text.strip()
@@ -179,41 +177,10 @@ async def translate_text(req: TranslationRequest):
         return {"translated_text": ""}
 
     target_lang = req.target_lang.strip().lower() if req.target_lang else "en"
-    has_script = is_urdu_or_arabic(clean)
+    source_param = "ur" if is_urdu_or_arabic(clean) else "auto"
+    translated = translate_via_google(clean, source_param, target_lang)
+    return {"translated_text": translated}
 
-    source_param = "ur" if has_script else "auto"
-    g_res = translate_via_google(clean, source_param, target_lang)
-    if g_res:
-        return {"translated_text": g_res}
-
-    return {"translated_text": clean}
-
-# --- ACCURATE AUDIO TRANSLATION (ZERO 404 RISK) ---
-@app.post("/api/translate-audio")
-async def translate_audio_route(
-    file_path: str = Form(...),
-    target_lang: str = Form("en"),
-    transcript_hint: str = Form("")
-):
-    chosen_target = target_lang.strip().lower() if target_lang else "en"
-    translated_text = ""
-    
-    clean_hint = transcript_hint.strip() if transcript_hint else ""
-    if clean_hint:
-        req = TranslationRequest(text=clean_hint, target_lang=chosen_target)
-        res = await translate_text(req)
-        translated_text = res.get("translated_text", "")
-
-    if not translated_text:
-        translated_text = "Voice message delivered"
-
-    return {
-        "translated_text": translated_text,
-        "target_lang": chosen_target,
-        "file_path": file_path
-    }
-
-# --- CHATS & MESSAGES ---
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
     conn = sqlite3.connect(DB_PATH)
@@ -265,7 +232,6 @@ async def upload_media(file: UploadFile = File(...)):
         f.write(await file.read())
     return {"url": f"/uploads/{filename}"}
 
-# --- WEBSOCKET ENGINE ---
 @app.websocket("/ws/{phone}")
 async def socket_endpoint(websocket: WebSocket, phone: str):
     await manager.connect(phone, websocket)
