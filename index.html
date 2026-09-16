@@ -526,7 +526,7 @@
     </div>
 
     <script>
-        // Global Error Guard to prevent third-party extension (e.g. 200.js) crashes
+        // Global Error Guard against third-party extension injection (e.g. 200.js / IDM)
         window.addEventListener('error', function (e) {
             if (e.filename && (e.filename.includes('200.js') || e.filename.includes('extension'))) {
                 e.stopImmediatePropagation();
@@ -536,7 +536,7 @@
         }, true);
 
         const urlParams = new URLSearchParams(window.location.search);
-        let directChatParam = urlParams.get('chat') || urlParams.get('invite') || "";
+        let directChatParam = urlParams.get('chat') || urlParams.get('invite') || urlParams.get('room') || "";
         
         let myPhone = localStorage.getItem("syncora_user_phone") || "";
         let activePartner = localStorage.getItem("syncora_active_partner") || "";
@@ -584,18 +584,21 @@
             iceCandidatePoolSize: 10
         };
 
-        window.onload = () => {
+        window.onload = async () => {
             if (myPhone) {
                 document.getElementById("auth-overlay").style.display = "none";
                 document.getElementById("my-status-label").innerText = `● ${myPhone}`;
                 initSocketSafe();
-                loadRecentChats();
+                await loadRecentChats();
                 loadUserProfileData();
 
-                if (directChatParam && directChatParam !== myPhone) {
+                // Auto partner recovery logic
+                if (directChatParam && directChatParam !== myPhone && !directChatParam.startsWith("call-")) {
                     selectChat(directChatParam);
                 } else if (activePartner && activePartner !== myPhone) {
                     selectChat(activePartner);
+                } else if (allChatsCache.length > 0) {
+                    selectChat(allChatsCache[0]);
                 }
             }
         };
@@ -628,11 +631,11 @@
                     document.getElementById("auth-overlay").style.display = "none";
                     document.getElementById("my-status-label").innerText = `● ${myPhone}`;
                     initSocketSafe();
-                    loadRecentChats();
+                    await loadRecentChats();
                     loadUserProfileData();
 
-                    if (directChatParam && directChatParam !== myPhone) {
-                        selectChat(directChatParam);
+                    if (allChatsCache.length > 0) {
+                        selectChat(allChatsCache[0]);
                     }
                 } else {
                     alert(data.error || "Login failed");
@@ -841,6 +844,7 @@
         }
 
         async function selectChat(partner) {
+            if (!partner || partner.startsWith("call-")) return;
             activePartner = partner;
             localStorage.setItem("syncora_active_partner", activePartner);
 
@@ -1186,10 +1190,7 @@
         }
 
         async function startVoiceRecording() {
-            if (!activePartner) { 
-                alert("Pehle kisi contact ko select karein!"); 
-                return; 
-            }
+            autoSelectFallbackPartner();
 
             try {
                 activeAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1311,14 +1312,22 @@
             document.getElementById("rec-live-words").innerText = "Listening...";
         }
 
+        function autoSelectFallbackPartner() {
+            if (!activePartner || activePartner.startsWith("call-")) {
+                activePartner = localStorage.getItem("syncora_active_partner") || "";
+            }
+            if (!activePartner && allChatsCache.length > 0) {
+                activePartner = allChatsCache[0];
+                selectChat(activePartner);
+            }
+        }
+
         function stageMessageForDispatch() {
+            autoSelectFallbackPartner();
+
             const input = document.getElementById("text-input");
             const text = input.value.trim();
             if (!text) return;
-            if (!activePartner) { 
-                alert("Pehle kisi contact ko select karein!"); 
-                return; 
-            }
 
             pendingPayload = { type: "text", content: text };
             document.getElementById("voice-hint-field").value = text;
@@ -1375,22 +1384,19 @@
         }
 
         function executeDispatch(content, translated, msgType) {
+            autoSelectFallbackPartner();
+
             if (!activePartner) {
-                activePartner = localStorage.getItem("syncora_active_partner") || "";
-            }
-            if (!activePartner) {
-                alert("Target contact selected nahi hai! Kisi contact par click karein.");
+                alert("Koi contact select nahi hai! Sidebar se contact choose karein.");
                 return;
             }
 
             const tempId = "msg_temp_" + Date.now();
             
-            // Visual render: Protected against extension crashes
+            // Visual render immediately (never blocks UI)
             try {
                 appendBubble(content, "sent", translated, msgType, "now", tempId, "sent");
-            } catch(e) {
-                console.log("[Bubble Render Guard]:", e);
-            }
+            } catch(e) {}
             
             document.getElementById("text-input").value = "";
 
@@ -1422,7 +1428,6 @@
             if (type === "media") {
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
             } else if (type === "voice") {
-                // Non-standard attribute to avoid IDM/200.js hijacking
                 body = `
                     <div style="display:flex; align-items:center; gap:8px; padding: 2px 0;">
                         <span style="font-size:16px;">🎙️</span>
