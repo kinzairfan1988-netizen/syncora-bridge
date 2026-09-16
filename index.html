@@ -409,12 +409,12 @@
     <!-- SEND CONFIRMATION MODAL -->
     <div class="send-modal-backdrop" id="send-modal">
         <div class="send-modal-card">
-            <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Voice Recording Ready</h3>
-            <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Audio file recorded successfully</p>
+            <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Voice Message Ready</h3>
+            <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Audio and text ready</p>
 
-            <div id="voice-edit-block" style="display:none; text-align:left;">
-                <label style="font-size: 11px; color: var(--text-muted);">Urdu/Speech Hint (Optional):</label>
-                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Transcript or words...">
+            <div id="voice-edit-block" style="display:block; text-align:left;">
+                <label style="font-size: 11px; color: var(--text-muted);">Captured Speech Text:</label>
+                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Speech text will show here...">
             </div>
 
             <div class="lang-options-drawer" id="lang-drawer">
@@ -428,12 +428,12 @@
                     <option value="es">Spanish (Español)</option>
                 </select>
                 <button class="modal-btn-choice btn-choice-trans" id="btn-modal-confirm-trans" onclick="confirmDispatchTranslation()">
-                    🌐 Translate & Send Voice
+                    🌐 Translate & Send Voice Note
                 </button>
             </div>
 
             <button class="modal-btn-choice" onclick="confirmDispatchOriginal()" style="margin-top: 4px;">
-                ✉️ Send Audio Without Translation
+                ✉️ Send Audio Only (No Translation)
             </button>
 
             <button onclick="cancelDispatch()" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer;">
@@ -512,7 +512,7 @@
                 <div class="recording-bar" id="recording-bar">
                     <div class="rec-indicator">
                         <div class="rec-dot"></div>
-                        <span id="rec-timer" style="font-size:12px; color:var(--text-primary); font-weight:700;">0:00</span>
+                        <span id="rec-live-words" style="font-size:12px; color:var(--accent-amber); max-width:140px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">Listening...</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <button class="icon-btn" type="button" onclick="cancelRecording()" style="color: var(--danger-red);">🗑️</button>
@@ -541,11 +541,9 @@
         let mediaRecorder = null;
         let recordedChunks = [];
         let isRecording = false;
-        let recordingSeconds = 0;
-        let recordingTimerInterval = null;
         let activeAudioStream = null;
-        let capturedVoiceHint = "";
-        let voiceRecognitionEngine = null;
+        let capturedLiveText = "";
+        let speechRecognitionEngine = null;
 
         let pendingPayload = null;
         let currentAvatarUrl = "";
@@ -1178,7 +1176,7 @@
             }
         });
 
-        /* --- BULLETPROOF AUDIO FILE RECORDING (PLAYS EVERYWHERE) --- */
+        /* --- DUAL CAPTURE: LIVE SPEECH + ACTUAL AUDIO FILE (100% RELIABLE) --- */
         function toggleVoiceRecording() {
             if (!isRecording) startVoiceRecording();
             else stopAndFinishRecording();
@@ -1201,24 +1199,30 @@
 
                 mediaRecorder = chosenMime ? new MediaRecorder(activeAudioStream, { mimeType: chosenMime }) : new MediaRecorder(activeAudioStream);
                 recordedChunks = [];
-                capturedVoiceHint = "";
+                capturedLiveText = "";
 
-                // Voice text hint
+                // Initialize Live Speech Engine
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
-                        voiceRecognitionEngine = new SR();
-                        voiceRecognitionEngine.continuous = true;
-                        voiceRecognitionEngine.interimResults = true;
-                        voiceRecognitionEngine.lang = 'ur-PK';
-                        voiceRecognitionEngine.onresult = (ev) => {
-                            let textSoFar = "";
+                        speechRecognitionEngine = new SR();
+                        speechRecognitionEngine.continuous = true;
+                        speechRecognitionEngine.interimResults = true;
+                        speechRecognitionEngine.lang = 'ur-PK';
+
+                        const liveDisplay = document.getElementById("rec-live-words");
+
+                        speechRecognitionEngine.onresult = (ev) => {
+                            let accumulated = "";
                             for (let i = 0; i < ev.results.length; ++i) {
-                                textSoFar += ev.results[i][0].transcript + " ";
+                                accumulated += ev.results[i][0].transcript + " ";
                             }
-                            capturedVoiceHint = textSoFar.trim();
+                            capturedLiveText = accumulated.trim();
+                            if (liveDisplay && capturedLiveText) {
+                                liveDisplay.innerText = capturedLiveText;
+                            }
                         };
-                        voiceRecognitionEngine.start();
+                        speechRecognitionEngine.start();
                     } catch(e){}
                 }
 
@@ -1241,12 +1245,12 @@
                     pendingPayload = {
                         type: "voice",
                         content: data.url,
-                        hint: capturedVoiceHint.trim()
+                        hint: capturedLiveText.trim()
                     };
 
-                    document.getElementById("voice-edit-block").style.display = "block";
-                    document.getElementById("voice-hint-field").value = capturedVoiceHint.trim();
-                    openSendModal("🎙️ Audio Ready");
+                    document.getElementById("voice-hint-field").value = capturedLiveText.trim();
+                    document.getElementById("send-modal-preview").innerText = capturedLiveText.trim() ? `"${capturedLiveText.trim()}"` : "Audio File Ready";
+                    document.getElementById("send-modal").style.display = "flex";
                 };
 
                 mediaRecorder.start(100);
@@ -1254,38 +1258,40 @@
 
                 document.getElementById("input-shell").style.display = "none";
                 document.getElementById("recording-bar").style.display = "flex";
-
-                recordingSeconds = 0;
-                document.getElementById("rec-timer").innerText = "0:00";
-                recordingTimerInterval = setInterval(() => {
-                    recordingSeconds++;
-                    const m = Math.floor(recordingSeconds / 60);
-                    const s = String(recordingSeconds % 60).padStart(2, '0');
-                    document.getElementById("rec-timer").innerText = `${m}:${s}`;
-                }, 1000);
+                document.getElementById("rec-live-words").innerText = "Listening (Urdu)...";
 
             } catch (err) {
-                alert("Mic permission error: " + err.message);
+                alert("Mic access error: " + err.message);
             }
         }
 
         function stopAndFinishRecording() {
             setTimeout(() => {
-                if (voiceRecognitionEngine) { try { voiceRecognitionEngine.stop(); } catch(e){} }
-                if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+                if (speechRecognitionEngine) { 
+                    try { speechRecognitionEngine.stop(); } catch(e){} 
+                    speechRecognitionEngine = null;
+                }
+                if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                    mediaRecorder.stop();
+                }
                 if (activeAudioStream) {
                     activeAudioStream.getTracks().forEach(t => t.stop());
                     activeAudioStream = null;
                 }
                 resetRecordingUI();
-            }, 300);
+            }, 350);
         }
 
         function cancelRecording() {
-            capturedVoiceHint = "";
+            capturedLiveText = "";
             recordedChunks = [];
-            if (voiceRecognitionEngine) { try { voiceRecognitionEngine.stop(); } catch(e){} }
-            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+            if (speechRecognitionEngine) { 
+                try { speechRecognitionEngine.stop(); } catch(e){} 
+                speechRecognitionEngine = null;
+            }
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+            }
             if (activeAudioStream) {
                 activeAudioStream.getTracks().forEach(t => t.stop());
                 activeAudioStream = null;
@@ -1295,19 +1301,25 @@
 
         function resetRecordingUI() {
             isRecording = false;
-            clearInterval(recordingTimerInterval);
             document.getElementById("recording-bar").style.display = "none";
             document.getElementById("input-shell").style.display = "flex";
+            document.getElementById("rec-live-words").innerText = "Listening...";
         }
 
-        function openSendModal(preview) {
-            document.getElementById("send-modal-preview").innerText = preview;
+        function stageMessageForDispatch() {
+            const input = document.getElementById("text-input");
+            const text = input.value.trim();
+            if (!text) return;
+            if (!activePartner) { alert("Pehle contact select karein!"); return; }
+
+            pendingPayload = { type: "text", content: text };
+            document.getElementById("voice-hint-field").value = text;
+            document.getElementById("send-modal-preview").innerText = `"${text.substring(0, 30)}"`;
             document.getElementById("send-modal").style.display = "flex";
         }
 
         function cancelDispatch() {
             pendingPayload = null;
-            document.getElementById("voice-edit-block").style.display = "none";
             document.getElementById("send-modal").style.display = "none";
         }
 
@@ -1328,51 +1340,29 @@
             btn.innerText = "Translating...";
             btn.disabled = true;
 
+            const textToTranslate = document.getElementById("voice-hint-field").value.trim() || (pendingPayload.type === 'text' ? pendingPayload.content : "");
             let translatedText = "";
 
-            if (pendingPayload.type === "text") {
+            if (textToTranslate) {
                 try {
                     const res = await fetch("/translate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ text: pendingPayload.content, target_lang: targetLang })
+                        body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
                     });
                     const data = await res.json();
-                    translatedText = data.translated_text || pendingPayload.content;
+                    translatedText = (data.translated_text && data.translated_text.trim()) ? data.translated_text : textToTranslate;
                 } catch (e) {
-                    translatedText = pendingPayload.content;
+                    translatedText = textToTranslate;
                 }
-            } else if (pendingPayload.type === "voice") {
-                try {
-                    const userHint = document.getElementById("voice-hint-field").value.trim() || pendingPayload.hint || "";
-                    const form = new FormData();
-                    form.append("file_path", pendingPayload.content);
-                    form.append("target_lang", targetLang);
-                    form.append("transcript_hint", userHint);
-
-                    const res = await fetch("/api/translate-audio", { method: "POST", body: form });
-                    const data = await res.json();
-                    translatedText = data.translated_text || "";
-                } catch (e) {}
             }
 
             btn.innerText = origText;
             btn.disabled = false;
 
-            // Audio URL will be stored as content, translated string as translated
-            executeDispatch(pendingPayload.content, translatedText, pendingPayload.type);
+            const finalContent = (pendingPayload.type === "voice") ? pendingPayload.content : (textToTranslate || pendingPayload.content);
+            executeDispatch(finalContent, translatedText, pendingPayload.type);
             cancelDispatch();
-        }
-
-        function stageMessageForDispatch() {
-            const input = document.getElementById("text-input");
-            const text = input.value.trim();
-            if (!text) return;
-            if (!activePartner) { alert("Pehle contact select karein!"); return; }
-
-            pendingPayload = { type: "text", content: text };
-            document.getElementById("voice-edit-block").style.display = "none";
-            openSendModal(`"${text.substring(0, 30)}"`);
         }
 
         function executeDispatch(content, translated, msgType) {
@@ -1406,13 +1396,10 @@
             if (type === "media") {
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
             } else if (type === "voice") {
-                // UNIVERSAL REAL AUDIO PLAYER: Plays on PC and Mobile without external dependencies
                 body = `
-                    <div style="display:flex; flex-direction:column; gap:6px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <span style="font-size:16px;">🎙️</span>
-                            <audio controls src="${content}" style="max-width:220px; height:36px; outline:none;"></audio>
-                        </div>
+                    <div style="display:flex; align-items:center; gap:8px; padding: 2px 0;">
+                        <span style="font-size:16px;">🎙️</span>
+                        <audio controls src="${content}" style="max-width:220px; height:36px; outline:none;"></audio>
                     </div>
                 `;
             } else if (type === "location") {
