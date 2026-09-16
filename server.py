@@ -190,7 +190,7 @@ async def translate_text(req: TranslationRequest):
     has_script = is_urdu_or_arabic(clean)
 
     if GEMINI_KEY:
-        for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+        for model_name in ["gemini-1.5-flash"]:
             try:
                 model = genai.GenerativeModel(model_name)
                 prompt = (
@@ -206,7 +206,7 @@ async def translate_text(req: TranslationRequest):
                     if out:
                         return {"translated_text": out}
             except Exception as e:
-                print(f"[Gemini Text Translation Error {model_name}]: {e}")
+                print(f"[Gemini Text Translation Error]: {e}")
                 continue
 
     source_param = "ur" if has_script else "auto"
@@ -230,33 +230,24 @@ async def translate_audio_route(
 
     if os.path.exists(actual_path) and GEMINI_KEY:
         try:
-            with open(actual_path, "rb") as f:
-                audio_bytes = f.read()
+            audio_file = genai.upload_file(path=actual_path)
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            prompt = (
+                f"Listen carefully to this voice note. The speaker is talking in Urdu, Roman Urdu, or Hindi. "
+                f"Accurately translate their spoken words into language: '{chosen_target}'. "
+                f"Do not invent facts or add commentary. Return ONLY the translation."
+            )
+            response = model.generate_content([audio_file, prompt])
+            
+            try:
+                genai.delete_file(audio_file.name)
+            except Exception:
+                pass
 
-            for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
-                try:
-                    model = genai.GenerativeModel(model_name)
-                    # Support audio webm or mp4
-                    mime_type = "audio/mp4" if local_filename.endswith(".mp4") else "audio/webm"
-                    audio_part = {
-                        "mime_type": mime_type,
-                        "data": base64.b64encode(audio_bytes).decode("utf-8")
-                    }
-                    prompt = (
-                        f"Listen carefully to this voice message. The speaker is talking in Urdu, Roman Urdu, or Hindi. "
-                        f"Transcribe what they actually said and translate it into '{chosen_target}'. "
-                        f"Do NOT invent words. Output ONLY the translated sentence, without any explanations or quotes."
-                    )
-                    resp = model.generate_content([prompt, audio_part])
-                    if resp and hasattr(resp, "text") and resp.text:
-                        cand = resp.text.strip().replace('"', '').replace("'", "")
-                        if cand:
-                            translated_text = cand
-                            break
-                except Exception as e:
-                    print(f"[Gemini Audio Error {model_name}]: {e}")
+            if response and hasattr(response, "text") and response.text:
+                translated_text = response.text.strip().replace('"', '').replace("'", "")
         except Exception as e:
-            print(f"[File Read Error]: {e}")
+            print(f"[Gemini Audio API Error]: {e}")
 
     if not translated_text and transcript_hint and transcript_hint.strip():
         req = TranslationRequest(text=transcript_hint.strip(), target_lang=chosen_target)
@@ -264,7 +255,7 @@ async def translate_audio_route(
         translated_text = res.get("translated_text", "")
 
     if not translated_text:
-        translated_text = "Audio received"
+        translated_text = "Translation failed (Check GEMINI_API_KEY or Audio Format)"
 
     return {
         "translated_text": translated_text,
@@ -291,7 +282,6 @@ async def get_conversation(phone: str, partner: str):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Safely mark unread messages as delivered
     cursor.execute("""
         UPDATE messages SET status = 'delivered'
         WHERE chat_id = ? AND receiver = ? AND status = 'sent'
@@ -325,12 +315,11 @@ async def upload_media(file: UploadFile = File(...)):
         f.write(await file.read())
     return {"url": f"/uploads/{filename}"}
 
-# --- WEBSOCKET ENGINE WITH HEARTBEAT & RELIABILITY ---
+# --- WEBSOCKET ENGINE ---
 @app.websocket("/ws/{phone}")
 async def socket_endpoint(websocket: WebSocket, phone: str):
     await manager.connect(phone, websocket)
     
-    # Mark messages as delivered for this online user
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -355,7 +344,6 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
             action = payload.get("action")
             receiver = payload.get("receiver")
 
-            # Heartbeat ping/pong to keep connection perpetually alive
             if action == "ping":
                 await websocket.send_text(json.dumps({"action": "pong"}))
                 continue
@@ -379,7 +367,6 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                 conn.commit()
                 conn.close()
 
-                # Ack back to sender
                 await manager.send_to_user(phone, {
                     "action": "message_sent_ack",
                     "id": msg_id,
@@ -387,7 +374,6 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                     "status": initial_status
                 })
 
-                # Forward to receiver
                 await manager.send_to_user(receiver, {
                     "action": "new_message",
                     "id": msg_id,
