@@ -39,7 +39,6 @@
             color: var(--text-primary);
         }
 
-        /* 1-STEP AUTH OVERLAY */
         .auth-overlay {
             position: fixed; inset: 0; background: rgba(11, 14, 20, 0.96);
             backdrop-filter: blur(12px); z-index: 999; display: flex;
@@ -71,10 +70,8 @@
             box-shadow: 0 4px 20px var(--accent-amber-glow);
         }
 
-        /* MAIN APP WRAPPER */
         .workspace { display: flex; width: 100%; height: 100%; position: relative; overflow: hidden; }
 
-        /* SIDEBAR PANEL */
         .sidebar-panel {
             width: 380px; border-right: 1px solid var(--border-graphite);
             background: var(--surface-panel); display: flex; flex-direction: column; flex-shrink: 0;
@@ -128,7 +125,6 @@
         .nav-tab-btn span.tab-icon { font-size: 18px; }
         .nav-tab-btn.active { color: var(--accent-amber); }
 
-        /* CHAT STAGE */
         .stage-panel {
             flex: 1; display: flex; flex-direction: column; background: var(--bg-obsidian);
             position: relative; height: 100%; overflow: hidden;
@@ -185,7 +181,6 @@
         }
         .bubble.received .btn-voice-speaker { background: var(--accent-amber); color: #000; }
 
-        /* PERMANENT INPUT BAR (ALWAYS VISIBLE) */
         .stage-input-bar {
             padding: 8px 12px; background: var(--surface-panel);
             border-top: 1px solid var(--border-graphite); display: flex; align-items: center;
@@ -232,7 +227,6 @@
             border-radius: 8px; color: var(--text-primary); cursor: pointer; font-size: 13px;
         }
 
-        /* MODALS */
         .contacts-overlay, .settings-overlay, .send-modal-backdrop {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88);
             backdrop-filter: blur(10px); z-index: 998; display: none;
@@ -270,7 +264,6 @@
             padding: 10px; border-radius: 10px; color: #fff; font-size: 13px; outline: none;
         }
 
-        /* CALL MODAL */
         .call-modal-overlay {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95);
             backdrop-filter: blur(14px); z-index: 1000; display: none;
@@ -297,7 +290,6 @@
         .btn-call-accept { background: var(--online-green); color: #fff; }
         .btn-call-mute { background: var(--surface-card); color: #fff; border: 1px solid var(--border-graphite); }
 
-        /* RESPONSIVE MOBILE FIX */
         @media (max-width: 768px) {
             .sidebar-panel { width: 100%; height: 100dvh; display: flex; }
             .stage-panel { display: none; width: 100%; height: 100dvh; }
@@ -322,7 +314,6 @@
 
     <audio id="remote-audio-sink" autoplay playsinline style="display:none;"></audio>
 
-    <!-- AUTH OVERLAY -->
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
             <div class="auth-badge">IA</div>
@@ -333,7 +324,6 @@
         </div>
     </div>
 
-    <!-- CONTACTS MODAL -->
     <div class="contacts-overlay" id="contacts-modal">
         <div class="contacts-card">
             <h3 style="font-size: 17px; color: var(--accent-amber); font-family: 'Space Grotesk', sans-serif;">Start New Conversation</h3>
@@ -362,7 +352,6 @@
         </div>
     </div>
 
-    <!-- CALL MODAL -->
     <div class="call-modal-overlay" id="call-modal">
         <div style="display:flex; flex-direction:column; align-items:center;">
             <div class="call-avatar-circle" id="call-avatar-icon">📞</div>
@@ -391,7 +380,6 @@
         </div>
     </div>
 
-    <!-- SETTINGS MODAL -->
     <div class="settings-overlay" id="settings-modal">
         <div class="settings-card">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -419,7 +407,6 @@
         </div>
     </div>
 
-    <!-- SEND CONFIRMATION MODAL -->
     <div class="send-modal-backdrop" id="send-modal">
         <div class="send-modal-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Dispatch Mode</h3>
@@ -454,10 +441,8 @@
         </div>
     </div>
 
-    <!-- WORKSPACE -->
     <div class="workspace">
         
-        <!-- SIDEBAR -->
         <aside class="sidebar-panel">
             <div class="sidebar-header">
                 <span class="app-brand">SYNCORA</span>
@@ -490,7 +475,6 @@
             </nav>
         </aside>
 
-        <!-- STAGE (CHAT PANEL) -->
         <main class="stage-panel" id="stage-panel">
             <header class="stage-header">
                 <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
@@ -532,7 +516,6 @@
             <input type="file" id="file-picker-media" accept="image/*,video/*" style="display:none;" onchange="uploadAttachment(event, 'media')">
             <input type="file" id="file-picker-doc" accept="*/*" style="display:none;" onchange="uploadAttachment(event, 'document')">
 
-            <!-- ALWAYS VISIBLE BOTTOM INPUT BAR -->
             <footer class="stage-input-bar">
                 <div class="input-shell" id="input-shell">
                     <button class="icon-btn" type="button" onclick="toggleAttachMenu()" title="Attach Link">📎</button>
@@ -579,6 +562,7 @@
         let recordingTimerInterval = null;
         let chosenAudioMime = "audio/webm";
         let capturedVoiceHint = "";
+        let interimVoiceHint = "";
         let voiceRecognitionEngine = null;
 
         let pendingPayload = null;
@@ -1231,7 +1215,7 @@
             }
         });
 
-        /* --- VOICE NOTE RECORDING --- */
+        /* --- ACCURATE VOICE NOTE RECORDING --- */
         function toggleVoiceRecording() {
             if (!isRecording) {
                 startVoiceRecording();
@@ -1260,20 +1244,26 @@
                 mediaRecorder = chosenAudioMime ? new MediaRecorder(stream, { mimeType: chosenAudioMime }) : new MediaRecorder(stream);
                 recordedChunks = [];
                 capturedVoiceHint = "";
+                interimVoiceHint = "";
 
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
                         voiceRecognitionEngine = new SR();
                         voiceRecognitionEngine.continuous = true;
-                        voiceRecognitionEngine.interimResults = false;
+                        voiceRecognitionEngine.interimResults = true;
                         voiceRecognitionEngine.lang = 'ur-PK';
+
                         voiceRecognitionEngine.onresult = (ev) => {
+                            let temp = "";
                             for (let i = ev.resultIndex; i < ev.results.length; ++i) {
                                 if (ev.results[i].isFinal) {
                                     capturedVoiceHint += " " + ev.results[i][0].transcript;
+                                } else {
+                                    temp += ev.results[i][0].transcript;
                                 }
                             }
+                            interimVoiceHint = temp;
                         };
                         voiceRecognitionEngine.start();
                     } catch(e){}
@@ -1292,10 +1282,11 @@
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
                     
+                    const combinedTranscript = (capturedVoiceHint + " " + interimVoiceHint).trim();
                     pendingPayload = {
                         type: "voice",
                         content: data.url,
-                        hint: capturedVoiceHint.trim()
+                        hint: combinedTranscript
                     };
                     openSendModal("🎙️ Voice Note Ready");
                 };
@@ -1321,17 +1312,20 @@
         }
 
         function stopAndFinishRecording() {
-            if (voiceRecognitionEngine) {
-                try { voiceRecognitionEngine.stop(); } catch(e){}
-            }
-            if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                mediaRecorder.stop();
-            }
-            resetRecordingUI();
+            setTimeout(() => {
+                if (voiceRecognitionEngine) {
+                    try { voiceRecognitionEngine.stop(); } catch(e){}
+                }
+                if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                    mediaRecorder.stop();
+                }
+                resetRecordingUI();
+            }, 300);
         }
 
         function cancelRecording() {
             capturedVoiceHint = "";
+            interimVoiceHint = "";
             recordedChunks = [];
             if (voiceRecognitionEngine) {
                 try { voiceRecognitionEngine.stop(); } catch(e){}
