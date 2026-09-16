@@ -12,10 +12,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import google.generativeai as genai
 
-UPLOAD_DIR = "uploads"
+# Database aur Uploads ko absolute path par lock kiya hai taake refresh ya folder change par data na ure
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-DB_PATH = "syncora.db"
+DB_PATH = os.path.join(BASE_DIR, "syncora.db")
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -55,10 +57,11 @@ init_db()
 app = FastAPI(title="Syncora Terminal Core Engine")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
-# --- APNI ASLI GEMINI API KEY YAHAN QUOTES MEIN LIKHEIN ---
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSy...")
+# --- APNI GEMINI KEY YAHAN DIRECT PASTE KAREIN ---
+RAW_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_KEY = RAW_KEY if RAW_KEY else "APNI_ASLI_GEMINI_API_KEY_YAHAN_LIKHEIN"
 
-if GEMINI_KEY and GEMINI_KEY != "AIzaSy...":
+if GEMINI_KEY and GEMINI_KEY != "APNI_ASLI_GEMINI_API_KEY_YAHAN_LIKHEIN":
     try:
         genai.configure(api_key=GEMINI_KEY)
     except Exception as e:
@@ -191,26 +194,25 @@ async def translate_text(req: TranslationRequest):
     target_lang = req.target_lang.strip().lower() if req.target_lang else "en"
     has_script = is_urdu_or_arabic(clean)
 
-    if GEMINI_KEY and GEMINI_KEY != "AIzaSy...":
-        for model_name in ["gemini-1.5-flash"]:
-            try:
-                model = genai.GenerativeModel(model_name)
-                prompt = (
-                    f"Translate the following user input accurately and strictly into language code '{target_lang}'.\n"
-                    f"The input could be Roman Urdu, Urdu script, or Hindi.\n"
-                    f"- If input is Roman Urdu or Urdu script and target is 'en', translate to natural English.\n"
-                    f"- If input is English and target is 'ur', translate to Urdu script.\n"
-                    f"Do NOT guess or add generic greetings. Output ONLY the exact translated sentence without quotes:\n\n{clean}"
-                )
-                response = model.generate_content(prompt)
-                if response and hasattr(response, "text") and response.text:
-                    out = response.text.strip().replace('"', '').replace("'", "")
-                    if out:
-                        return {"translated_text": out}
-            except Exception as e:
-                print(f"[Gemini Text Translation Error]: {e}")
-                continue
+    if GEMINI_KEY and GEMINI_KEY != "APNI_ASLI_GEMINI_API_KEY_YAHAN_LIKHEIN":
+        try:
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            prompt = (
+                f"Translate the following user input accurately into language code '{target_lang}'.\n"
+                f"Input can be Roman Urdu, Urdu script, or Hindi.\n"
+                f"- If Roman Urdu/Urdu and target is 'en', translate to clean natural English.\n"
+                f"- If English and target is 'ur', translate to Urdu script.\n"
+                f"Output ONLY the translated sentence, without any explanations or quotes:\n\n{clean}"
+            )
+            response = model.generate_content(prompt)
+            if response and hasattr(response, "text") and response.text:
+                out = response.text.strip().replace('"', '').replace("'", "")
+                if out:
+                    return {"translated_text": out}
+        except Exception as e:
+            print(f"[Gemini Text Translation Error]: {e}")
 
+    # Fallback to Google GTX
     source_param = "ur" if has_script else "auto"
     g_res = translate_via_google(clean, source_param, target_lang)
     if g_res:
@@ -227,19 +229,15 @@ async def translate_audio_route(
 ):
     chosen_target = target_lang.strip().lower() if target_lang else "en"
     translated_text = ""
-    error_detail = ""
+    error_msg = ""
     
     local_filename = os.path.basename(file_path)
     actual_path = os.path.join(UPLOAD_DIR, local_filename)
 
-    if not GEMINI_KEY or GEMINI_KEY == "AIzaSy...":
-        return {
-            "translated_text": "Error: GEMINI_API_KEY is not configured",
-            "target_lang": chosen_target,
-            "file_path": file_path
-        }
+    if not os.path.exists(actual_path):
+        return {"translated_text": "Error: File not found", "target_lang": chosen_target, "file_path": file_path}
 
-    if os.path.exists(actual_path):
+    if GEMINI_KEY and GEMINI_KEY != "APNI_ASLI_GEMINI_API_KEY_YAHAN_LIKHEIN":
         try:
             with open(actual_path, "rb") as f:
                 audio_bytes = f.read()
@@ -260,24 +258,24 @@ async def translate_audio_route(
             model = genai.GenerativeModel("gemini-1.5-flash")
             prompt = (
                 f"Listen carefully to this voice note. The speaker is talking in Urdu, Roman Urdu, or Hindi. "
-                f"Translate their spoken meaning accurately and naturally into language '{chosen_target}'. "
-                f"Output ONLY the translated sentence. Do not add quotes, brackets, or explanation."
+                f"Accurately translate what they said into language: '{chosen_target}'. "
+                f"Do not invent facts. Return ONLY the translated sentence, without quotes or explanations."
             )
-
             response = model.generate_content([prompt, audio_part])
             if response and hasattr(response, "text") and response.text:
                 translated_text = response.text.strip().replace('"', '').replace("'", "")
         except Exception as e:
-            error_detail = str(e)
-            print(f"[Gemini Audio Direct Error]: {e}")
+            error_msg = str(e)
+            print(f"[Gemini Audio Error]: {e}")
 
+    # Fallback if audio translation had an issue but hint exists
     if not translated_text and transcript_hint and transcript_hint.strip():
         req = TranslationRequest(text=transcript_hint.strip(), target_lang=chosen_target)
         res = await translate_text(req)
         translated_text = res.get("translated_text", "")
 
     if not translated_text:
-        translated_text = f"Translation error: {error_detail or 'Audio could not be decoded'}"
+        translated_text = f"Audio Translation Error: {error_msg if error_msg else 'Failed to decode'}"
 
     return {
         "translated_text": translated_text,
@@ -428,7 +426,8 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
 
 @app.get("/")
 async def serve_index():
-    return FileResponse("index.html")
+    index_file = os.path.join(BASE_DIR, "index.html")
+    return FileResponse(index_file)
 
 if __name__ == "__main__":
     import uvicorn
