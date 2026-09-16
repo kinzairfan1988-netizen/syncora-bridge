@@ -1226,7 +1226,7 @@
             }
         });
 
-        /* --- 100% RELIABLE SPEECH-TO-VOICE PIPELINE --- */
+        /* --- RELIABLE SPEECH-TO-VOICE PIPELINE --- */
         function toggleVoiceRecording() {
             if (!isRecording) startVoiceRecording();
             else stopAndFinishRecording();
@@ -1352,18 +1352,17 @@
             const textToTranslate = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
             let translatedText = "";
 
-            if (textToTranslate) {
-                try {
-                    const res = await fetch("/translate", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
-                    });
-                    const data = await res.json();
-                    translatedText = (data.translated_text && data.translated_text.trim()) ? data.translated_text : textToTranslate;
-                } catch (e) {
-                    translatedText = textToTranslate;
-                }
+            try {
+                const res = await fetch("/translate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
+                });
+                const data = await res.json();
+                translatedText = (data.translated_text && data.translated_text.trim()) ? data.translated_text : textToTranslate;
+            } catch (e) {
+                console.error("Translation fetch error:", e);
+                translatedText = textToTranslate;
             }
 
             btn.innerText = origText;
@@ -1373,7 +1372,6 @@
             let finalDispatchType = pendingPayload.type;
 
             if (pendingPayload.type === "voice") {
-                // Generates AI Voice Note Card that works on both PC and Mobile
                 finalDispatchContent = `translated_voice:${targetLang}:${encodeURIComponent(translatedText || textToTranslate)}`;
             }
 
