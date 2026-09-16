@@ -55,13 +55,13 @@ init_db()
 app = FastAPI(title="Syncora Terminal Core Engine")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_KEY = "AIzaSy..." 
+
 if GEMINI_KEY:
     try:
         genai.configure(api_key=GEMINI_KEY)
     except Exception as e:
         print(f"[Gemini Config Error]: {e}")
-
 class DirectLoginRequest(BaseModel):
     phone: str
 
