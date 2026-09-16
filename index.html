@@ -244,6 +244,13 @@
         }
         .btn-contact-opt.wa-btn { background: rgba(37, 211, 102, 0.15); color: var(--wa-green); }
         .btn-choice-trans { background: var(--accent-amber); color: #000; border: none; }
+        
+        .voice-hint-input {
+            width: 100%; background: var(--surface-card); border: 1px solid var(--border-graphite);
+            padding: 10px 12px; border-radius: 10px; color: #fff; font-size: 13px; outline: none; margin-top: 4px;
+        }
+        .voice-hint-input:focus { border-color: var(--accent-amber); }
+
         .settings-field { display: flex; flex-direction: column; gap: 4px; text-align: left; }
         .settings-field label { font-size: 10px; color: var(--text-muted); font-weight: 600; }
         .settings-input {
@@ -407,10 +414,17 @@
         </div>
     </div>
 
+    <!-- SEND CONFIRMATION MODAL WITH LIVE VOICE PREVIEW -->
     <div class="send-modal-backdrop" id="send-modal">
         <div class="send-modal-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Dispatch Mode</h3>
             <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Choose how to deliver your message</p>
+
+            <!-- Voice Hint Text Input for Instant 100% Accuracy -->
+            <div id="voice-edit-block" style="display:none; text-align:left;">
+                <label style="font-size: 11px; color: var(--text-muted);">Urdu/Roman Words (Transcribed):</label>
+                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Type or verify spoken words...">
+            </div>
 
             <button class="modal-btn-choice" onclick="confirmDispatchOriginal()">
                 ✉️ Send Original
@@ -442,7 +456,6 @@
     </div>
 
     <div class="workspace">
-        
         <aside class="sidebar-panel">
             <div class="sidebar-header">
                 <span class="app-brand">SYNCORA</span>
@@ -455,9 +468,7 @@
 
             <div class="chat-list" id="chat-list"></div>
 
-            <button class="fab-btn" onclick="openContactsModal()" title="Start New Chat">
-                💬
-            </button>
+            <button class="fab-btn" onclick="openContactsModal()" title="Start New Chat">💬</button>
 
             <nav class="bottom-nav-bar">
                 <button class="nav-tab-btn active" onclick="switchTab('chats')">
@@ -487,30 +498,18 @@
                 </div>
 
                 <div class="call-buttons-group" id="call-buttons-dock" style="display: flex;">
-                    <button class="btn-call-action" onclick="startCallSession('audio', false)" title="Normal Audio Call">
-                        📞 Audio
-                    </button>
-                    <button class="btn-call-action" onclick="startCallSession('video', false)" title="Normal Video Call">
-                        📹 Video
-                    </button>
-                    <button class="btn-call-action trans-call-btn" onclick="startCallSession('audio', true)" title="Call with Live AI Translation">
-                        🌐 Translate
-                    </button>
+                    <button class="btn-call-action" onclick="startCallSession('audio', false)" title="Normal Audio Call">📞 Audio</button>
+                    <button class="btn-call-action" onclick="startCallSession('video', false)" title="Normal Video Call">📹 Video</button>
+                    <button class="btn-call-action trans-call-btn" onclick="startCallSession('audio', true)" title="Call with Live AI Translation">🌐 Translate</button>
                 </div>
             </header>
 
             <div class="messages-container" id="messages-container"></div>
 
             <div class="attach-popup-menu" id="attach-menu">
-                <div class="attach-menu-item" onclick="document.getElementById('file-picker-media').click()">
-                    <span>🖼️</span> Photos / Videos
-                </div>
-                <div class="attach-menu-item" onclick="shareLocation()">
-                    <span>📍</span> Location
-                </div>
-                <div class="attach-menu-item" onclick="document.getElementById('file-picker-doc').click()">
-                    <span>📄</span> Document
-                </div>
+                <div class="attach-menu-item" onclick="document.getElementById('file-picker-media').click()"><span>🖼️</span> Photos / Videos</div>
+                <div class="attach-menu-item" onclick="shareLocation()"><span>📍</span> Location</div>
+                <div class="attach-menu-item" onclick="document.getElementById('file-picker-doc').click()"><span>📄</span> Document</div>
             </div>
 
             <input type="file" id="file-picker-media" accept="image/*,video/*" style="display:none;" onchange="uploadAttachment(event, 'media')">
@@ -534,12 +533,9 @@
                     </div>
                 </div>
 
-                <button class="btn-send-permanent" id="send-arrow-btn" type="button" onclick="stageMessageForDispatch()" title="Send">
-                    ➤
-                </button>
+                <button class="btn-send-permanent" id="send-arrow-btn" type="button" onclick="stageMessageForDispatch()" title="Send">➤</button>
             </footer>
         </main>
-
     </div>
 
     <script>
@@ -562,7 +558,6 @@
         let recordingTimerInterval = null;
         let chosenAudioMime = "audio/webm";
         let capturedVoiceHint = "";
-        let interimVoiceHint = "";
         let voiceRecognitionEngine = null;
 
         let pendingPayload = null;
@@ -641,23 +636,16 @@
             }
         }
 
-        function openContactsModal() {
-            document.getElementById("contacts-modal").style.display = "flex";
-        }
-
-        function closeContactsModal() {
-            document.getElementById("contacts-modal").style.display = "none";
-        }
+        function openContactsModal() { document.getElementById("contacts-modal").style.display = "flex"; }
+        function closeContactsModal() { document.getElementById("contacts-modal").style.display = "none"; }
 
         async function pickFromPhoneContacts() {
             if ('contacts' in navigator && 'ContactsManager' in window) {
                 try {
                     const props = ['tel', 'name'];
-                    const opts = { multiple: false };
-                    const contacts = await navigator.contacts.select(props, opts);
+                    const contacts = await navigator.contacts.select(props, { multiple: false });
                     if (contacts && contacts.length > 0) {
-                        const contact = contacts[0];
-                        let selectedNumber = (contact.tel && contact.tel.length > 0) ? contact.tel[0] : "";
+                        let selectedNumber = (contacts[0].tel && contacts[0].tel.length > 0) ? contacts[0].tel[0] : "";
                         selectedNumber = selectedNumber.replace(/\s+/g, '').replace(/-/g, '');
                         if (selectedNumber) {
                             closeContactsModal();
@@ -697,9 +685,7 @@
         }
 
         function switchTab(tab) {
-            if (tab === 'chats') {
-                backToSidebar();
-            }
+            if (tab === 'chats') backToSidebar();
         }
 
         function playSpokenVoice(text, lang) {
@@ -728,9 +714,7 @@
             document.getElementById("settings-modal").style.display = "flex";
         }
 
-        function closeSettingsModal() {
-            document.getElementById("settings-modal").style.display = "none";
-        }
+        function closeSettingsModal() { document.getElementById("settings-modal").style.display = "none"; }
 
         async function saveProfileChanges() {
             const name = document.getElementById("settings-name-input").value.trim();
@@ -754,11 +738,7 @@
 
         function executeLogout() {
             if (confirm("Kiya aap waqai Syncora se Logout karna chahte hain?")) {
-                if (socket) {
-                    socket.onclose = null;
-                    socket.close();
-                    socket = null;
-                }
+                if (socket) { socket.close(); socket = null; }
                 localStorage.removeItem("syncora_user_phone");
                 localStorage.removeItem("syncora_active_partner");
                 myPhone = "";
@@ -771,9 +751,7 @@
 
         function initSocketSafe() {
             if (!myPhone || isConnectingSocket) return;
-            if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-                return;
-            }
+            if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
 
             isConnectingSocket = true;
             const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
@@ -784,7 +762,6 @@
                 socket.onopen = () => {
                     isConnectingSocket = false;
                     document.getElementById("my-status-label").innerText = `● ${myPhone}`;
-                    
                     if (heartbeatInterval) clearInterval(heartbeatInterval);
                     heartbeatInterval = setInterval(() => {
                         if (socket && socket.readyState === WebSocket.OPEN) {
@@ -817,9 +794,7 @@
                         } 
                         else if (data.action === "ice_candidate") {
                             if (peerConnection && data.candidate) {
-                                try {
-                                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-                                } catch (e) {}
+                                try { await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) {}
                             }
                         } 
                         else if (data.action === "call_live_caption") {
@@ -834,18 +809,11 @@
                 socket.onclose = () => {
                     isConnectingSocket = false;
                     socket = null;
-                    if (myPhone) {
-                        setTimeout(initSocketSafe, 3000);
-                    }
+                    if (myPhone) setTimeout(initSocketSafe, 3000);
                 };
 
-                socket.onerror = () => {
-                    isConnectingSocket = false;
-                };
-
-            } catch(e) {
-                isConnectingSocket = false;
-            }
+                socket.onerror = () => { isConnectingSocket = false; };
+            } catch(e) { isConnectingSocket = false; }
         }
 
         async function loadRecentChats() {
@@ -924,10 +892,7 @@
 
         /* --- WEBRTC ENGINE --- */
         async function startCallSession(type, isTranslateMode = false) {
-            if (!activePartner) {
-                alert("Pehle kisi contact ko select karein!");
-                return;
-            }
+            if (!activePartner) { alert("Pehle kisi contact ko select karein!"); return; }
             currentCallType = type;
             isTranslationCallMode = isTranslateMode;
 
@@ -979,10 +944,7 @@
                     }));
                 }
 
-                if (isTranslateMode) {
-                    startLiveCallSpeechEngine();
-                }
-
+                if (isTranslateMode) startLiveCallSpeechEngine();
             } catch (err) {
                 alert("Media permission error: " + err.message);
                 endCurrentCall();
@@ -990,9 +952,7 @@
         }
 
         function initPeerConnection() {
-            if (peerConnection) { 
-                peerConnection.close(); 
-            }
+            if (peerConnection) peerConnection.close();
             peerConnection = new RTCPeerConnection(rtcConfig);
 
             peerConnection.onicecandidate = (event) => {
@@ -1037,14 +997,11 @@
                     document.getElementById("call-status-text").innerText = "Incoming AI Translation Call...";
                     document.getElementById("call-avatar-icon").innerText = "🌐";
                     document.getElementById("call-subtitles-dock").style.display = "flex";
-                    document.getElementById("call-original-subtitle").innerText = "Incoming Translate Call...";
-                    document.getElementById("call-translated-subtitle").innerText = "Accept to start live translation";
                 } else {
                     document.getElementById("call-status-text").innerText = `Incoming Normal ${currentCallType.toUpperCase()} Call...`;
                     document.getElementById("call-avatar-icon").innerText = currentCallType === "video" ? "📹" : "📞";
                     document.getElementById("call-subtitles-dock").style.display = "none";
                 }
-
             } else if (data.signal_type === "answer") {
                 if (peerConnection) {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
@@ -1088,11 +1045,7 @@
                 }
 
                 document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected";
-                
-                if (isTranslationCallMode) {
-                    startLiveCallSpeechEngine();
-                }
-
+                if (isTranslationCallMode) startLiveCallSpeechEngine();
             } catch (err) {
                 alert("Call accept error: " + err.message);
                 endCurrentCall();
@@ -1122,10 +1075,7 @@
                                 const res = await fetch("/translate", {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({
-                                        text: spokenText,
-                                        target_lang: "en"
-                                    })
+                                    body: JSON.stringify({ text: spokenText, target_lang: "en" })
                                 });
                                 const data = await res.json();
                                 const translated = data.translated_text || spokenText;
@@ -1159,28 +1109,15 @@
 
         function endCurrentCall() {
             if (activePartner && socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    action: "call_signal",
-                    receiver: activePartner,
-                    signal_type: "end"
-                }));
+                socket.send(JSON.stringify({ action: "call_signal", receiver: activePartner, signal_type: "end" }));
             }
             closeCallUI();
         }
 
         function closeCallUI() {
-            if (peerConnection) {
-                peerConnection.close();
-                peerConnection = null;
-            }
-            if (localMediaStream) {
-                localMediaStream.getTracks().forEach(t => t.stop());
-                localMediaStream = null;
-            }
-            if (callSpeechRec) {
-                try { callSpeechRec.stop(); } catch(e){}
-                callSpeechRec = null;
-            }
+            if (peerConnection) { peerConnection.close(); peerConnection = null; }
+            if (localMediaStream) { localMediaStream.getTracks().forEach(t => t.stop()); localMediaStream = null; }
+            if (callSpeechRec) { try { callSpeechRec.stop(); } catch(e){} callSpeechRec = null; }
             const audioSink = document.getElementById("remote-audio-sink");
             if (audioSink) audioSink.srcObject = null;
 
@@ -1215,55 +1152,37 @@
             }
         });
 
-        /* --- ACCURATE VOICE NOTE RECORDING --- */
+        /* --- BULLETPROOF VOICE RECORDING WITH LIVE CONFIRMATION --- */
         function toggleVoiceRecording() {
-            if (!isRecording) {
-                startVoiceRecording();
-            } else {
-                stopAndFinishRecording();
-            }
+            if (!isRecording) startVoiceRecording();
+            else stopAndFinishRecording();
         }
 
         async function startVoiceRecording() {
-            if (!activePartner) {
-                alert("Pehle kisi contact ko select karein!");
-                return;
-            }
+            if (!activePartner) { alert("Pehle kisi contact ko select karein!"); return; }
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
                 chosenAudioMime = "audio/webm";
                 if (!MediaRecorder.isTypeSupported("audio/webm")) {
-                    if (MediaRecorder.isTypeSupported("audio/mp4")) {
-                        chosenAudioMime = "audio/mp4";
-                    } else {
-                        chosenAudioMime = "";
-                    }
+                    chosenAudioMime = MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "";
                 }
 
                 mediaRecorder = chosenAudioMime ? new MediaRecorder(stream, { mimeType: chosenAudioMime }) : new MediaRecorder(stream);
                 recordedChunks = [];
                 capturedVoiceHint = "";
-                interimVoiceHint = "";
 
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
                         voiceRecognitionEngine = new SR();
-                        voiceRecognitionEngine.continuous = true;
+                        voiceRecognitionEngine.continuous = false;
                         voiceRecognitionEngine.interimResults = true;
                         voiceRecognitionEngine.lang = 'ur-PK';
-
                         voiceRecognitionEngine.onresult = (ev) => {
-                            let temp = "";
                             for (let i = ev.resultIndex; i < ev.results.length; ++i) {
-                                if (ev.results[i].isFinal) {
-                                    capturedVoiceHint += " " + ev.results[i][0].transcript;
-                                } else {
-                                    temp += ev.results[i][0].transcript;
-                                }
+                                capturedVoiceHint = ev.results[i][0].transcript;
                             }
-                            interimVoiceHint = temp;
                         };
                         voiceRecognitionEngine.start();
                     } catch(e){}
@@ -1282,12 +1201,14 @@
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
                     
-                    const combinedTranscript = (capturedVoiceHint + " " + interimVoiceHint).trim();
                     pendingPayload = {
                         type: "voice",
                         content: data.url,
-                        hint: combinedTranscript
+                        hint: capturedVoiceHint.trim()
                     };
+
+                    document.getElementById("voice-edit-block").style.display = "block";
+                    document.getElementById("voice-hint-field").value = capturedVoiceHint.trim();
                     openSendModal("🎙️ Voice Note Ready");
                 };
 
@@ -1305,34 +1226,22 @@
                     const s = String(recordingSeconds % 60).padStart(2, '0');
                     document.getElementById("rec-timer").innerText = `${m}:${s}`;
                 }, 1000);
-
             } catch (err) {
                 alert("Microphone permission error: " + err.message);
             }
         }
 
         function stopAndFinishRecording() {
-            setTimeout(() => {
-                if (voiceRecognitionEngine) {
-                    try { voiceRecognitionEngine.stop(); } catch(e){}
-                }
-                if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                    mediaRecorder.stop();
-                }
-                resetRecordingUI();
-            }, 300);
+            if (voiceRecognitionEngine) { try { voiceRecognitionEngine.stop(); } catch(e){} }
+            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+            resetRecordingUI();
         }
 
         function cancelRecording() {
             capturedVoiceHint = "";
-            interimVoiceHint = "";
             recordedChunks = [];
-            if (voiceRecognitionEngine) {
-                try { voiceRecognitionEngine.stop(); } catch(e){}
-            }
-            if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                mediaRecorder.stop();
-            }
+            if (voiceRecognitionEngine) { try { voiceRecognitionEngine.stop(); } catch(e){} }
+            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
             resetRecordingUI();
         }
 
@@ -1347,15 +1256,10 @@
             const input = document.getElementById("text-input");
             const text = input.value.trim();
             if (!text) return;
-            if (!activePartner) {
-                alert("Pehle kisi contact ko select karein!");
-                return;
-            }
+            if (!activePartner) { alert("Pehle kisi contact ko select karein!"); return; }
 
-            pendingPayload = {
-                type: "text",
-                content: text
-            };
+            pendingPayload = { type: "text", content: text };
+            document.getElementById("voice-edit-block").style.display = "none";
             openSendModal(`"${text.substring(0, 30)}"`);
         }
 
@@ -1372,6 +1276,7 @@
 
         function cancelDispatch() {
             pendingPayload = null;
+            document.getElementById("voice-edit-block").style.display = "none";
             document.getElementById("send-modal").style.display = "none";
         }
 
@@ -1389,7 +1294,7 @@
 
             const btn = document.getElementById("btn-modal-confirm-trans");
             const origText = btn.innerText;
-            btn.innerText = "Processing Translation...";
+            btn.innerText = "Translating...";
             btn.disabled = true;
 
             let translatedText = "";
@@ -1401,10 +1306,7 @@
                     const res = await fetch("/translate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            text: pendingPayload.content,
-                            target_lang: targetLang
-                        })
+                        body: JSON.stringify({ text: pendingPayload.content, target_lang: targetLang })
                     });
                     const data = await res.json();
                     translatedText = data.translated_text || pendingPayload.content;
@@ -1413,15 +1315,14 @@
                 }
             } else if (pendingPayload.type === "voice") {
                 try {
+                    const editedHint = document.getElementById("voice-hint-field").value.trim() || pendingPayload.hint || "";
+                    
                     const form = new FormData();
                     form.append("file_path", pendingPayload.content);
                     form.append("target_lang", targetLang);
-                    form.append("transcript_hint", pendingPayload.hint || "");
+                    form.append("transcript_hint", editedHint);
 
-                    const res = await fetch("/api/translate-audio", {
-                        method: "POST",
-                        body: form
-                    });
+                    const res = await fetch("/api/translate-audio", { method: "POST", body: form });
                     const data = await res.json();
                     translatedText = data.translated_text || "";
 
@@ -1523,8 +1424,7 @@
             } else {
                 const sentTicks = document.querySelectorAll(".bubble.sent .tick-icon");
                 if (sentTicks.length > 0) {
-                    const lastTick = sentTicks[sentTicks.length - 1];
-                    lastTick.innerText = (status === "delivered") ? "✓✓" : "✓";
+                    sentTicks[sentTicks.length - 1].innerText = (status === "delivered") ? "✓✓" : "✓";
                 }
             }
         }
