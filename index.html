@@ -39,7 +39,6 @@
             overflow: hidden;
         }
 
-        /* LOGIN OVERLAY */
         .auth-overlay {
             position: fixed; inset: 0; background: rgba(11, 14, 20, 0.96);
             backdrop-filter: blur(12px); z-index: 999; display: flex;
@@ -71,10 +70,8 @@
             box-shadow: 0 4px 20px var(--accent-amber-glow);
         }
 
-        /* WORKSPACE */
         .workspace { display: flex; width: 100%; height: 100%; position: relative; }
 
-        /* LEFT SIDEBAR */
         .sidebar-panel {
             width: 380px; border-right: 1px solid var(--border-graphite);
             background: var(--surface-panel); display: flex; flex-direction: column; flex-shrink: 0;
@@ -108,7 +105,6 @@
         .chat-title { font-size: 15px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
         .chat-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
 
-        /* FAB */
         .fab-btn {
             position: absolute; bottom: 70px; right: 20px;
             width: 56px; height: 56px; border-radius: 50%; background: var(--accent-amber);
@@ -118,7 +114,6 @@
         }
         .fab-btn:active { transform: scale(0.92); }
 
-        /* BOTTOM NAVIGATION BAR */
         .bottom-nav-bar {
             height: 56px; border-top: 1px solid var(--border-graphite); background: var(--surface-panel);
             display: flex; align-items: center; justify-content: space-around; width: 100%;
@@ -132,7 +127,6 @@
         .nav-tab-btn span.tab-icon { font-size: 18px; }
         .nav-tab-btn.active { color: var(--accent-amber); }
 
-        /* RIGHT CHAT STAGE */
         .stage-panel {
             flex: 1; display: flex; flex-direction: column; background: var(--bg-obsidian); position: relative;
         }
@@ -245,7 +239,6 @@
         }
         .attach-menu-item:hover { background: var(--surface-hover); color: var(--accent-amber); }
 
-        /* CONTACTS MODAL */
         .contacts-overlay {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88);
             backdrop-filter: blur(10px); z-index: 998; display: none;
@@ -267,7 +260,6 @@
         }
         .btn-contact-opt.wa-btn:hover { background: var(--wa-green); color: #000; }
 
-        /* CALL MODAL */
         .call-modal-overlay {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95);
             backdrop-filter: blur(14px); z-index: 1000; display: none;
@@ -316,7 +308,6 @@
         .btn-call-accept { background: var(--online-green); color: #fff; }
         .btn-call-mute { background: var(--surface-card); color: #fff; border: 1px solid var(--border-graphite); }
 
-        /* SETTINGS MODAL */
         .settings-overlay {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88);
             backdrop-filter: blur(10px); z-index: 998; display: none;
@@ -343,7 +334,6 @@
             font-size: 14px;
         }
 
-        /* SEND CONFIRMATION MODAL */
         .send-modal-backdrop {
             position: fixed; inset: 0; background: rgba(0,0,0,0.85);
             z-index: 999; display: none; align-items: center; justify-content: center; padding: 20px;
@@ -379,7 +369,6 @@
 
     <audio id="remote-audio-sink" autoplay playsinline style="display:none;"></audio>
 
-    <!-- 1-STEP LOGIN OVERLAY -->
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
             <div class="auth-badge">IA</div>
@@ -391,7 +380,6 @@
         </div>
     </div>
 
-    <!-- NEW CHAT & CONTACT SYNC MODAL -->
     <div class="contacts-overlay" id="contacts-modal">
         <div class="contacts-card">
             <h3 style="font-size: 18px; color: var(--accent-amber); font-family: 'Space Grotesk', sans-serif;">Start New Conversation</h3>
@@ -420,7 +408,6 @@
         </div>
     </div>
 
-    <!-- CALL MODAL -->
     <div class="call-modal-overlay" id="call-modal">
         <div class="call-user-card">
             <div class="call-avatar-circle" id="call-avatar-icon">📞</div>
@@ -449,7 +436,6 @@
         </div>
     </div>
 
-    <!-- SETTINGS MODAL -->
     <div class="settings-overlay" id="settings-modal">
         <div class="settings-card">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -477,7 +463,6 @@
         </div>
     </div>
 
-    <!-- SEND CONFIRMATION MODAL -->
     <div class="send-modal-backdrop" id="send-modal">
         <div class="send-modal-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Dispatch Mode</h3>
@@ -512,10 +497,8 @@
         </div>
     </div>
 
-    <!-- WORKSPACE -->
     <div class="workspace">
         
-        <!-- SIDEBAR -->
         <aside class="sidebar-panel">
             <div class="sidebar-header">
                 <span class="app-brand">SYNCORA</span>
@@ -550,7 +533,6 @@
             </nav>
         </aside>
 
-        <!-- STAGE (CHAT) -->
         <main class="stage-panel" id="stage-panel">
             <header class="stage-header">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -637,11 +619,12 @@
         let recordingSeconds = 0;
         let recordingTimerInterval = null;
         let chosenAudioMime = "audio/webm";
+        let capturedVoiceHint = "";
+        let voiceRecognitionEngine = null;
 
         let pendingPayload = null;
         let currentAvatarUrl = "";
 
-        // WebRTC Config with reliable Google STUN servers
         let peerConnection = null;
         let localMediaStream = null;
         let currentCallType = "audio";
@@ -665,7 +648,6 @@
                 loadRecentChats();
                 loadUserProfileData();
 
-                // Auto-restore chat on reload
                 if (directChatParam && directChatParam !== myPhone) {
                     selectChat(directChatParam);
                 } else if (activePartner && activePartner !== myPhone) {
@@ -716,7 +698,6 @@
             }
         }
 
-        /* --- CONTACTS SYNC & ACTIONS --- */
         function openContactsModal() {
             document.getElementById("contacts-modal").style.display = "flex";
         }
@@ -742,7 +723,7 @@
                     }
                 } catch (err) {}
             } else {
-                alert("Phone contact picker is not available on this browser. Use manual entry or WhatsApp invite below.");
+                alert("Phone contact picker is not available. Use manual entry below.");
                 document.getElementById("manual-contact-input").focus();
             }
         }
@@ -845,7 +826,6 @@
             }
         }
 
-        /* --- STABLE SOCKET ENGINE --- */
         function initSocketSafe() {
             if (!myPhone || isConnectingSocket) return;
             if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
@@ -1000,7 +980,7 @@
             if (statusPollInterval) clearInterval(statusPollInterval);
         }
 
-        /* --- STABLE WEBRTC ENGINE --- */
+        /* --- WEBRTC CALL ENGINE --- */
         async function startCallSession(type, isTranslateMode = false) {
             if (!activePartner) {
                 alert("Pehle kisi contact ko select karein!");
@@ -1293,7 +1273,7 @@
             }
         });
 
-        /* --- CROSS-PLATFORM VOICE RECORDING --- */
+        /* --- VOICE NOTE RECORDING WITH DUAL SPEECH SYNC --- */
         function toggleVoiceRecording() {
             if (!isRecording) {
                 startVoiceRecording();
@@ -1321,6 +1301,26 @@
 
                 mediaRecorder = chosenAudioMime ? new MediaRecorder(stream, { mimeType: chosenAudioMime }) : new MediaRecorder(stream);
                 recordedChunks = [];
+                capturedVoiceHint = "";
+
+                // Speech recognition actively captures voice for 100% translation accuracy
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (SR) {
+                    try {
+                        voiceRecognitionEngine = new SR();
+                        voiceRecognitionEngine.continuous = true;
+                        voiceRecognitionEngine.interimResults = false;
+                        voiceRecognitionEngine.lang = 'ur-PK';
+                        voiceRecognitionEngine.onresult = (ev) => {
+                            for (let i = ev.resultIndex; i < ev.results.length; ++i) {
+                                if (ev.results[i].isFinal) {
+                                    capturedVoiceHint += " " + ev.results[i][0].transcript;
+                                }
+                            }
+                        };
+                        voiceRecognitionEngine.start();
+                    } catch(e){}
+                }
 
                 mediaRecorder.ondataavailable = e => {
                     if (e.data.size > 0) recordedChunks.push(e.data);
@@ -1337,7 +1337,8 @@
                     
                     pendingPayload = {
                         type: "voice",
-                        content: data.url
+                        content: data.url,
+                        hint: capturedVoiceHint.trim()
                     };
                     openSendModal("🎙️ Voice Note Ready");
                 };
@@ -1363,6 +1364,9 @@
         }
 
         function stopAndFinishRecording() {
+            if (voiceRecognitionEngine) {
+                try { voiceRecognitionEngine.stop(); } catch(e){}
+            }
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
             }
@@ -1370,7 +1374,11 @@
         }
 
         function cancelRecording() {
+            capturedVoiceHint = "";
             recordedChunks = [];
+            if (voiceRecognitionEngine) {
+                try { voiceRecognitionEngine.stop(); } catch(e){}
+            }
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
             }
@@ -1384,7 +1392,6 @@
             document.getElementById("input-shell").style.display = "flex";
         }
 
-        /* --- STAGE & DISPATCH MODAL --- */
         function stageMessageForDispatch() {
             const input = document.getElementById("text-input");
             const text = input.value.trim();
@@ -1458,7 +1465,7 @@
                     const form = new FormData();
                     form.append("file_path", pendingPayload.content);
                     form.append("target_lang", targetLang);
-                    form.append("transcript_hint", "");
+                    form.append("transcript_hint", pendingPayload.hint || "");
 
                     const res = await fetch("/api/translate-audio", {
                         method: "POST",
