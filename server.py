@@ -10,15 +10,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, F
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-
-# --- NEW OFFICIAL SDK ---
-# The old "google-generativeai" package is DEPRECATED by Google
-# (see https://github.com/google-gemini/deprecated-generative-ai-python).
-# It was returning stale model info that no longer matches what Google's
-# servers actually serve, causing every translation call to 404.
-# "google-genai" is the current, actively maintained SDK.
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -64,62 +56,11 @@ app = FastAPI(title="Syncora Terminal Core Engine")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
-gemini_client = None
 if GEMINI_KEY:
     try:
-        gemini_client = genai.Client(api_key=GEMINI_KEY)
-        print("[Syncora] GEMINI_API_KEY loaded via google-genai SDK. AI translation (text + voice) is ACTIVE.")
+        genai.configure(api_key=GEMINI_KEY)
     except Exception as e:
         print(f"[Gemini Config Error]: {e}")
-else:
-    print("[Syncora] WARNING: GEMINI_API_KEY is NOT set. Falling back to free Google Translate "
-          "endpoint only (less reliable on hosted servers like Railway, and voice translation "
-          "will not work at all without a Gemini key). Set GEMINI_API_KEY in your environment "
-          "variables to enable full AI translation.")
-
-# --- DYNAMIC MODEL DISCOVERY ---
-# Google periodically retires model names. Rather than hardcoding one that will
-# eventually go stale, we ask the live API which models are usable right now.
-_cached_model_name = None
-FALLBACK_MODEL_CANDIDATES = ["gemini-flash-latest", "gemini-3.6-flash", "gemini-2.5-flash", "gemini-pro-latest"]
-
-def get_working_model_name():
-    global _cached_model_name
-    if _cached_model_name:
-        return _cached_model_name
-    if not gemini_client:
-        return None
-    try:
-        usable = []
-        for m in gemini_client.models.list():
-            name = getattr(m, "name", "") or ""
-            if not name:
-                continue
-            actions = getattr(m, "supported_actions", None)
-            if actions is None or "generateContent" in actions:
-                usable.append(name.replace("models/", ""))
-        flash_models = [m for m in usable if "flash" in m.lower()]
-        candidates = flash_models + [m for m in usable if m not in flash_models]
-        if candidates:
-            _cached_model_name = candidates[0]
-            print(f"[Gemini] Auto-discovered working model: {_cached_model_name}")
-            return _cached_model_name
-        print("[Gemini] models.list() returned no usable models.")
-    except Exception as e:
-        print(f"[Gemini] Could not auto-discover model list: {e}")
-    return None
-
-def get_model_candidates():
-    """Ordered list of model names to try: the auto-discovered one first,
-    then a few known-current names as backup."""
-    discovered = get_working_model_name()
-    ordered = []
-    if discovered:
-        ordered.append(discovered)
-    for f in FALLBACK_MODEL_CANDIDATES:
-        if f not in ordered:
-            ordered.append(f)
-    return ordered
 
 class DirectLoginRequest(BaseModel):
     phone: str
@@ -141,16 +82,15 @@ def get_chat_id(u1: str, u2: str) -> str:
 def is_urdu_or_arabic(text: str) -> bool:
     return bool(re.search(r'[\u0600-\u06FF]', text))
 
-def translate_via_google(text: str, target: str) -> str:
-    """Free Google Translate fallback, only used if Gemini is unavailable/fails."""
+def translate_via_google(text: str, source: str, target: str) -> str:
     try:
         encoded = urllib.parse.quote(text.strip().encode('utf-8'))
-        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target}&dt=t&q={encoded}"
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source}&tl={target}&dt=t&q={encoded}"
         req = urllib.request.Request(
-            url,
+            url, 
             headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         )
-        with urllib.request.urlopen(req, timeout=8) as response:
+        with urllib.request.urlopen(req, timeout=5) as response:
             res_json = json.loads(response.read().decode('utf-8'))
             if res_json and isinstance(res_json, list) and len(res_json) > 0 and res_json[0]:
                 out = "".join([part[0] for part in res_json[0] if part and part[0]]).strip()
@@ -242,16 +182,17 @@ async def update_user_profile(req: ProfileUpdate):
 # --- TEXT TRANSLATE ROUTE ---
 @app.post("/translate")
 async def translate_text(req: TranslationRequest):
-    global _cached_model_name
     clean = req.text.strip()
     if not clean:
         return {"translated_text": ""}
 
     target_lang = req.target_lang.strip().lower() if req.target_lang else "en"
+    has_script = is_urdu_or_arabic(clean)
 
-    if gemini_client:
-        for model_name in get_model_candidates():
+    if GEMINI_KEY:
+        for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
             try:
+                model = genai.GenerativeModel(model_name)
                 prompt = (
                     f"Translate the following user input accurately and strictly into language code '{target_lang}'.\n"
                     f"The input could be Roman Urdu, Urdu script, or Hindi.\n"
@@ -259,27 +200,21 @@ async def translate_text(req: TranslationRequest):
                     f"- If input is English and target is 'ur', translate to Urdu script.\n"
                     f"Do NOT guess or add generic greetings. Output ONLY the exact translated sentence without quotes:\n\n{clean}"
                 )
-                response = gemini_client.models.generate_content(
-                    model=model_name,
-                    contents=prompt
-                )
-                out_text = getattr(response, "text", None)
-                if out_text:
-                    out = out_text.strip().replace('"', '').replace("'", "")
+                response = model.generate_content(prompt)
+                if response and hasattr(response, "text") and response.text:
+                    out = response.text.strip().replace('"', '').replace("'", "")
                     if out:
-                        return {"translated_text": out, "engine": model_name}
+                        return {"translated_text": out}
             except Exception as e:
                 print(f"[Gemini Text Translation Error {model_name}]: {e}")
-                if "404" in str(e) or "not found" in str(e).lower():
-                    _cached_model_name = None
                 continue
 
-    g_res = translate_via_google(clean, target_lang)
+    source_param = "ur" if has_script else "auto"
+    g_res = translate_via_google(clean, source_param, target_lang)
     if g_res:
-        return {"translated_text": g_res, "engine": "google_gtx_fallback"}
+        return {"translated_text": g_res}
 
-    print("[Translate] All engines failed (Gemini + Google fallback). Returning original text.")
-    return {"translated_text": clean, "engine": "none"}
+    return {"translated_text": clean}
 
 # --- ACCURATE AUDIO TRANSLATION ---
 @app.post("/api/translate-audio")
@@ -288,50 +223,40 @@ async def translate_audio_route(
     target_lang: str = Form("en"),
     transcript_hint: str = Form("")
 ):
-    global _cached_model_name
     chosen_target = target_lang.strip().lower() if target_lang else "en"
     translated_text = ""
     local_filename = os.path.basename(file_path)
     actual_path = os.path.join(UPLOAD_DIR, local_filename)
 
-    if not os.path.exists(actual_path):
-        print(f"[Audio Translate] File not found on disk: {actual_path}")
-
-    if os.path.exists(actual_path) and gemini_client:
+    if os.path.exists(actual_path) and GEMINI_KEY:
         try:
             with open(actual_path, "rb") as f:
                 audio_bytes = f.read()
 
-            # Recorded files can be .webm, .mp4 or .m4a depending on browser
-            mime_type = "audio/mp4" if local_filename.endswith((".mp4", ".m4a")) else "audio/webm"
-
-            for model_name in get_model_candidates():
+            for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
                 try:
+                    model = genai.GenerativeModel(model_name)
+                    # Support audio webm or mp4
+                    mime_type = "audio/mp4" if local_filename.endswith(".mp4") else "audio/webm"
+                    audio_part = {
+                        "mime_type": mime_type,
+                        "data": base64.b64encode(audio_bytes).decode("utf-8")
+                    }
                     prompt = (
-                        f"Listen carefully to this voice message. The speaker is talking in Urdu, Roman Urdu, "
-                        f"Hindi, English, or another language. "
+                        f"Listen carefully to this voice message. The speaker is talking in Urdu, Roman Urdu, or Hindi. "
                         f"Transcribe what they actually said and translate it into '{chosen_target}'. "
                         f"Do NOT invent words. Output ONLY the translated sentence, without any explanations or quotes."
                     )
-                    audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
-                    resp = gemini_client.models.generate_content(
-                        model=model_name,
-                        contents=[prompt, audio_part]
-                    )
-                    out_text = getattr(resp, "text", None)
-                    if out_text:
-                        cand = out_text.strip().replace('"', '').replace("'", "")
+                    resp = model.generate_content([prompt, audio_part])
+                    if resp and hasattr(resp, "text") and resp.text:
+                        cand = resp.text.strip().replace('"', '').replace("'", "")
                         if cand:
                             translated_text = cand
                             break
                 except Exception as e:
                     print(f"[Gemini Audio Error {model_name}]: {e}")
-                    if "404" in str(e) or "not found" in str(e).lower():
-                        _cached_model_name = None
         except Exception as e:
             print(f"[File Read Error]: {e}")
-    elif os.path.exists(actual_path) and not gemini_client:
-        print("[Audio Translate] GEMINI_API_KEY missing - cannot transcribe/translate voice notes at all.")
 
     if not translated_text and transcript_hint and transcript_hint.strip():
         req = TranslationRequest(text=transcript_hint.strip(), target_lang=chosen_target)
@@ -400,27 +325,11 @@ async def upload_media(file: UploadFile = File(...)):
         f.write(await file.read())
     return {"url": f"/uploads/{filename}"}
 
-# --- DEBUG: check which Gemini models this API key can actually use ---
-@app.get("/api/debug/models")
-async def debug_list_models():
-    if not gemini_client:
-        return {"error": "GEMINI_API_KEY not set on this server."}
-    try:
-        all_models = []
-        for m in gemini_client.models.list():
-            all_models.append(getattr(m, "name", str(m)))
-        return {
-            "auto_selected_model": get_working_model_name(),
-            "all_models": all_models
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
 # --- WEBSOCKET ENGINE WITH HEARTBEAT & RELIABILITY ---
 @app.websocket("/ws/{phone}")
 async def socket_endpoint(websocket: WebSocket, phone: str):
     await manager.connect(phone, websocket)
-
+    
     # Mark messages as delivered for this online user
     try:
         conn = sqlite3.connect(DB_PATH)
