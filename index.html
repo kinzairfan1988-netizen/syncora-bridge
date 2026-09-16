@@ -160,7 +160,7 @@
             border: 1px solid var(--border-graphite); border-bottom-left-radius: 2px;
         }
         .bubble-translation {
-            font-size: 12px; margin-top: 5px; padding-top: 5px; font-weight: 600;
+            font-size: 12px; margin-top: 6px; padding-top: 6px; font-weight: 700;
             border-top: 1px dashed rgba(0, 0, 0, 0.25); color: #1e293b;
         }
         .bubble.received .bubble-translation {
@@ -410,15 +410,15 @@
     <div class="send-modal-backdrop" id="send-modal">
         <div class="send-modal-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Voice Message Ready</h3>
-            <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Audio and text ready</p>
+            <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Audio file ready to dispatch</p>
 
             <div id="voice-edit-block" style="display:block; text-align:left;">
-                <label style="font-size: 11px; color: var(--text-muted);">Captured Speech Text:</label>
-                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Speech text will show here...">
+                <label style="font-size: 11px; color: var(--text-muted);">Speech Transcript (Translate hoga):</label>
+                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Urdu or words to translate...">
             </div>
 
             <div class="lang-options-drawer" id="lang-drawer">
-                <label style="font-size: 11px; color: var(--text-muted);">Select Target Language:</label>
+                <label style="font-size: 11px; color: var(--text-muted);">Target Language:</label>
                 <select class="lang-dropdown" id="modal-target-lang">
                     <option value="en" selected>English (US)</option>
                     <option value="ur">Urdu (اردو)</option>
@@ -428,12 +428,12 @@
                     <option value="es">Spanish (Español)</option>
                 </select>
                 <button class="modal-btn-choice btn-choice-trans" id="btn-modal-confirm-trans" onclick="confirmDispatchTranslation()">
-                    🌐 Translate & Send Voice Note
+                    🌐 Translate & Send
                 </button>
             </div>
 
             <button class="modal-btn-choice" onclick="confirmDispatchOriginal()" style="margin-top: 4px;">
-                ✉️ Send Audio Only (No Translation)
+                ✉️ Send Audio Without Translation
             </button>
 
             <button onclick="cancelDispatch()" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer;">
@@ -885,7 +885,7 @@
                     video: (type === "video")
                 });
             } catch (err) {
-                alert("Microphone permission check: Address bar mein 🔒 par click karke Allow karein.");
+                alert("Microphone permission required. Allow from address bar 🔒.");
                 throw err;
             }
         }
@@ -1176,7 +1176,7 @@
             }
         });
 
-        /* --- DUAL CAPTURE: LIVE SPEECH + ACTUAL AUDIO FILE (100% RELIABLE) --- */
+        /* --- DUAL CAPTURE ENGINE: SPEECH + ACTUAL AUDIO FILE --- */
         function toggleVoiceRecording() {
             if (!isRecording) startVoiceRecording();
             else stopAndFinishRecording();
@@ -1201,7 +1201,7 @@
                 recordedChunks = [];
                 capturedLiveText = "";
 
-                // Initialize Live Speech Engine
+                // Live speech recognition for transcript caption
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
@@ -1210,14 +1210,13 @@
                         speechRecognitionEngine.interimResults = true;
                         speechRecognitionEngine.lang = 'ur-PK';
 
-                        const liveDisplay = document.getElementById("rec-live-words");
-
                         speechRecognitionEngine.onresult = (ev) => {
-                            let accumulated = "";
+                            let textSoFar = "";
                             for (let i = 0; i < ev.results.length; ++i) {
-                                accumulated += ev.results[i][0].transcript + " ";
+                                textSoFar += ev.results[i][0].transcript + " ";
                             }
-                            capturedLiveText = accumulated.trim();
+                            capturedLiveText = textSoFar.trim();
+                            const liveDisplay = document.getElementById("rec-live-words");
                             if (liveDisplay && capturedLiveText) {
                                 liveDisplay.innerText = capturedLiveText;
                             }
@@ -1249,7 +1248,7 @@
                     };
 
                     document.getElementById("voice-hint-field").value = capturedLiveText.trim();
-                    document.getElementById("send-modal-preview").innerText = capturedLiveText.trim() ? `"${capturedLiveText.trim()}"` : "Audio File Ready";
+                    document.getElementById("send-modal-preview").innerText = capturedLiveText.trim() ? `"${capturedLiveText.trim()}"` : "Audio Recording Ready";
                     document.getElementById("send-modal").style.display = "flex";
                 };
 
@@ -1261,7 +1260,7 @@
                 document.getElementById("rec-live-words").innerText = "Listening (Urdu)...";
 
             } catch (err) {
-                alert("Mic access error: " + err.message);
+                alert("Microphone permission error: " + err.message);
             }
         }
 
@@ -1279,7 +1278,7 @@
                     activeAudioStream = null;
                 }
                 resetRecordingUI();
-            }, 350);
+            }, 300);
         }
 
         function cancelRecording() {
