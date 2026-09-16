@@ -311,7 +311,7 @@
 </head>
 <body>
 
-    <audio id="remote-audio-sink" autoplay playsinline></audio>
+    <audio id="remote-audio-sink" autoplay playsinline style="display:none;"></audio>
 
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
@@ -526,6 +526,15 @@
     </div>
 
     <script>
+        // Global Error Guard to prevent third-party extension (e.g. 200.js) crashes
+        window.addEventListener('error', function (e) {
+            if (e.filename && (e.filename.includes('200.js') || e.filename.includes('extension'))) {
+                e.stopImmediatePropagation();
+                e.preventDefault();
+                return true;
+            }
+        }, true);
+
         const urlParams = new URLSearchParams(window.location.search);
         let directChatParam = urlParams.get('chat') || urlParams.get('invite') || "";
         
@@ -921,9 +930,6 @@
                     document.getElementById("call-video-container").style.display = "none";
                 }
 
-                const audioSink = document.getElementById("remote-audio-sink");
-                if (audioSink) { audioSink.play().catch(() => {}); }
-
                 initPeerConnection();
                 localMediaStream.getTracks().forEach(track => peerConnection.addTrack(track, localMediaStream));
 
@@ -952,7 +958,7 @@
 
         function initPeerConnection() {
             if (peerConnection) { 
-                try { peerConnection.close(); } catch(e){}
+                try { peerConnection.close(); } catch(e){} 
                 peerConnection = null; 
             }
             peerConnection = new RTCPeerConnection(rtcConfig);
@@ -1032,9 +1038,6 @@
 
             try {
                 localMediaStream = await obtainMediaStreamSafely(currentCallType);
-
-                const audioSink = document.getElementById("remote-audio-sink");
-                if (audioSink) { audioSink.play().catch(() => {}); }
 
                 if (currentCallType === "video") {
                     document.getElementById("call-video-container").style.display = "block";
@@ -1372,7 +1375,6 @@
         }
 
         function executeDispatch(content, translated, msgType) {
-            // Safety check for active partner
             if (!activePartner) {
                 activePartner = localStorage.getItem("syncora_active_partner") || "";
             }
@@ -1383,8 +1385,13 @@
 
             const tempId = "msg_temp_" + Date.now();
             
-            // Visual feedback: Always render bubble locally first so UI never freezes
-            appendBubble(content, "sent", translated, msgType, "now", tempId, "sent");
+            // Visual render: Protected against extension crashes
+            try {
+                appendBubble(content, "sent", translated, msgType, "now", tempId, "sent");
+            } catch(e) {
+                console.log("[Bubble Render Guard]:", e);
+            }
+            
             document.getElementById("text-input").value = "";
 
             if (!socket || socket.readyState !== WebSocket.OPEN) {
@@ -1415,10 +1422,13 @@
             if (type === "media") {
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
             } else if (type === "voice") {
+                // Non-standard attribute to avoid IDM/200.js hijacking
                 body = `
                     <div style="display:flex; align-items:center; gap:8px; padding: 2px 0;">
                         <span style="font-size:16px;">🎙️</span>
-                        <audio controls src="${content}" style="max-width:220px; height:36px; outline:none;"></audio>
+                        <audio controls preload="metadata" data-extension-bypass="true" style="max-width:220px; height:36px; outline:none;">
+                            <source src="${content}">
+                        </audio>
                     </div>
                 `;
             } else if (type === "location") {
