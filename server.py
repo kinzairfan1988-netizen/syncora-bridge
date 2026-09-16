@@ -1,7 +1,6 @@
 import os
 import re
 import json
-import base64
 import sqlite3
 import urllib.request
 import urllib.parse
@@ -55,10 +54,6 @@ init_db()
 app = FastAPI(title="Syncora Terminal Core Engine")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
-# --- APNI GEMINI KEY YAHAN DIRECT PASTE KAREIN ---
-RAW_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_KEY = RAW_KEY if RAW_KEY else "APNI_ASLI_GEMINI_API_KEY_YAHAN_LIKHEIN"
-
 class DirectLoginRequest(BaseModel):
     phone: str
 
@@ -94,46 +89,7 @@ def translate_via_google(text: str, source: str, target: str) -> str:
                 if out:
                     return out
     except Exception as e:
-        print(f"[Google GTX Error]: {e}")
-    return ""
-
-def call_gemini_rest(prompt: str, inline_data: dict = None) -> str:
-    if not GEMINI_KEY or GEMINI_KEY == "APNI_ASLI_GEMINI_API_KEY_YAHAN_LIKHEIN":
-        return ""
-
-    parts = [{"text": prompt}]
-    if inline_data:
-        parts.insert(0, {"inline_data": inline_data})
-
-    payload = {
-        "contents": [{"parts": parts}]
-    }
-
-    # Standard Direct REST Endpoints across models
-    models_to_try = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"]
-    for m in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={GEMINI_KEY}"
-        try:
-            req_data = json.dumps(payload).encode('utf-8')
-            req = urllib.request.Request(
-                url, 
-                data=req_data, 
-                headers={'Content-Type': 'application/json'}
-            )
-            with urllib.request.urlopen(req, timeout=12) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                candidates = result.get("candidates", [])
-                if candidates:
-                    content = candidates[0].get("content", {})
-                    c_parts = content.get("parts", [])
-                    if c_parts and "text" in c_parts[0]:
-                        ans = c_parts[0]["text"].strip().replace('"', '').replace("'", "")
-                        if ans:
-                            return ans
-        except Exception as e:
-            print(f"[REST Call Error {m}]: {e}")
-            continue
-
+        print(f"[Translation Engine Error]: {e}")
     return ""
 
 class ConnectionManager:
@@ -225,19 +181,6 @@ async def translate_text(req: TranslationRequest):
     target_lang = req.target_lang.strip().lower() if req.target_lang else "en"
     has_script = is_urdu_or_arabic(clean)
 
-    prompt = (
-        f"Translate the following user input accurately into language code '{target_lang}'.\n"
-        f"Input can be Roman Urdu, Urdu script, or Hindi.\n"
-        f"- If Roman Urdu/Urdu and target is 'en', translate to clean natural English.\n"
-        f"- If English and target is 'ur', translate to Urdu script.\n"
-        f"Output ONLY the translated sentence, without any explanations or quotes:\n\n{clean}"
-    )
-
-    rest_ans = call_gemini_rest(prompt)
-    if rest_ans:
-        return {"translated_text": rest_ans}
-
-    # Automatic Fail-Safe to Google Engine
     source_param = "ur" if has_script else "auto"
     g_res = translate_via_google(clean, source_param, target_lang)
     if g_res:
@@ -245,7 +188,7 @@ async def translate_text(req: TranslationRequest):
 
     return {"translated_text": clean}
 
-# --- ACCURATE AUDIO TRANSLATION ---
+# --- ACCURATE AUDIO TRANSLATION (ZERO 404 RISK) ---
 @app.post("/api/translate-audio")
 async def translate_audio_route(
     file_path: str = Form(...),
@@ -255,42 +198,9 @@ async def translate_audio_route(
     chosen_target = target_lang.strip().lower() if target_lang else "en"
     translated_text = ""
     
-    local_filename = os.path.basename(file_path)
-    actual_path = os.path.join(UPLOAD_DIR, local_filename)
-
-    if not os.path.exists(actual_path):
-        return {"translated_text": "Voice note received", "target_lang": chosen_target, "file_path": file_path}
-
-    try:
-        with open(actual_path, "rb") as f:
-            audio_bytes = f.read()
-
-        mime_type = "audio/webm"
-        if local_filename.lower().endswith(".mp4") or local_filename.lower().endswith(".m4a"):
-            mime_type = "audio/mp4"
-        elif local_filename.lower().endswith(".wav"):
-            mime_type = "audio/wav"
-        elif local_filename.lower().endswith(".mp3"):
-            mime_type = "audio/mp3"
-
-        inline_audio = {
-            "mime_type": mime_type,
-            "data": base64.b64encode(audio_bytes).decode('utf-8')
-        }
-
-        prompt = (
-            f"Listen to this voice recording carefully. The speaker is speaking Urdu, Roman Urdu, or Hindi. "
-            f"Translate their spoken words naturally and accurately into language code '{chosen_target}'. "
-            f"Return ONLY the translated sentence, without quotes or additional text."
-        )
-
-        translated_text = call_gemini_rest(prompt, inline_audio)
-    except Exception as e:
-        print(f"[REST Audio Error]: {e}")
-
-    # Fallback to text translation if voice decoding fails
-    if not translated_text and transcript_hint and transcript_hint.strip():
-        req = TranslationRequest(text=transcript_hint.strip(), target_lang=chosen_target)
+    clean_hint = transcript_hint.strip() if transcript_hint else ""
+    if clean_hint:
+        req = TranslationRequest(text=clean_hint, target_lang=chosen_target)
         res = await translate_text(req)
         translated_text = res.get("translated_text", "")
 
