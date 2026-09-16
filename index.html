@@ -448,6 +448,46 @@
         </div>
     </div>
 
+    <!-- CALL LANGUAGE SETUP MODAL (fixes hardcoded English-only call translation) -->
+    <div class="send-modal-backdrop" id="call-lang-modal">
+        <div class="send-modal-card">
+            <h3 style="font-size: 16px; color: var(--accent-amber);">🌐 Live Translation Setup</h3>
+            <p style="font-size: 12px; color: var(--text-muted);">Call shuru karne se pehle languages select karein.</p>
+
+            <div class="settings-field">
+                <label>Main is language mein bolonga:</label>
+                <select class="lang-dropdown" id="call-spoken-lang">
+                    <option value="ur-PK" selected>Urdu (اردو)</option>
+                    <option value="en-US">English (US)</option>
+                    <option value="ar-SA">Arabic (العربية)</option>
+                    <option value="hi-IN">Hindi (हिन्दी)</option>
+                    <option value="de-DE">German (Deutsch)</option>
+                    <option value="fr-FR">French (Français)</option>
+                    <option value="es-ES">Spanish (Español)</option>
+                    <option value="zh-CN">Chinese (中文)</option>
+                </select>
+            </div>
+
+            <div class="settings-field">
+                <label>Translate is language mein ho:</label>
+                <select class="lang-dropdown" id="call-target-lang-select">
+                    <option value="en" selected>English (US)</option>
+                    <option value="ur">Urdu (اردو)</option>
+                    <option value="ar">Arabic (العربية)</option>
+                    <option value="de">German (Deutsch)</option>
+                    <option value="fr">French (Français)</option>
+                    <option value="es">Spanish (Español)</option>
+                    <option value="zh">Chinese (中文)</option>
+                </select>
+            </div>
+
+            <button class="btn-auth" onclick="confirmCallLangSetup()">Start Live Translation Call</button>
+            <button onclick="cancelCallLangSetup()" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer;">
+                Cancel
+            </button>
+        </div>
+    </div>
+
     <!-- SETTINGS MODAL -->
     <div class="settings-overlay" id="settings-modal">
         <div class="settings-card">
@@ -568,7 +608,7 @@
                     <button class="btn-call-action" onclick="startCallSession('video', false)" title="Normal Video Call">
                         📹 Video
                     </button>
-                    <button class="btn-call-action trans-call-btn" onclick="startCallSession('audio', true)" title="Call with Live AI Translation">
+                    <button class="btn-call-action trans-call-btn" onclick="openCallLangModal('outgoing')" title="Call with Live AI Translation">
                         🌐 Translate Call
                     </button>
                 </div>
@@ -647,6 +687,11 @@
         let isTranslationCallMode = false;
         let isMicMuted = false;
         let callSpeechRec = null;
+
+        // Live-call translation language settings (fixes previous hardcoded "en" bug)
+        let callSpokenLang = "ur-PK";   // language the local user will speak (STT input)
+        let callTargetLang = "en";      // language captions get translated INTO
+        let callLangModalMode = "outgoing"; // "outgoing" | "incoming"
 
         const rtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
@@ -774,7 +819,8 @@
             if (!('speechSynthesis' in window)) return;
             window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = (lang === 'ur') ? 'ur-PK' : (lang === 'ar' ? 'ar-SA' : 'en-US');
+            const langMap = { ur: 'ur-PK', ar: 'ar-SA', de: 'de-DE', fr: 'fr-FR', es: 'es-ES', zh: 'zh-CN', en: 'en-US' };
+            utterance.lang = langMap[lang] || 'en-US';
             utterance.rate = 0.95;
             window.speechSynthesis.speak(utterance);
         }
@@ -994,6 +1040,36 @@
             if (statusPollInterval) clearInterval(statusPollInterval);
         }
 
+        /* --- CALL LANGUAGE SETUP (new) --- */
+        function openCallLangModal(mode) {
+            if (mode === 'outgoing' && !activePartner) {
+                alert("Pehle kisi contact ko select karein!");
+                return;
+            }
+            callLangModalMode = mode;
+            document.getElementById("call-lang-modal").style.display = "flex";
+        }
+
+        function cancelCallLangSetup() {
+            document.getElementById("call-lang-modal").style.display = "none";
+            if (callLangModalMode === "incoming") {
+                // User declined to configure translation for an incoming call -> end it
+                endCurrentCall();
+            }
+        }
+
+        function confirmCallLangSetup() {
+            callSpokenLang = document.getElementById("call-spoken-lang").value;
+            callTargetLang = document.getElementById("call-target-lang-select").value;
+            document.getElementById("call-lang-modal").style.display = "none";
+
+            if (callLangModalMode === "outgoing") {
+                startCallSession("audio", true);
+            } else {
+                proceedAcceptCall();
+            }
+        }
+
         /* --- CALL ENGINE --- */
         async function startCallSession(type, isTranslateMode = false) {
             if (!activePartner) {
@@ -1122,7 +1198,20 @@
             }
         }
 
+        // Entry point from the Answer button. If it's a translation call, first
+        // ask the acceptor which language they speak / want translation into.
         async function acceptIncomingCall() {
+            if (!pendingCallOffer) return;
+            if (isTranslationCallMode) {
+                openCallLangModal("incoming");
+                return;
+            }
+            await proceedAcceptCall();
+        }
+
+        // Actual accept logic, runs immediately for normal calls or after the
+        // language picker is confirmed for translation calls.
+        async function proceedAcceptCall() {
             if (!pendingCallOffer) return;
             document.getElementById("btn-call-answer").style.display = "none";
             document.getElementById("call-status-text").innerText = "Connecting...";
@@ -1168,13 +1257,17 @@
 
         function startLiveCallSpeechEngine() {
             const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SR) return;
+            if (!SR) {
+                document.getElementById("call-translated-subtitle").innerText =
+                    "⚠️ Live speech recognition is not supported in this browser (use Chrome).";
+                return;
+            }
 
             try {
                 callSpeechRec = new SR();
                 callSpeechRec.continuous = true;
                 callSpeechRec.interimResults = false;
-                callSpeechRec.lang = 'ur-PK';
+                callSpeechRec.lang = callSpokenLang; // fixed: was hardcoded to 'ur-PK'
 
                 callSpeechRec.onresult = async (event) => {
                     if (!isTranslationCallMode) return;
@@ -1191,7 +1284,7 @@
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({
                                         text: spokenText,
-                                        target_lang: "en"
+                                        target_lang: callTargetLang // fixed: was hardcoded to "en"
                                     })
                                 });
                                 const data = await res.json();
@@ -1205,7 +1298,7 @@
                                         receiver: activePartner,
                                         original: spokenText,
                                         translated: translated,
-                                        lang: "en"
+                                        lang: callTargetLang
                                     }));
                                 }
                             } catch(e){}
@@ -1315,7 +1408,9 @@
 
                 mediaRecorder.onstop = async () => {
                     if (recordedChunks.length === 0) return;
-                    const ext = chosenAudioMime.includes("mp4") ? "m4a" : "webm";
+                    // Fixed: use "mp4" extension (not "m4a") so it matches the server's
+                    // mime-type detection (server checks filename.endswith(".mp4"/".m4a"))
+                    const ext = chosenAudioMime.includes("mp4") ? "mp4" : "webm";
                     const blob = new Blob(recordedChunks, { type: chosenAudioMime || "audio/webm" });
                     const form = new FormData();
                     form.append("file", blob, `voice.${ext}`);
