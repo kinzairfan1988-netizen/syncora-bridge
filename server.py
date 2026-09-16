@@ -59,8 +59,14 @@ GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 if GEMINI_KEY:
     try:
         genai.configure(api_key=GEMINI_KEY)
+        print("[Syncora] GEMINI_API_KEY loaded. AI translation (text + voice) is ACTIVE.")
     except Exception as e:
         print(f"[Gemini Config Error]: {e}")
+else:
+    print("[Syncora] WARNING: GEMINI_API_KEY is NOT set. Falling back to free Google Translate "
+          "endpoint only (less reliable on hosted servers like Railway, and voice translation "
+          "will not work at all without a Gemini key). Set GEMINI_API_KEY in your environment "
+          "variables to enable full AI translation.")
 
 class DirectLoginRequest(BaseModel):
     phone: str
@@ -82,15 +88,17 @@ def get_chat_id(u1: str, u2: str) -> str:
 def is_urdu_or_arabic(text: str) -> bool:
     return bool(re.search(r'[\u0600-\u06FF]', text))
 
-def translate_via_google(text: str, source: str, target: str) -> str:
+def translate_via_google(text: str, target: str) -> str:
+    """Free Google Translate fallback. Always uses 'auto' source detection,
+    which is more reliable than guessing the source language ourselves."""
     try:
         encoded = urllib.parse.quote(text.strip().encode('utf-8'))
-        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source}&tl={target}&dt=t&q={encoded}"
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target}&dt=t&q={encoded}"
         req = urllib.request.Request(
-            url, 
+            url,
             headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         )
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=8) as response:
             res_json = json.loads(response.read().decode('utf-8'))
             if res_json and isinstance(res_json, list) and len(res_json) > 0 and res_json[0]:
                 out = "".join([part[0] for part in res_json[0] if part and part[0]]).strip()
@@ -187,7 +195,6 @@ async def translate_text(req: TranslationRequest):
         return {"translated_text": ""}
 
     target_lang = req.target_lang.strip().lower() if req.target_lang else "en"
-    has_script = is_urdu_or_arabic(clean)
 
     if GEMINI_KEY:
         for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
@@ -204,17 +211,17 @@ async def translate_text(req: TranslationRequest):
                 if response and hasattr(response, "text") and response.text:
                     out = response.text.strip().replace('"', '').replace("'", "")
                     if out:
-                        return {"translated_text": out}
+                        return {"translated_text": out, "engine": model_name}
             except Exception as e:
                 print(f"[Gemini Text Translation Error {model_name}]: {e}")
                 continue
 
-    source_param = "ur" if has_script else "auto"
-    g_res = translate_via_google(clean, source_param, target_lang)
+    g_res = translate_via_google(clean, target_lang)
     if g_res:
-        return {"translated_text": g_res}
+        return {"translated_text": g_res, "engine": "google_gtx_fallback"}
 
-    return {"translated_text": clean}
+    print("[Translate] All engines failed (Gemini + Google fallback). Returning original text.")
+    return {"translated_text": clean, "engine": "none"}
 
 # --- ACCURATE AUDIO TRANSLATION ---
 @app.post("/api/translate-audio")
@@ -228,22 +235,30 @@ async def translate_audio_route(
     local_filename = os.path.basename(file_path)
     actual_path = os.path.join(UPLOAD_DIR, local_filename)
 
+    if not os.path.exists(actual_path):
+        print(f"[Audio Translate] File not found on disk: {actual_path}")
+
     if os.path.exists(actual_path) and GEMINI_KEY:
         try:
             with open(actual_path, "rb") as f:
                 audio_bytes = f.read()
 
+            # Fixed: recorded files can be .webm, .mp4 or .m4a depending on browser
+            if local_filename.endswith((".mp4", ".m4a")):
+                mime_type = "audio/mp4"
+            else:
+                mime_type = "audio/webm"
+
             for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
                 try:
                     model = genai.GenerativeModel(model_name)
-                    # Support audio webm or mp4
-                    mime_type = "audio/mp4" if local_filename.endswith(".mp4") else "audio/webm"
                     audio_part = {
                         "mime_type": mime_type,
                         "data": base64.b64encode(audio_bytes).decode("utf-8")
                     }
                     prompt = (
-                        f"Listen carefully to this voice message. The speaker is talking in Urdu, Roman Urdu, or Hindi. "
+                        f"Listen carefully to this voice message. The speaker is talking in Urdu, Roman Urdu, "
+                        f"Hindi, English, or another language. "
                         f"Transcribe what they actually said and translate it into '{chosen_target}'. "
                         f"Do NOT invent words. Output ONLY the translated sentence, without any explanations or quotes."
                     )
@@ -257,6 +272,8 @@ async def translate_audio_route(
                     print(f"[Gemini Audio Error {model_name}]: {e}")
         except Exception as e:
             print(f"[File Read Error]: {e}")
+    elif os.path.exists(actual_path) and not GEMINI_KEY:
+        print("[Audio Translate] GEMINI_API_KEY missing - cannot transcribe/translate voice notes at all.")
 
     if not translated_text and transcript_hint and transcript_hint.strip():
         req = TranslationRequest(text=transcript_hint.strip(), target_lang=chosen_target)
@@ -329,7 +346,7 @@ async def upload_media(file: UploadFile = File(...)):
 @app.websocket("/ws/{phone}")
 async def socket_endpoint(websocket: WebSocket, phone: str):
     await manager.connect(phone, websocket)
-    
+
     # Mark messages as delivered for this online user
     try:
         conn = sqlite3.connect(DB_PATH)
