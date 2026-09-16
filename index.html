@@ -421,8 +421,8 @@
             <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Spoken words converted successfully</p>
 
             <div id="voice-edit-block" style="display:none; text-align:left;">
-                <label style="font-size: 11px; color: var(--text-muted);">Urdu Words Captured:</label>
-                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Urdu transcript will appear here...">
+                <label style="font-size: 11px; color: var(--text-muted);">Captured Words:</label>
+                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Transcript will appear here...">
             </div>
 
             <button class="modal-btn-choice" onclick="confirmDispatchOriginal()">
@@ -550,12 +550,7 @@
         let heartbeatInterval = null;
         let statusPollInterval = null;
 
-        let mediaRecorder = null;
-        let recordedChunks = [];
         let isRecording = false;
-        let recordingSeconds = 0;
-        let recordingTimerInterval = null;
-        let chosenAudioMime = "audio/webm";
         let capturedVoiceText = "";
         let voiceRecognitionEngine = null;
 
@@ -602,6 +597,11 @@
                 } else if (activePartner && activePartner !== myPhone) {
                     selectChat(activePartner);
                 }
+            }
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.onvoiceschanged = () => {
+                    window.speechSynthesis.getVoices();
+                };
             }
         };
 
@@ -699,12 +699,39 @@
             if (tab === 'chats') backToSidebar();
         }
 
+        /* --- SCRIPT-AWARE ACCURATE AUDIO PLAYBACK --- */
         function playSpokenVoice(text, lang) {
-            if (!('speechSynthesis' in window)) return;
+            if (!('speechSynthesis' in window)) {
+                alert("Text-to-speech is not supported on this browser.");
+                return;
+            }
             window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = (lang === 'ur') ? 'ur-PK' : (lang === 'ar' ? 'ar-SA' : 'en-US');
+
+            const cleanText = (text || "").trim();
+            if (!cleanText) return;
+
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            
+            // Check if text is Urdu / Arabic script
+            const hasArabicScript = /[\u0600-\u06FF]/.test(cleanText);
+            if (hasArabicScript) {
+                utterance.lang = 'ur-PK';
+            } else {
+                utterance.lang = (lang === 'ur') ? 'ur-PK' : (lang === 'ar' ? 'ar-SA' : (lang === 'fr' ? 'fr-FR' : (lang === 'de' ? 'de-DE' : 'en-US')));
+            }
+
             utterance.rate = 0.95;
+            utterance.pitch = 1.0;
+
+            const voices = window.speechSynthesis.getVoices();
+            if (voices.length > 0) {
+                const targetPrefix = utterance.lang.split('-')[0].toLowerCase();
+                const matchedVoice = voices.find(v => v.lang.toLowerCase().startsWith(targetPrefix));
+                if (matchedVoice) {
+                    utterance.voice = matchedVoice;
+                }
+            }
+
             window.speechSynthesis.speak(utterance);
         }
 
@@ -901,7 +928,6 @@
             if (statusPollInterval) clearInterval(statusPollInterval);
         }
 
-        /* --- WEBRTC HARDWARE ACCESS HELPER --- */
         async function obtainMediaStreamSafely(type) {
             try {
                 return await navigator.mediaDevices.getUserMedia({
@@ -1204,7 +1230,7 @@
             }
         });
 
-        /* --- MOBILE-OPTIMIZED VOICE PIPELINE (ZERO MIC CONFLICT) --- */
+        /* --- SPEECH-TO-VOICE PIPELINE --- */
         function toggleVoiceRecording() {
             if (!isRecording) startVoiceRecording();
             else stopAndFinishRecording();
@@ -1252,7 +1278,6 @@
                 }
             }
 
-            // Fallback: If WebSpeech completely missing, open manual prompt
             const manualWord = prompt("Bolain ya Urdu text likhein:");
             if (manualWord) {
                 stageAndOpenModal(manualWord);
