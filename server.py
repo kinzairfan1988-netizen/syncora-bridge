@@ -68,6 +68,50 @@ else:
           "will not work at all without a Gemini key). Set GEMINI_API_KEY in your environment "
           "variables to enable full AI translation.")
 
+# --- DYNAMIC MODEL DISCOVERY ---
+# Google periodically retires old model names (e.g. gemini-2.5-flash, gemini-2.0-flash,
+# gemini-1.5-flash all returned 404 "no longer available" for this project). Instead of
+# hardcoding model names that go stale, we ask Google's API which models are ACTUALLY
+# available right now and cache the best one. This self-heals when Google changes lineups.
+_cached_model_name = None
+
+def get_working_model_name():
+    global _cached_model_name
+    if _cached_model_name:
+        return _cached_model_name
+    if not GEMINI_KEY:
+        return None
+    try:
+        all_models = list(genai.list_models())
+        usable = [
+            m.name for m in all_models
+            if "generateContent" in getattr(m, "supported_generation_methods", [])
+        ]
+        # Prefer "flash" models (cheaper/faster), then anything else usable
+        flash_models = [m for m in usable if "flash" in m.lower()]
+        candidates = flash_models + [m for m in usable if m not in flash_models]
+        if candidates:
+            _cached_model_name = candidates[0]
+            print(f"[Gemini] Auto-discovered working model: {_cached_model_name}")
+            return _cached_model_name
+        print("[Gemini] list_models() returned no usable models.")
+    except Exception as e:
+        print(f"[Gemini] Could not auto-discover model list: {e}")
+    return None
+
+def get_model_candidates():
+    """Ordered list of model names to try: the auto-discovered one first,
+    then a few common current aliases as backup."""
+    discovered = get_working_model_name()
+    fallbacks = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-pro-latest"]
+    ordered = []
+    if discovered:
+        ordered.append(discovered)
+    for f in fallbacks:
+        if f not in ordered:
+            ordered.append(f)
+    return ordered
+
 class DirectLoginRequest(BaseModel):
     phone: str
 
@@ -197,7 +241,7 @@ async def translate_text(req: TranslationRequest):
     target_lang = req.target_lang.strip().lower() if req.target_lang else "en"
 
     if GEMINI_KEY:
-        for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+        for model_name in get_model_candidates():
             try:
                 model = genai.GenerativeModel(model_name)
                 prompt = (
@@ -214,6 +258,11 @@ async def translate_text(req: TranslationRequest):
                         return {"translated_text": out, "engine": model_name}
             except Exception as e:
                 print(f"[Gemini Text Translation Error {model_name}]: {e}")
+                # If a model name itself is invalid/retired, clear the cache so
+                # the next request re-discovers a fresh working model.
+                global _cached_model_name
+                if "404" in str(e):
+                    _cached_model_name = None
                 continue
 
     g_res = translate_via_google(clean, target_lang)
@@ -249,7 +298,7 @@ async def translate_audio_route(
             else:
                 mime_type = "audio/webm"
 
-            for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+            for model_name in get_model_candidates():
                 try:
                     model = genai.GenerativeModel(model_name)
                     audio_part = {
@@ -270,6 +319,9 @@ async def translate_audio_route(
                             break
                 except Exception as e:
                     print(f"[Gemini Audio Error {model_name}]: {e}")
+                    global _cached_model_name
+                    if "404" in str(e):
+                        _cached_model_name = None
         except Exception as e:
             print(f"[File Read Error]: {e}")
     elif os.path.exists(actual_path) and not GEMINI_KEY:
@@ -434,6 +486,26 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
         manager.disconnect(phone)
     except Exception:
         manager.disconnect(phone)
+
+@app.get("/api/debug/models")
+async def debug_list_models():
+    """Diagnostic endpoint: open this URL in your browser to see exactly which
+    Gemini models your API key currently has access to, and which one the
+    server auto-selected for translation."""
+    if not GEMINI_KEY:
+        return {"error": "GEMINI_API_KEY not set on this server."}
+    try:
+        all_models = list(genai.list_models())
+        usable = [
+            m.name for m in all_models
+            if "generateContent" in getattr(m, "supported_generation_methods", [])
+        ]
+        return {
+            "auto_selected_model": get_working_model_name(),
+            "all_usable_models": usable
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.get("/")
 async def serve_index():
