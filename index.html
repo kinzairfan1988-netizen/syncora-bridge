@@ -414,16 +414,14 @@
         </div>
     </div>
 
-    <!-- SEND CONFIRMATION MODAL WITH LIVE VOICE PREVIEW -->
     <div class="send-modal-backdrop" id="send-modal">
         <div class="send-modal-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Dispatch Mode</h3>
             <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Choose how to deliver your message</p>
 
-            <!-- Voice Hint Text Input for Instant 100% Accuracy -->
             <div id="voice-edit-block" style="display:none; text-align:left;">
-                <label style="font-size: 11px; color: var(--text-muted);">Urdu/Roman Words (Transcribed):</label>
-                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Type or verify spoken words...">
+                <label style="font-size: 11px; color: var(--text-muted);">Urdu Words Transcribed:</label>
+                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Listening to audio...">
             </div>
 
             <button class="modal-btn-choice" onclick="confirmDispatchOriginal()">
@@ -559,6 +557,7 @@
         let chosenAudioMime = "audio/webm";
         let capturedVoiceHint = "";
         let voiceRecognitionEngine = null;
+        let activeAudioStream = null;
 
         let pendingPayload = null;
         let currentAvatarUrl = "";
@@ -890,7 +889,7 @@
             if (statusPollInterval) clearInterval(statusPollInterval);
         }
 
-        /* --- WEBRTC ENGINE --- */
+        /* --- WEBRTC CALL ENGINE --- */
         async function startCallSession(type, isTranslateMode = false) {
             if (!activePartner) { alert("Pehle kisi contact ko select karein!"); return; }
             currentCallType = type;
@@ -1152,7 +1151,7 @@
             }
         });
 
-        /* --- BULLETPROOF VOICE RECORDING WITH LIVE CONFIRMATION --- */
+        /* --- DUAL STREAM RECORDING --- */
         function toggleVoiceRecording() {
             if (!isRecording) startVoiceRecording();
             else stopAndFinishRecording();
@@ -1161,14 +1160,14 @@
         async function startVoiceRecording() {
             if (!activePartner) { alert("Pehle kisi contact ko select karein!"); return; }
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                activeAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
                 chosenAudioMime = "audio/webm";
                 if (!MediaRecorder.isTypeSupported("audio/webm")) {
                     chosenAudioMime = MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "";
                 }
 
-                mediaRecorder = chosenAudioMime ? new MediaRecorder(stream, { mimeType: chosenAudioMime }) : new MediaRecorder(stream);
+                mediaRecorder = chosenAudioMime ? new MediaRecorder(activeAudioStream, { mimeType: chosenAudioMime }) : new MediaRecorder(activeAudioStream);
                 recordedChunks = [];
                 capturedVoiceHint = "";
 
@@ -1176,13 +1175,16 @@
                 if (SR) {
                     try {
                         voiceRecognitionEngine = new SR();
-                        voiceRecognitionEngine.continuous = false;
+                        voiceRecognitionEngine.continuous = true;
                         voiceRecognitionEngine.interimResults = true;
                         voiceRecognitionEngine.lang = 'ur-PK';
+
                         voiceRecognitionEngine.onresult = (ev) => {
-                            for (let i = ev.resultIndex; i < ev.results.length; ++i) {
-                                capturedVoiceHint = ev.results[i][0].transcript;
+                            let textSoFar = "";
+                            for (let i = 0; i < ev.results.length; ++i) {
+                                textSoFar += ev.results[i][0].transcript + " ";
                             }
+                            capturedVoiceHint = textSoFar.trim();
                         };
                         voiceRecognitionEngine.start();
                     } catch(e){}
@@ -1232,9 +1234,15 @@
         }
 
         function stopAndFinishRecording() {
-            if (voiceRecognitionEngine) { try { voiceRecognitionEngine.stop(); } catch(e){} }
-            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
-            resetRecordingUI();
+            setTimeout(() => {
+                if (voiceRecognitionEngine) { try { voiceRecognitionEngine.stop(); } catch(e){} }
+                if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+                if (activeAudioStream) {
+                    activeAudioStream.getTracks().forEach(t => t.stop());
+                    activeAudioStream = null;
+                }
+                resetRecordingUI();
+            }, 350);
         }
 
         function cancelRecording() {
@@ -1242,6 +1250,10 @@
             recordedChunks = [];
             if (voiceRecognitionEngine) { try { voiceRecognitionEngine.stop(); } catch(e){} }
             if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+            if (activeAudioStream) {
+                activeAudioStream.getTracks().forEach(t => t.stop());
+                activeAudioStream = null;
+            }
             resetRecordingUI();
         }
 
@@ -1424,7 +1436,8 @@
             } else {
                 const sentTicks = document.querySelectorAll(".bubble.sent .tick-icon");
                 if (sentTicks.length > 0) {
-                    sentTicks[sentTicks.length - 1].innerText = (status === "delivered") ? "✓✓" : "✓";
+                    const lastTick = sentTicks[sentTicks.length - 1];
+                    lastTick.innerText = (status === "delivered") ? "✓✓" : "✓";
                 }
             }
         }
