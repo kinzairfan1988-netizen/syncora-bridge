@@ -378,6 +378,9 @@
 </head>
 <body>
 
+    <!-- HIDDEN AUDIO FEED FOR CALLS -->
+    <audio id="remote-audio-sink" autoplay playsinline style="display:none;"></audio>
+
     <!-- 1-STEP LOGIN OVERLAY -->
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
@@ -648,7 +651,13 @@
         let isMicMuted = false;
         let callSpeechRec = null;
 
-        const rtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        const rtcConfig = {
+            iceServers: [
+                { urls: "stun:stun.l.google.com:19302" },
+                { urls: "stun:stun1.l.google.com:19302" },
+                { urls: "stun:stun2.l.google.com:19302" }
+            ]
+        };
 
         window.onload = () => {
             if (myPhone) {
@@ -837,7 +846,7 @@
             }
         }
 
-        /* --- STABLE SOCKET WITH HEARTBEAT (NEVER DROPS OFFLINE) --- */
+        /* --- STABLE SOCKET WITH HEARTBEAT --- */
         function initSocketSafe() {
             if (!myPhone || isConnectingSocket) return;
             if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
@@ -854,7 +863,6 @@
                     isConnectingSocket = false;
                     document.getElementById("my-status-label").innerText = `● ${myPhone}`;
                     
-                    // Keep-alive heartbeat every 15s so server never thinks user is offline
                     if (heartbeatInterval) clearInterval(heartbeatInterval);
                     heartbeatInterval = setInterval(() => {
                         if (socket && socket.readyState === WebSocket.OPEN) {
@@ -866,7 +874,7 @@
                 socket.onmessage = async (event) => {
                     try {
                         const data = JSON.parse(event.data);
-                        if (data.action === "pong") return; // Keepalive ack
+                        if (data.action === "pong") return;
                         
                         if (data.action === "new_message") {
                             if (data.sender === activePartner) {
@@ -955,7 +963,6 @@
             document.getElementById("mobile-back-btn").style.display = "inline-block";
             document.getElementById("call-buttons-dock").style.display = "flex";
 
-            // Check live online status immediately without breaking socket
             checkPartnerLiveStatus();
             if (statusPollInterval) clearInterval(statusPollInterval);
             statusPollInterval = setInterval(checkPartnerLiveStatus, 6000);
@@ -994,7 +1001,7 @@
             if (statusPollInterval) clearInterval(statusPollInterval);
         }
 
-        /* --- CALL ENGINE --- */
+        /* --- STABLE WEBRTC CALL ENGINE --- */
         async function startCallSession(type, isTranslateMode = false) {
             if (!activePartner) {
                 alert("Pehle kisi contact ko select karein!");
@@ -1062,11 +1069,13 @@
         }
 
         function initPeerConnection() {
-            if (peerConnection) { peerConnection.close(); }
+            if (peerConnection) { 
+                peerConnection.close(); 
+            }
             peerConnection = new RTCPeerConnection(rtcConfig);
 
             peerConnection.onicecandidate = (event) => {
-                if (event.candidate && socket && socket.readyState === WebSocket.OPEN) {
+                if (event.candidate && socket && socket.readyState === WebSocket.OPEN && activePartner) {
                     socket.send(JSON.stringify({
                         action: "ice_candidate",
                         receiver: activePartner,
@@ -1078,11 +1087,14 @@
             peerConnection.ontrack = (event) => {
                 const remoteStream = event.streams[0];
                 if (currentCallType === "video") {
-                    document.getElementById("remote-video").srcObject = remoteStream;
+                    const rv = document.getElementById("remote-video");
+                    if (rv) rv.srcObject = remoteStream;
                 } else {
-                    const audioEl = new Audio();
-                    audioEl.srcObject = remoteStream;
-                    audioEl.play().catch(()=>{});
+                    const audioSink = document.getElementById("remote-audio-sink");
+                    if (audioSink) {
+                        audioSink.srcObject = remoteStream;
+                        audioSink.play().catch(() => {});
+                    }
                 }
             };
         }
@@ -1248,6 +1260,9 @@
                 try { callSpeechRec.stop(); } catch(e){}
                 callSpeechRec = null;
             }
+            const audioSink = document.getElementById("remote-audio-sink");
+            if (audioSink) audioSink.srcObject = null;
+
             document.getElementById("call-modal").style.display = "none";
             document.getElementById("call-video-container").style.display = "none";
             document.getElementById("call-subtitles-dock").style.display = "none";
@@ -1279,7 +1294,7 @@
             }
         });
 
-        /* --- CROSS-PLATFORM VOICE RECORDING (SAFARI + ANDROID FIX) --- */
+        /* --- CROSS-PLATFORM VOICE RECORDING --- */
         function toggleVoiceRecording() {
             if (!isRecording) {
                 startVoiceRecording();
@@ -1296,7 +1311,6 @@
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
-                // Smart MIME detection for Safari vs Android
                 chosenAudioMime = "audio/webm";
                 if (!MediaRecorder.isTypeSupported("audio/webm")) {
                     if (MediaRecorder.isTypeSupported("audio/mp4")) {
