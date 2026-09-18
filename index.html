@@ -173,12 +173,12 @@
         .tick-icon { font-size: 11px; font-weight: 800; }
         .bubble.sent .tick-icon { color: #000; }
 
-        /* Pure Secret Voice Note UI (No text on screen) */
+        /* Clean Privacy Audio Player */
         .voice-card-private {
             display: flex; align-items: center; gap: 12px; padding: 4px 2px;
         }
         .btn-play-voice-circle {
-            width: 44px; height: 44px; border-radius: 50%; background: #000; color: var(--accent-amber);
+            width: 42px; height: 42px; border-radius: 50%; background: #000; color: var(--accent-amber);
             border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
             font-size: 18px; flex-shrink: 0; transition: transform 0.1s;
         }
@@ -280,46 +280,15 @@
             padding: 10px; border-radius: 10px; color: #fff; font-size: 13px; outline: none;
         }
 
-        .call-modal-overlay {
-            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95);
-            backdrop-filter: blur(14px); z-index: 1000; display: none;
-            flex-direction: column; align-items: center; justify-content: space-between;
-            padding: 30px 20px;
-        }
-        .call-avatar-circle {
-            width: 80px; height: 80px; border-radius: 50%; background: #222;
-            border: 2px solid var(--accent-amber); display: flex; align-items: center; justify-content: center;
-            font-size: 32px; color: var(--accent-amber); margin-bottom: 8px;
-        }
-        .call-subtitles-dock {
-            width: 100%; max-width: 500px; min-height: 70px;
-            background: rgba(24, 24, 28, 0.85); border: 1px solid var(--border-graphite);
-            border-radius: 14px; padding: 10px 14px; display: none; flex-direction: column;
-            gap: 4px; text-align: center; justify-content: center;
-        }
-        .call-controls-row { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
-        .btn-call-btn {
-            width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; font-size: 20px;
-        }
-        .btn-call-end { background: var(--danger-red); color: #fff; }
-        .btn-call-accept { background: var(--online-green); color: #fff; }
-        .btn-call-mute { background: var(--surface-card); color: #fff; border: 1px solid var(--border-graphite); }
-
         @media (max-width: 768px) {
             .sidebar-panel { width: 100%; height: 100dvh; display: flex; }
             .stage-panel { display: none; width: 100%; height: 100dvh; }
-            
             body.in-chat .sidebar-panel { display: none !important; }
             body.in-chat .stage-panel { display: flex !important; flex-direction: column; height: 100dvh; }
-
             .stage-header { padding: 8px 10px; gap: 6px; }
             .chat-avatar { width: 36px; height: 36px; font-size: 12px; }
             #active-partner-label { font-size: 13px !important; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-            
             .btn-call-action { height: 30px; padding: 0 8px; font-size: 11px; gap: 3px; }
-            .btn-call-action.trans-call-btn { padding: 0 8px; font-size: 11px; }
-
             .stage-input-bar { padding: 6px 10px; }
             .main-text-input { font-size: 14px; padding: 6px 2px; }
             .btn-send-permanent { width: 38px; height: 38px; font-size: 15px; }
@@ -368,34 +337,6 @@
         </div>
     </div>
 
-    <div class="call-modal-overlay" id="call-modal">
-        <div style="display:flex; flex-direction:column; align-items:center;">
-            <div class="call-avatar-circle" id="call-avatar-icon">📞</div>
-            <div style="font-size: 18px; font-weight: 700; color: #fff;" id="call-partner-name">User</div>
-            <div style="font-size: 13px; color: var(--online-green);" id="call-status-text">Calling...</div>
-        </div>
-
-        <div style="width:100%; max-width:540px; height:260px; display:none; position:relative; background:#000; border-radius:16px; overflow:hidden;" id="call-video-container">
-            <video id="remote-video" style="width:100%; height:100%; object-fit:cover;" autoplay playsinline></video>
-            <video id="local-video" style="width:100px; height:75px; position:absolute; bottom:8px; right:8px; border-radius:8px; border:2px solid var(--accent-amber); object-fit:cover;" autoplay muted playsinline></video>
-        </div>
-
-        <div class="call-subtitles-dock" id="call-subtitles-dock">
-            <div style="font-size: 11px; font-weight: 700; color: var(--accent-amber); display:flex; justify-content:space-between;">
-                <span>🌐 Live AI Translation</span>
-                <span style="color:var(--online-green);">● Active</span>
-            </div>
-            <div style="font-size: 13px; font-weight: 600; color: #fff;" id="call-original-subtitle">Speaking...</div>
-            <div style="font-size: 14px; font-weight: 700; color: var(--online-green);" id="call-translated-subtitle">Translation will stream here...</div>
-        </div>
-
-        <div class="call-controls-row">
-            <button class="btn-call-btn btn-call-mute" id="btn-toggle-mic" onclick="toggleCallMic()">🎤</button>
-            <button class="btn-call-btn btn-call-accept" id="btn-call-answer" style="display:none;" onclick="acceptIncomingCall()">📞</button>
-            <button class="btn-call-btn btn-call-end" onclick="endCurrentCall()">📵</button>
-        </div>
-    </div>
-
     <div class="settings-overlay" id="settings-modal">
         <div class="settings-card">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -430,8 +371,8 @@
             <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Confirm your message</p>
 
             <div id="voice-edit-block" style="display:block; text-align:left;">
-                <label style="font-size: 11px; color: var(--text-muted);">Spoken Words (Verification):</label>
-                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Spoken transcript...">
+                <label style="font-size: 11px; color: var(--text-muted);">Spoken Words / Hint (Optional):</label>
+                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Verify or type words...">
             </div>
 
             <div class="lang-options-drawer" id="lang-drawer">
@@ -445,7 +386,7 @@
                     <option value="es">Spanish (Español)</option>
                 </select>
                 <button class="modal-btn-choice btn-choice-trans" id="btn-modal-confirm-trans" onclick="confirmDispatchTranslation()">
-                    🌐 Translate & Send AI Voice Note
+                    🌐 Translate & Send Voice
                 </button>
             </div>
 
@@ -500,12 +441,6 @@
                         <div style="font-size: 10px; color: var(--text-muted);" id="active-partner-status">Offline</div>
                     </div>
                 </div>
-
-                <div class="call-buttons-group" id="call-buttons-dock" style="display: flex;">
-                    <button class="btn-call-action" onclick="startCallSession('audio', false)" title="Normal Audio Call">📞 Audio</button>
-                    <button class="btn-call-action" onclick="startCallSession('video', false)" title="Normal Video Call">📹 Video</button>
-                    <button class="btn-call-action trans-call-btn" onclick="startCallSession('audio', true)" title="Call with Live AI Translation">🌐 Translate</button>
-                </div>
             </header>
 
             <div class="messages-container" id="messages-container"></div>
@@ -529,7 +464,7 @@
                 <div class="recording-bar" id="recording-bar">
                     <div class="rec-indicator">
                         <div class="rec-dot"></div>
-                        <span id="rec-live-words" style="font-size:12px; color:var(--accent-amber); max-width:140px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">Listening...</span>
+                        <span id="rec-live-words" style="font-size:12px; color:var(--accent-amber); max-width:140px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">Recording Voice...</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <button class="icon-btn" type="button" onclick="cancelRecording()" style="color: var(--danger-red);">🗑️</button>
@@ -565,6 +500,7 @@
 
         let mediaRecorder = null;
         let recordedChunks = [];
+        let recordedAudioBlob = null;
         let isRecording = false;
         let activeAudioStream = null;
         let capturedLiveText = "";
@@ -572,33 +508,6 @@
 
         let pendingPayload = null;
         let currentAvatarUrl = "";
-
-        let peerConnection = null;
-        let localMediaStream = null;
-        let currentCallType = "audio";
-        let isTranslationCallMode = false;
-        let isMicMuted = false;
-        let callSpeechRec = null;
-
-        const rtcConfig = {
-            iceServers: [
-                { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun1.l.google.com:19302" },
-                { urls: "stun:stun2.l.google.com:19302" },
-                { urls: "stun:stun.relay.metered.ca:80" },
-                {
-                    urls: "turn:standard.relay.metered.ca:80",
-                    username: "openrelayproject",
-                    credential: "openrelayproject"
-                },
-                {
-                    urls: "turn:standard.relay.metered.ca:443",
-                    username: "openrelayproject",
-                    credential: "openrelayproject"
-                }
-            ],
-            iceCandidatePoolSize: 10
-        };
 
         window.onload = async () => {
             if (myPhone) {
@@ -630,14 +539,11 @@
             if (socket) { socket.close(); }
             if (heartbeatInterval) clearInterval(heartbeatInterval);
             if (statusPollInterval) clearInterval(statusPollInterval);
-            if (localMediaStream) { localMediaStream.getTracks().forEach(t => t.stop()); }
-            if (callSpeechRec) { try { callSpeechRec.stop(); } catch(e){} }
         };
 
-        // Text-to-Speech Playback
         function playSpokenVoice(text, lang) {
             if (!('speechSynthesis' in window)) {
-                alert("Speech playback not supported in this browser.");
+                alert("Speech Synthesis is not supported in this browser.");
                 return;
             }
             window.speechSynthesis.cancel();
@@ -851,7 +757,7 @@
                         if (data.action === "new_message") {
                             await registerPermanentContact(data.sender);
                             if (data.sender === activePartner) {
-                                appendBubble(data.content, "received", data.translated, data.msg_type, data.time, data.id, data.status, data.lang || "en");
+                                appendBubble(data.content, "received", data.translated, data.msg_type, data.time, data.id, data.status);
                             }
                             loadRecentChats();
                         } 
@@ -861,20 +767,6 @@
                         else if (data.action === "messages_delivered") {
                             if (data.delivered_to === activePartner) {
                                 markAllSentBubblesDelivered();
-                            }
-                        }
-                        else if (data.action === "call_signal") {
-                            handleIncomingCallSignal(data);
-                        } 
-                        else if (data.action === "ice_candidate") {
-                            if (peerConnection && data.candidate) {
-                                try { await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) {}
-                            }
-                        } 
-                        else if (data.action === "call_live_caption") {
-                            if (isTranslationCallMode) {
-                                document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
-                                document.getElementById("call-translated-subtitle").innerText = `🌐 ${data.translated}`;
                             }
                         }
                     } catch(e){}
@@ -925,7 +817,6 @@
             document.body.classList.add("in-chat");
             document.getElementById("active-partner-label").innerText = partner;
             document.getElementById("active-avatar").innerText = partner.slice(-2);
-            document.getElementById("call-buttons-dock").style.display = "flex";
 
             checkPartnerLiveStatus();
             if (statusPollInterval) clearInterval(statusPollInterval);
@@ -965,284 +856,6 @@
             if (statusPollInterval) clearInterval(statusPollInterval);
         }
 
-        async function obtainMediaStreamSafely(type) {
-            try {
-                return await navigator.mediaDevices.getUserMedia({
-                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-                    video: (type === "video")
-                });
-            } catch (err) {
-                alert("Microphone permission required. Allow from address bar 🔒.");
-                throw err;
-            }
-        }
-
-        /* --- WEBRTC CALL ENGINE --- */
-        async function startCallSession(type, isTranslateMode = false) {
-            if (!activePartner) { alert("Pehle contact select karein!"); return; }
-            currentCallType = type;
-            isTranslationCallMode = isTranslateMode;
-
-            try {
-                localMediaStream = await obtainMediaStreamSafely(type);
-
-                document.getElementById("call-partner-name").innerText = activePartner;
-                document.getElementById("call-avatar-icon").innerText = type === "video" ? "📹" : (isTranslateMode ? "🌐" : "📞");
-                document.getElementById("btn-call-answer").style.display = "none";
-                document.getElementById("call-modal").style.display = "flex";
-
-                if (isTranslateMode) {
-                    document.getElementById("call-status-text").innerText = "Outgoing AI Translation Call...";
-                    document.getElementById("call-subtitles-dock").style.display = "flex";
-                    document.getElementById("call-original-subtitle").innerText = "Listening to your voice...";
-                    document.getElementById("call-translated-subtitle").innerText = "Translation will stream here...";
-                } else {
-                    document.getElementById("call-status-text").innerText = `Outgoing Normal ${type.toUpperCase()} Call...`;
-                    document.getElementById("call-subtitles-dock").style.display = "none";
-                }
-
-                if (type === "video") {
-                    document.getElementById("call-video-container").style.display = "block";
-                    document.getElementById("local-video").srcObject = localMediaStream;
-                } else {
-                    document.getElementById("call-video-container").style.display = "none";
-                }
-
-                initPeerConnection();
-                localMediaStream.getTracks().forEach(track => peerConnection.addTrack(track, localMediaStream));
-
-                const offer = await peerConnection.createOffer({
-                    offerToReceiveAudio: true,
-                    offerToReceiveVideo: (type === "video")
-                });
-                await peerConnection.setLocalDescription(offer);
-
-                if (socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({
-                        action: "call_signal",
-                        receiver: activePartner,
-                        signal_type: "offer",
-                        call_type: type,
-                        is_translation_call: isTranslateMode,
-                        sdp: offer
-                    }));
-                }
-
-                if (isTranslateMode) startLiveCallSpeechEngine();
-            } catch (err) {
-                endCurrentCall();
-            }
-        }
-
-        function initPeerConnection() {
-            if (peerConnection) { 
-                try { peerConnection.close(); } catch(e){} 
-                peerConnection = null; 
-            }
-            peerConnection = new RTCPeerConnection(rtcConfig);
-
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate && socket && socket.readyState === WebSocket.OPEN && activePartner) {
-                    socket.send(JSON.stringify({
-                        action: "ice_candidate",
-                        receiver: activePartner,
-                        candidate: event.candidate
-                    }));
-                }
-            };
-
-            peerConnection.ontrack = (event) => {
-                const remoteStream = event.streams[0] || new MediaStream([event.track]);
-                if (currentCallType === "video") {
-                    const rv = document.getElementById("remote-video");
-                    if (rv) { rv.srcObject = remoteStream; rv.play().catch(() => {}); }
-                }
-                const audioSink = document.getElementById("remote-audio-sink");
-                if (audioSink) {
-                    audioSink.srcObject = remoteStream;
-                    audioSink.muted = false;
-                    audioSink.play().catch(e => {});
-                }
-            };
-
-            peerConnection.oniceconnectionstatechange = () => {
-                if (peerConnection) {
-                    const state = peerConnection.iceConnectionState;
-                    if (state === "connected" || state === "completed") {
-                        document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected (Live)";
-                    } else if (state === "disconnected" || state === "failed") {
-                        document.getElementById("call-status-text").innerText = "Reconnecting...";
-                    }
-                }
-            };
-        }
-
-        let pendingCallOffer = null;
-
-        async function handleIncomingCallSignal(data) {
-            if (data.signal_type === "offer") {
-                pendingCallOffer = data;
-                activePartner = data.sender;
-                currentCallType = data.call_type || "audio";
-                isTranslationCallMode = !!data.is_translation_call;
-
-                document.getElementById("call-partner-name").innerText = data.sender;
-                document.getElementById("btn-call-answer").style.display = "flex";
-                document.getElementById("call-modal").style.display = "flex";
-
-                if (isTranslationCallMode) {
-                    document.getElementById("call-status-text").innerText = "Incoming AI Translation Call...";
-                    document.getElementById("call-avatar-icon").innerText = "🌐";
-                    document.getElementById("call-subtitles-dock").style.display = "flex";
-                } else {
-                    document.getElementById("call-status-text").innerText = `Incoming Normal ${currentCallType.toUpperCase()} Call...`;
-                    document.getElementById("call-avatar-icon").innerText = currentCallType === "video" ? "📹" : "📞";
-                    document.getElementById("call-subtitles-dock").style.display = "none";
-                }
-            } else if (data.signal_type === "answer") {
-                if (peerConnection) {
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-                    document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected (Live)";
-                }
-            } else if (data.signal_type === "end") {
-                closeCallUI();
-            }
-        }
-
-        async function acceptIncomingCall() {
-            if (!pendingCallOffer) return;
-            document.getElementById("btn-call-answer").style.display = "none";
-            document.getElementById("call-status-text").innerText = "Connecting live line...";
-
-            try {
-                localMediaStream = await obtainMediaStreamSafely(currentCallType);
-
-                if (currentCallType === "video") {
-                    document.getElementById("call-video-container").style.display = "block";
-                    document.getElementById("local-video").srcObject = localMediaStream;
-                }
-
-                initPeerConnection();
-                localMediaStream.getTracks().forEach(track => peerConnection.addTrack(track, localMediaStream));
-
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(pendingCallOffer.sdp));
-                const answer = await peerConnection.createAnswer({
-                    offerToReceiveAudio: true,
-                    offerToReceiveVideo: (currentCallType === "video")
-                });
-                await peerConnection.setLocalDescription(answer);
-
-                if (socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({
-                        action: "call_signal",
-                        receiver: activePartner,
-                        signal_type: "answer",
-                        sdp: answer
-                    }));
-                }
-
-                document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected (Live)";
-                if (isTranslationCallMode) startLiveCallSpeechEngine();
-            } catch (err) {
-                endCurrentCall();
-            }
-        }
-
-        function startLiveCallSpeechEngine() {
-            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SR) return;
-
-            try {
-                callSpeechRec = new SR();
-                callSpeechRec.continuous = true;
-                callSpeechRec.interimResults = false;
-                callSpeechRec.lang = 'ur-PK';
-
-                callSpeechRec.onresult = async (event) => {
-                    if (!isTranslationCallMode) return;
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        if (event.results[i].isFinal) {
-                            const spokenText = event.results[i][0].transcript.trim();
-                            if (!spokenText) continue;
-
-                            document.getElementById("call-original-subtitle").innerText = `You: ${spokenText}`;
-
-                            try {
-                                const res = await fetch("/translate", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ text: spokenText, target_lang: "en" })
-                                });
-                                const data = await res.json();
-                                const translated = data.translated_text || spokenText;
-
-                                document.getElementById("call-translated-subtitle").innerText = `🌐 ${translated}`;
-
-                                if (socket && socket.readyState === WebSocket.OPEN && activePartner) {
-                                    socket.send(JSON.stringify({
-                                        action: "call_live_caption",
-                                        receiver: activePartner,
-                                        original: spokenText,
-                                        translated: translated,
-                                        lang: "en"
-                                    }));
-                                }
-                            } catch(e){}
-                        }
-                    }
-                };
-
-                callSpeechRec.onerror = () => {};
-                callSpeechRec.onend = () => {
-                    if (peerConnection && isTranslationCallMode) {
-                        try { callSpeechRec.start(); } catch(e){}
-                    }
-                };
-
-                callSpeechRec.start();
-            } catch(e){}
-        }
-
-        function endCurrentCall() {
-            if (activePartner && socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ action: "call_signal", receiver: activePartner, signal_type: "end" }));
-            }
-            closeCallUI();
-        }
-
-        function closeCallUI() {
-            if (peerConnection) { 
-                try { peerConnection.close(); } catch(e){} 
-                peerConnection = null; 
-            }
-            if (localMediaStream) { 
-                localMediaStream.getTracks().forEach(t => t.stop()); 
-                localMediaStream = null; 
-            }
-            if (callSpeechRec) { 
-                try { callSpeechRec.stop(); } catch(e){} 
-                callSpeechRec = null; 
-            }
-            const audioSink = document.getElementById("remote-audio-sink");
-            if (audioSink) { audioSink.srcObject = null; }
-
-            document.getElementById("call-modal").style.display = "none";
-            document.getElementById("call-video-container").style.display = "none";
-            document.getElementById("call-subtitles-dock").style.display = "none";
-            isTranslationCallMode = false;
-            pendingCallOffer = null;
-        }
-
-        function toggleCallMic() {
-            if (!localMediaStream) return;
-            const audioTrack = localMediaStream.getAudioTracks()[0];
-            if (audioTrack) {
-                isMicMuted = !isMicMuted;
-                audioTrack.enabled = !isMicMuted;
-                document.getElementById("btn-toggle-mic").innerText = isMicMuted ? "🔇" : "🎤";
-            }
-        }
-
         function toggleAttachMenu() {
             const menu = document.getElementById("attach-menu");
             menu.style.display = menu.style.display === "flex" ? "none" : "flex";
@@ -1257,7 +870,7 @@
             }
         });
 
-        /* --- BULLETPROOF AUDIO & SPEECH DISPATCH --- */
+        /* --- BULLETPROOF AUDIO PIPELINE --- */
         function toggleVoiceRecording() {
             if (!isRecording) startVoiceRecording();
             else stopAndFinishRecording();
@@ -1282,7 +895,6 @@
                 recordedChunks = [];
                 capturedLiveText = "";
 
-                // Voice capture logic
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
@@ -1291,17 +903,12 @@
                         speechRecognitionEngine.interimResults = true;
                         speechRecognitionEngine.lang = 'ur-PK';
 
-                        const liveDisplay = document.getElementById("rec-live-words");
-
                         speechRecognitionEngine.onresult = (ev) => {
                             let textSoFar = "";
                             for (let i = 0; i < ev.results.length; ++i) {
                                 textSoFar += ev.results[i][0].transcript + " ";
                             }
                             capturedLiveText = textSoFar.trim();
-                            if (liveDisplay && capturedLiveText) {
-                                liveDisplay.innerText = capturedLiveText;
-                            }
                         };
                         speechRecognitionEngine.start();
                     } catch(e){}
@@ -1315,22 +922,16 @@
 
                 mediaRecorder.onstop = async () => {
                     if (recordedChunks.length === 0) return;
-                    const ext = (chosenMime && chosenMime.includes("mp4")) ? "m4a" : "webm";
-                    const blob = new Blob(recordedChunks, { type: chosenMime || "audio/webm" });
-                    
-                    const form = new FormData();
-                    form.append("file", blob, `voice.${ext}`);
-                    const res = await fetch("/api/upload", { method: "POST", body: form });
-                    const data = await res.json();
+                    recordedAudioBlob = new Blob(recordedChunks, { type: chosenMime || "audio/webm" });
 
                     pendingPayload = {
                         type: "voice",
-                        content: data.url,
+                        blob: recordedAudioBlob,
                         hint: capturedLiveText.trim()
                     };
 
                     document.getElementById("voice-hint-field").value = capturedLiveText.trim();
-                    document.getElementById("send-modal-preview").innerText = capturedLiveText.trim() ? `"${capturedLiveText.trim()}"` : "Voice Note Captured";
+                    document.getElementById("send-modal-preview").innerText = "Voice Recorded (Privacy Protected)";
                     document.getElementById("send-modal").style.display = "flex";
                 };
 
@@ -1339,7 +940,7 @@
 
                 document.getElementById("input-shell").style.display = "none";
                 document.getElementById("recording-bar").style.display = "flex";
-                document.getElementById("rec-live-words").innerText = "Listening (Urdu)...";
+                document.getElementById("rec-live-words").innerText = "Recording Voice...";
 
             } catch (err) {
                 alert("Microphone permission error: " + err.message);
@@ -1366,6 +967,7 @@
         function cancelRecording() {
             capturedLiveText = "";
             recordedChunks = [];
+            recordedAudioBlob = null;
             if (speechRecognitionEngine) { 
                 try { speechRecognitionEngine.stop(); } catch(e){} 
                 speechRecognitionEngine = null;
@@ -1415,10 +1017,18 @@
             document.getElementById("send-modal").style.display = "none";
         }
 
-        function confirmDispatchOriginal() {
+        async function confirmDispatchOriginal() {
             if (!pendingPayload) return;
-            const contentToSend = (pendingPayload.type === 'voice') ? pendingPayload.content : (document.getElementById("voice-hint-field").value.trim() || pendingPayload.content);
-            executeDispatch(contentToSend, "", pendingPayload.type);
+            
+            if (pendingPayload.type === 'voice') {
+                const form = new FormData();
+                form.append("file", pendingPayload.blob, "voice.webm");
+                const res = await fetch("/api/upload", { method: "POST", body: form });
+                const data = await res.json();
+                executeDispatch(data.url, "", "voice");
+            } else {
+                executeDispatch(pendingPayload.content, "", "text");
+            }
             cancelDispatch();
         }
 
@@ -1430,18 +1040,32 @@
 
             const btn = document.getElementById("btn-modal-confirm-trans");
             const origText = btn.innerText;
-            btn.innerText = "Translating...";
+            btn.innerText = "Converting Audio...";
             btn.disabled = true;
 
-            // Captured text or fallback to input text
-            let textToTranslate = document.getElementById("voice-hint-field").value.trim();
-            if (!textToTranslate && pendingPayload.type === 'text') {
-                textToTranslate = pendingPayload.content;
-            }
+            if (pendingPayload.type === "voice") {
+                // Server-side robust audio conversion
+                try {
+                    const form = new FormData();
+                    form.append("audio_file", pendingPayload.blob, "voice.webm");
+                    form.append("target_lang", targetLang);
+                    form.append("transcript_hint", document.getElementById("voice-hint-field").value.trim() || pendingPayload.hint || "");
 
-            let translatedText = "";
+                    const res = await fetch("/api/translate-audio", { method: "POST", body: form });
+                    const data = await res.json();
 
-            if (textToTranslate) {
+                    btn.innerText = origText;
+                    btn.disabled = false;
+
+                    executeDispatch(data.audio_url, data.translated_text || "", "voice", targetLang);
+                } catch(err) {
+                    btn.innerText = origText;
+                    btn.disabled = false;
+                    alert("Conversion failed: " + err.message);
+                }
+            } else {
+                const textToTranslate = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
+                let translatedText = "";
                 try {
                     const res = await fetch("/translate", {
                         method: "POST",
@@ -1449,18 +1073,15 @@
                         body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
                     });
                     const data = await res.json();
-                    translatedText = (data && data.translated_text && data.translated_text.trim()) ? data.translated_text : textToTranslate;
+                    translatedText = (data && data.translated_text) ? data.translated_text : textToTranslate;
                 } catch (e) {
                     translatedText = textToTranslate;
                 }
+                btn.innerText = origText;
+                btn.disabled = false;
+                executeDispatch(textToTranslate, translatedText, "text", targetLang);
             }
 
-            btn.innerText = origText;
-            btn.disabled = false;
-
-            const finalContent = (pendingPayload.type === "voice") ? pendingPayload.content : (textToTranslate || pendingPayload.content);
-            
-            executeDispatch(finalContent, translatedText, pendingPayload.type, targetLang);
             cancelDispatch();
         }
 
@@ -1510,22 +1131,20 @@
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
             } 
             else if (type === "voice") {
-                // PURE SECRET VOICE NOTE: Zero text on screen!
                 const safeTrans = (translated || "").replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 
                 if (translated && translated.trim() !== "") {
-                    // Translated Speech: Only Play button with audio speech
+                    // Translated Speech Note: Sirf Play button aur target language indicator (No text on screen)
                     body = `
                         <div class="voice-card-private">
                             <button class="btn-play-voice-circle" onclick="playSpokenVoice('${safeTrans}', '${lang}')" title="Play Voice Note">▶</button>
                             <div class="voice-info-wrap">
                                 <span class="voice-title-label">🎙️ AI Voice Note (${lang.toUpperCase()})</span>
-                                <span class="voice-sub-label">Click ▶ to listen</span>
+                                <span class="voice-sub-label">Click ▶ to listen privately</span>
                             </div>
                         </div>
                     `;
                 } else {
-                    // Original Audio file
                     body = `
                         <div class="voice-card-private">
                             <audio controls preload="metadata" data-extension-bypass="true" style="max-width:220px; height:36px; outline:none;">
@@ -1541,7 +1160,6 @@
                 body = `<a href="${content}" target="_blank" style="color:inherit; text-decoration:underline;">📄 Document File</a>`;
             }
 
-            // ONLY show text translation if the message was pure text
             if (type === "text" && translated && translated.trim() !== "") {
                 body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
             }
