@@ -173,6 +173,19 @@
         .tick-icon { font-size: 11px; font-weight: 800; }
         .bubble.sent .tick-icon { color: #000; }
 
+        /* AI Voice Note Play Button Box */
+        .ai-voice-box {
+            display: flex; align-items: center; gap: 10px; padding: 4px 0;
+        }
+        .btn-play-tts {
+            width: 36px; height: 36px; border-radius: 50%; background: #000; color: var(--accent-amber);
+            border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            font-size: 15px; flex-shrink: 0;
+        }
+        .bubble.received .btn-play-tts {
+            background: var(--accent-amber); color: #000;
+        }
+
         .stage-input-bar {
             padding: 8px 12px; background: var(--surface-panel);
             border-top: 1px solid var(--border-graphite); display: flex; align-items: center;
@@ -413,7 +426,7 @@
             <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Confirm your message</p>
 
             <div id="voice-edit-block" style="display:block; text-align:left;">
-                <label style="font-size: 11px; color: var(--text-muted);">Text Content (To Translate):</label>
+                <label style="font-size: 11px; color: var(--text-muted);">Spoken / Text Content (Translate hoga):</label>
                 <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Type or verify message text...">
             </div>
 
@@ -428,12 +441,12 @@
                     <option value="es">Spanish (Español)</option>
                 </select>
                 <button class="modal-btn-choice btn-choice-trans" id="btn-modal-confirm-trans" onclick="confirmDispatchTranslation()">
-                    🌐 Translate & Send
+                    🌐 Translate & Send AI Voice
                 </button>
             </div>
 
             <button class="modal-btn-choice" onclick="confirmDispatchOriginal()" style="margin-top: 4px;">
-                ✉️ Send Original
+                ✉️ Send Original Voice (No Translation)
             </button>
 
             <button onclick="cancelDispatch()" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer;">
@@ -604,6 +617,9 @@
                     selectChat(allChatsCache[0]);
                 }
             }
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+            }
         };
 
         window.onbeforeunload = () => {
@@ -613,6 +629,36 @@
             if (localMediaStream) { localMediaStream.getTracks().forEach(t => t.stop()); }
             if (callSpeechRec) { try { callSpeechRec.stop(); } catch(e){} }
         };
+
+        // Text-to-Speech Playback (Guaranteed to play translated spoken voice on PC & Mobile)
+        function playSpokenVoice(text, lang) {
+            if (!('speechSynthesis' in window)) {
+                alert("Speech Synthesis is not supported in this browser.");
+                return;
+            }
+            window.speechSynthesis.cancel();
+            const clean = (text || "").trim();
+            if (!clean) return;
+
+            const utterance = new SpeechSynthesisUtterance(clean);
+            const hasUrdu = /[\u0600-\u06FF]/.test(clean);
+
+            const voices = window.speechSynthesis.getVoices();
+            if (hasUrdu) {
+                const uv = voices.find(v => v.lang.toLowerCase().includes('ur') || v.lang.toLowerCase().includes('hi'));
+                if (uv) { utterance.voice = uv; utterance.lang = uv.lang; }
+                else { utterance.lang = 'ur-PK'; }
+            } else {
+                const target = (lang || 'en').toLowerCase();
+                const mv = voices.find(v => v.lang.toLowerCase().startsWith(target));
+                if (mv) { utterance.voice = mv; utterance.lang = mv.lang; }
+                else { utterance.lang = 'en-US'; }
+            }
+
+            utterance.rate = 0.95;
+            utterance.pitch = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
 
         async function registerPermanentContact(partnerPhone) {
             if (!myPhone || !partnerPhone || myPhone === partnerPhone) return;
@@ -1402,12 +1448,14 @@
             btn.innerText = origText;
             btn.disabled = false;
 
-            const finalContent = (pendingPayload.type === "voice") ? pendingPayload.content : (textToTranslate || pendingPayload.content);
-            executeDispatch(finalContent, translatedText, pendingPayload.type);
+            let finalContent = (pendingPayload.type === "voice") ? pendingPayload.content : (textToTranslate || pendingPayload.content);
+            
+            // Deliver voice with translation attached
+            executeDispatch(finalContent, translatedText, pendingPayload.type, targetLang);
             cancelDispatch();
         }
 
-        function executeDispatch(content, translated, msgType) {
+        function executeDispatch(content, translated, msgType, lang = "en") {
             autoSelectFallbackPartner();
 
             if (!activePartner) {
@@ -1418,7 +1466,7 @@
             const tempId = "msg_temp_" + Date.now();
             
             try {
-                appendBubble(content, "sent", translated, msgType, "now", tempId, "sent");
+                appendBubble(content, "sent", translated, msgType, "now", tempId, "sent", lang);
             } catch(e) {}
             
             document.getElementById("text-input").value = "";
@@ -1433,7 +1481,8 @@
                     receiver: activePartner,
                     msg_type: msgType,
                     content: content,
-                    translated: translated
+                    translated: translated,
+                    lang: lang
                 };
                 socket.send(JSON.stringify(payload));
             }
@@ -1441,7 +1490,7 @@
             loadRecentChats();
         }
 
-        function appendBubble(content, dir, translated, type, time, msgId = null, status = "sent") {
+        function appendBubble(content, dir, translated, type, time, msgId = null, status = "sent", lang = "en") {
             const box = document.getElementById("messages-container");
             const bubble = document.createElement("div");
             bubble.className = `bubble ${dir}`;
@@ -1451,12 +1500,30 @@
             if (type === "media") {
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
             } else if (type === "voice") {
+                // Dual Play Option: Translated Audio (TTS) + Original Audio File
+                const safeTrans = (translated || "").replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                let ttsButtonHtml = "";
+                if (translated && translated.trim() !== "") {
+                    ttsButtonHtml = `
+                        <div class="ai-voice-box" style="margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed rgba(255,255,255,0.15);">
+                            <button class="btn-play-tts" onclick="playSpokenVoice('${safeTrans}', '${lang}')" title="Play Translated Spoken Voice">▶</button>
+                            <div style="display:flex; flex-direction:column;">
+                                <span style="font-size:12px; font-weight:700;">🎙️ AI Translated Audio (${lang.toUpperCase()})</span>
+                                <span style="font-size:10px; opacity:0.8;">Click ▶ to listen in ${lang.toUpperCase()}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+
                 body = `
-                    <div style="display:flex; align-items:center; gap:8px; padding: 2px 0;">
-                        <span style="font-size:16px;">🎙️</span>
-                        <audio controls preload="metadata" data-extension-bypass="true" style="max-width:220px; height:36px; outline:none;">
-                            <source src="${content}">
-                        </audio>
+                    <div style="display:flex; flex-direction:column; gap:4px; padding: 2px 0;">
+                        ${ttsButtonHtml}
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:13px; opacity:0.75;" title="Original Recorded Voice">Original:</span>
+                            <audio controls preload="metadata" data-extension-bypass="true" style="max-width:210px; height:34px; outline:none;">
+                                <source src="${content}">
+                            </audio>
+                        </div>
                     </div>
                 `;
             } else if (type === "location") {
