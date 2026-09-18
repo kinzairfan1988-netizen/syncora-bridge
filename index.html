@@ -173,7 +173,7 @@
         .tick-icon { font-size: 11px; font-weight: 800; }
         .bubble.sent .tick-icon { color: #000; }
 
-        /* Pure Secret Voice Note UI (Zero text visible on screen) */
+        /* Pure Secret Voice Note UI */
         .voice-card-private {
             display: flex; align-items: center; gap: 12px; padding: 4px 2px;
         }
@@ -326,7 +326,7 @@
         }
     </style>
 </head>
-<body>
+<body onclick="unlockMobileAudio()">
 
     <audio id="remote-audio-sink" autoplay playsinline style="display:none;"></audio>
 
@@ -551,6 +551,23 @@
             }
         }, true);
 
+        let mobileAudioUnlocked = false;
+        function unlockMobileAudio() {
+            if (mobileAudioUnlocked) return;
+            try {
+                if ('speechSynthesis' in window) {
+                    const silentUtterance = new SpeechSynthesisUtterance('');
+                    silentUtterance.volume = 0;
+                    window.speechSynthesis.speak(silentUtterance);
+                }
+                const audioSink = document.getElementById("remote-audio-sink");
+                if (audioSink) {
+                    audioSink.play().catch(() => {});
+                }
+                mobileAudioUnlocked = true;
+            } catch(e) {}
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         let directChatParam = urlParams.get('chat') || urlParams.get('invite') || "";
         
@@ -634,8 +651,9 @@
             if (callSpeechRec) { try { callSpeechRec.stop(); } catch(e){} }
         };
 
-        // Text-to-Speech Playback with mobile audio unlocking
+        // Mobile Unlocked Text-to-Speech Playback
         function playSpokenVoice(text, lang) {
+            unlockMobileAudio();
             if (!('speechSynthesis' in window)) {
                 alert("Speech playback not supported in this browser.");
                 return;
@@ -661,7 +679,11 @@
 
             utterance.rate = 0.95;
             utterance.pitch = 1.0;
-            window.speechSynthesis.speak(utterance);
+            utterance.volume = 1.0;
+
+            setTimeout(() => {
+                window.speechSynthesis.speak(utterance);
+            }, 100);
         }
 
         async function registerPermanentContact(partnerPhone) {
@@ -676,6 +698,7 @@
         }
 
         async function executeDirectLogin() {
+            unlockMobileAudio();
             const input = document.getElementById("my-phone-input").value.trim();
             if (!input || input.length < 7) {
                 alert("Please valid mobile number enter karein.");
@@ -875,6 +898,11 @@
                             if (isTranslationCallMode) {
                                 document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${data.translated}`;
+                                
+                                // REVOLUTIONARY FIX: Audio will speak automatically on receiver's phone!
+                                if (data.translated && data.translated.trim()) {
+                                    playSpokenVoice(data.translated, data.lang || "en");
+                                }
                             }
                         }
                     } catch(e){}
@@ -979,6 +1007,7 @@
 
         /* --- WEBRTC CALL ENGINE --- */
         async function startCallSession(type, isTranslateMode = false) {
+            unlockMobileAudio();
             if (!activePartner) { alert("Pehle contact select karein!"); return; }
             currentCallType = type;
             isTranslationCallMode = isTranslateMode;
@@ -1110,6 +1139,7 @@
         }
 
         async function acceptIncomingCall() {
+            unlockMobileAudio();
             if (!pendingCallOffer) return;
             document.getElementById("btn-call-answer").style.display = "none";
             document.getElementById("call-status-text").innerText = "Connecting live line...";
@@ -1259,6 +1289,7 @@
 
         /* --- BULLETPROOF AUDIO & SPEECH DISPATCH --- */
         function toggleVoiceRecording() {
+            unlockMobileAudio();
             if (!isRecording) startVoiceRecording();
             else stopAndFinishRecording();
         }
@@ -1282,7 +1313,6 @@
                 recordedChunks = [];
                 capturedLiveText = "";
 
-                // Live speech recognition for transcript
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
@@ -1330,7 +1360,7 @@
                     };
 
                     document.getElementById("voice-hint-field").value = capturedLiveText.trim();
-                    document.getElementById("send-modal-preview").innerText = capturedLiveText.trim() ? `"${capturedLiveText.trim()}"` : "Voice Recorded (Privacy Protected)";
+                    document.getElementById("send-modal-preview").innerText = "Voice Recorded (Privacy Protected)";
                     document.getElementById("send-modal").style.display = "flex";
                 };
 
@@ -1457,7 +1487,7 @@
             btn.innerText = origText;
             btn.disabled = false;
 
-            let finalContent = (pendingPayload.type === "voice") ? pendingPayload.content : (textToTranslate || pendingPayload.content);
+            const finalContent = (pendingPayload.type === "voice") ? pendingPayload.content : (textToTranslate || pendingPayload.content);
             
             executeDispatch(finalContent, translatedText, pendingPayload.type, targetLang);
             cancelDispatch();
@@ -1509,22 +1539,20 @@
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
             } 
             else if (type === "voice") {
-                // PURE SECRET VOICE NOTE: Zero text on screen!
+                // Pure Secret Voice Note: Zero Text on Screen
                 const safeTrans = (translated || "").replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 
                 if (translated && translated.trim() !== "") {
-                    // Translated Speech: Only Play button with audio speech (Zero text)
                     body = `
                         <div class="voice-card-private">
                             <button class="btn-play-voice-circle" onclick="playSpokenVoice('${safeTrans}', '${lang}')" title="Play Voice Note">▶</button>
                             <div class="voice-info-wrap">
                                 <span class="voice-title-label">🎙️ AI Voice Note (${lang.toUpperCase()})</span>
-                                <span class="voice-sub-label">Click ▶ to listen</span>
+                                <span class="voice-sub-label">Click ▶ to listen privately</span>
                             </div>
                         </div>
                     `;
                 } else {
-                    // Original Audio file
                     body = `
                         <div class="voice-card-private">
                             <audio controls preload="metadata" data-extension-bypass="true" style="max-width:220px; height:36px; outline:none;">
@@ -1540,7 +1568,7 @@
                 body = `<a href="${content}" target="_blank" style="color:inherit; text-decoration:underline;">📄 Document File</a>`;
             }
 
-            // ONLY show text translation if the message was pure text (Voice me kabhi text nahi aayega)
+            // ONLY show text translation if pure text
             if (type === "text" && translated && translated.trim() !== "") {
                 body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
             }
