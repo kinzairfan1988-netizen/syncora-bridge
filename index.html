@@ -173,18 +173,22 @@
         .tick-icon { font-size: 11px; font-weight: 800; }
         .bubble.sent .tick-icon { color: #000; }
 
-        /* AI Voice Note Play Button Box */
-        .ai-voice-box {
-            display: flex; align-items: center; gap: 10px; padding: 4px 0;
+        /* Private Voice Note Audio Player UI */
+        .voice-card-private {
+            display: flex; align-items: center; gap: 12px; padding: 4px 2px;
         }
-        .btn-play-tts {
-            width: 36px; height: 36px; border-radius: 50%; background: #000; color: var(--accent-amber);
+        .btn-play-voice-circle {
+            width: 42px; height: 42px; border-radius: 50%; background: #000; color: var(--accent-amber);
             border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            font-size: 15px; flex-shrink: 0;
+            font-size: 18px; flex-shrink: 0; transition: transform 0.1s;
         }
-        .bubble.received .btn-play-tts {
+        .btn-play-voice-circle:active { transform: scale(0.92); }
+        .bubble.received .btn-play-voice-circle {
             background: var(--accent-amber); color: #000;
         }
+        .voice-info-wrap { display: flex; flex-direction: column; }
+        .voice-title-label { font-size: 13px; font-weight: 700; }
+        .voice-sub-label { font-size: 11px; opacity: 0.8; }
 
         .stage-input-bar {
             padding: 8px 12px; background: var(--surface-panel);
@@ -426,8 +430,8 @@
             <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Confirm your message</p>
 
             <div id="voice-edit-block" style="display:block; text-align:left;">
-                <label style="font-size: 11px; color: var(--text-muted);">Spoken / Text Content (Translate hoga):</label>
-                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Type or verify message text...">
+                <label style="font-size: 11px; color: var(--text-muted);">Spoken Words (Verification):</label>
+                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Verify or edit spoken words...">
             </div>
 
             <div class="lang-options-drawer" id="lang-drawer">
@@ -630,7 +634,7 @@
             if (callSpeechRec) { try { callSpeechRec.stop(); } catch(e){} }
         };
 
-        // Text-to-Speech Playback (Guaranteed to play translated spoken voice on PC & Mobile)
+        // Text-to-Speech Playback
         function playSpokenVoice(text, lang) {
             if (!('speechSynthesis' in window)) {
                 alert("Speech Synthesis is not supported in this browser.");
@@ -1325,7 +1329,7 @@
                     };
 
                     document.getElementById("voice-hint-field").value = capturedLiveText.trim();
-                    document.getElementById("send-modal-preview").innerText = capturedLiveText.trim() ? `"${capturedLiveText.trim()}"` : "Voice Note Captured";
+                    document.getElementById("send-modal-preview").innerText = "Voice Recorded (Privacy Protected)";
                     document.getElementById("send-modal").style.display = "flex";
                 };
 
@@ -1450,7 +1454,7 @@
 
             let finalContent = (pendingPayload.type === "voice") ? pendingPayload.content : (textToTranslate || pendingPayload.content);
             
-            // Deliver voice with translation attached
+            // Deliver voice or text
             executeDispatch(finalContent, translatedText, pendingPayload.type, targetLang);
             cancelDispatch();
         }
@@ -1499,40 +1503,41 @@
             let body = `<div>${content}</div>`;
             if (type === "media") {
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
-            } else if (type === "voice") {
-                // Dual Play Option: Translated Audio (TTS) + Original Audio File
+            } 
+            else if (type === "voice") {
+                // PURE PRIVATE VOICE NOTE: Zero text on screen!
                 const safeTrans = (translated || "").replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                let ttsButtonHtml = "";
+                
                 if (translated && translated.trim() !== "") {
-                    ttsButtonHtml = `
-                        <div class="ai-voice-box" style="margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed rgba(255,255,255,0.15);">
-                            <button class="btn-play-tts" onclick="playSpokenVoice('${safeTrans}', '${lang}')" title="Play Translated Spoken Voice">▶</button>
-                            <div style="display:flex; flex-direction:column;">
-                                <span style="font-size:12px; font-weight:700;">🎙️ AI Translated Audio (${lang.toUpperCase()})</span>
-                                <span style="font-size:10px; opacity:0.8;">Click ▶ to listen in ${lang.toUpperCase()}</span>
+                    // Translated Speech Note: Sirf Play button aur target language indicator
+                    body = `
+                        <div class="voice-card-private">
+                            <button class="btn-play-voice-circle" onclick="playSpokenVoice('${safeTrans}', '${lang}')" title="Play Voice Note">▶</button>
+                            <div class="voice-info-wrap">
+                                <span class="voice-title-label">🎙️ AI Voice Note (${lang.toUpperCase()})</span>
+                                <span class="voice-sub-label">Click ▶ to listen privately</span>
                             </div>
                         </div>
                     `;
-                }
-
-                body = `
-                    <div style="display:flex; flex-direction:column; gap:4px; padding: 2px 0;">
-                        ${ttsButtonHtml}
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <span style="font-size:13px; opacity:0.75;" title="Original Recorded Voice">Original:</span>
-                            <audio controls preload="metadata" data-extension-bypass="true" style="max-width:210px; height:34px; outline:none;">
+                } else {
+                    // Original Audio Note: Standard Audio player (Zero text)
+                    body = `
+                        <div class="voice-card-private">
+                            <audio controls preload="metadata" data-extension-bypass="true" style="max-width:220px; height:36px; outline:none;">
                                 <source src="${content}">
                             </audio>
                         </div>
-                    </div>
-                `;
-            } else if (type === "location") {
+                    `;
+                }
+            } 
+            else if (type === "location") {
                 body = `<a href="${content}" target="_blank" style="color:inherit; font-weight:700;">📍 Shared Location (Open Map)</a>`;
             } else if (type === "document") {
                 body = `<a href="${content}" target="_blank" style="color:inherit; text-decoration:underline;">📄 Document File</a>`;
             }
 
-            if (translated && translated.trim() !== "") {
+            // ONLY show text translation if the message was pure TEXT (Voice me text kabi show nahi hoga)
+            if (type === "text" && translated && translated.trim() !== "") {
                 body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
             }
 
