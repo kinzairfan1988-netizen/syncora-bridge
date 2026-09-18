@@ -4,3 +4,5 @@ python-multipart
 google-generativeai
 websockets
 twilio
+SpeechRecognition
+pydub
