@@ -17,7 +17,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 DB_PATH = os.path.join(BASE_DIR, "syncora.db")
 
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
     cursor = conn.cursor()
     
     cursor.execute("""
@@ -95,6 +95,7 @@ def get_chat_id(u1: str, u2: str) -> str:
 def has_urdu_arabic_script(text: str) -> bool:
     return bool(re.search(r'[\u0600-\u06FF]', text))
 
+# Robust Rotary Translation (Mobile & Web Compatible)
 def translate_robust(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
@@ -109,16 +110,16 @@ def translate_robust(text: str, target_lang: str) -> str:
         q_enc = urllib.parse.quote(clean.encode('utf-8'))
         url_g = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source_param}&tl={target_lang}&dt=t&q={q_enc}"
         req_g = urllib.request.Request(url_g, headers={
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36'
         })
-        with urllib.request.urlopen(req_g, timeout=4) as response:
+        with urllib.request.urlopen(req_g, timeout=5) as response:
             res_json = json.loads(response.read().decode('utf-8'))
             if res_json and isinstance(res_json, list) and len(res_json) > 0 and res_json[0]:
                 out = "".join([part[0] for part in res_json[0] if part and part[0]]).strip()
                 if out and out.lower() != clean.lower():
                     return out
     except Exception as e:
-        print(f"[Tier 1 Google Single Error]: {e}")
+        print(f"[Tier 1 Error]: {e}")
 
     # Tier 2: MyMemory API Fallback
     try:
@@ -128,14 +129,14 @@ def translate_robust(text: str, target_lang: str) -> str:
             pair = f"{src_pair}|{target_lang}"
             url_mm = f"https://api.mymemory.translated.net/get?q={q_enc}&langpair={pair}"
             req_mm = urllib.request.Request(url_mm, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req_mm, timeout=4) as response:
+            with urllib.request.urlopen(req_mm, timeout=5) as response:
                 res_data = json.loads(response.read().decode('utf-8'))
                 if res_data and "responseData" in res_data and res_data["responseData"]["translatedText"]:
                     out_text = res_data["responseData"]["translatedText"].strip()
                     if out_text and not out_text.startswith("PLEASE SELECT") and not out_text.startswith("MYMEMORY WARNING") and out_text.lower() != "bruh":
                         return out_text
     except Exception as e:
-        print(f"[Tier 2 MyMemory Error]: {e}")
+        print(f"[Tier 2 Error]: {e}")
 
     # Tier 3: Lingva Relay
     try:
@@ -144,14 +145,14 @@ def translate_robust(text: str, target_lang: str) -> str:
         if src_lingva != target_lang:
             url_l = f"https://lingva.ml/api/v1/{src_lingva}/{target_lang}/{q_enc}"
             req_l = urllib.request.Request(url_l, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req_l, timeout=4) as response:
+            with urllib.request.urlopen(req_l, timeout=5) as response:
                 res_json = json.loads(response.read().decode('utf-8'))
                 if "translation" in res_json and res_json["translation"]:
                     out_l = res_json["translation"].strip()
                     if out_l:
                         return out_l
     except Exception as e:
-        print(f"[Tier 3 Lingva Error]: {e}")
+        print(f"[Tier 3 Error]: {e}")
 
     return clean
 
@@ -185,7 +186,7 @@ async def direct_login(req: DirectLoginRequest):
     if not phone or len(phone) < 7:
         return JSONResponse(status_code=400, content={"error": "Valid mobile number required"})
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
     cursor = conn.cursor()
     cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (phone, phone))
     conn.commit()
@@ -193,6 +194,7 @@ async def direct_login(req: DirectLoginRequest):
 
     return {"status": "ok", "phone": phone}
 
+# Lifetime Contacts Registration (Both ways)
 @app.post("/api/contacts/add")
 async def add_permanent_contact(req: AddContactRequest):
     u = req.user_phone.strip()
@@ -200,11 +202,12 @@ async def add_permanent_contact(req: AddContactRequest):
     if not u or not c or u == c:
         return JSONResponse(status_code=400, content={"error": "Invalid phones"})
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
     cursor = conn.cursor()
     cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (u, c))
     cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (c, u))
     cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (c, c))
+    cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (u, u))
     conn.commit()
     conn.close()
     return {"status": "ok", "message": "Contact saved permanently"}
@@ -215,7 +218,7 @@ async def get_user_status(phone: str):
 
 @app.get("/api/user/profile/{phone}")
 async def get_user_profile(phone: str):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
     cursor = conn.cursor()
     cursor.execute("SELECT phone, display_name, about_status, avatar_url, created_at FROM users WHERE phone = ?", (phone,))
     row = cursor.fetchone()
@@ -232,7 +235,7 @@ async def get_user_profile(phone: str):
 
 @app.post("/api/user/profile/update")
 async def update_user_profile(req: ProfileUpdate):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO users (phone, display_name, about_status, avatar_url)
@@ -256,10 +259,11 @@ async def translate_text(req: TranslationRequest):
     translated = translate_robust(clean, target_lang)
     return {"translated_text": translated}
 
+# Stable Chats Listing (Messages + Saved Contacts)
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
     p = phone.strip()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
     cursor = conn.cursor()
     
     cursor.execute("""
@@ -285,7 +289,7 @@ async def get_user_chats(phone: str):
 @app.get("/api/messages/{phone}/{partner}")
 async def get_conversation(phone: str, partner: str):
     chat_id = get_chat_id(phone, partner)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -327,7 +331,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
     await manager.connect(phone, websocket)
     
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=15)
         cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT sender FROM messages WHERE receiver = ? AND status = 'sent'", (phone,))
         senders = [row[0] for row in cursor.fetchall()]
@@ -341,7 +345,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                 "delivered_to": phone
             })
     except Exception as e:
-        print(f"[Delivered Update Error]: {e}")
+        print(f"[Delivered Error]: {e}")
 
     try:
         while True:
@@ -364,7 +368,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                 is_rec_online = manager.is_online(receiver)
                 initial_status = "delivered" if is_rec_online else "sent"
 
-                conn = sqlite3.connect(DB_PATH)
+                conn = sqlite3.connect(DB_PATH, timeout=15)
                 cursor = conn.cursor()
                 cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (phone, receiver))
                 cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (receiver, phone))
