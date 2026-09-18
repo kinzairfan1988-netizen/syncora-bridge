@@ -590,7 +590,6 @@
                 initSocketSafe();
                 loadUserProfileData();
 
-                // If opened via invite/direct link, save contact permanently right away!
                 if (directChatParam && directChatParam !== myPhone && !directChatParam.startsWith("call-")) {
                     await registerPermanentContact(directChatParam);
                 }
@@ -704,7 +703,6 @@
                 return;
             }
             closeContactsModal();
-            // Save permanently in database
             await registerPermanentContact(num);
             await loadRecentChats();
             selectChat(num);
