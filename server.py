@@ -95,7 +95,20 @@ def get_chat_id(u1: str, u2: str) -> str:
 def has_urdu_arabic_script(text: str) -> bool:
     return bool(re.search(r'[\u0600-\u06FF]', text))
 
-# Robust Rotary Translation (Mobile & Web Compatible)
+# Aam Roman Urdu markers jo batate hain ke text English nahi balki Urdu hai
+ROMAN_URDU_MARKERS = [
+    "karo", "karein", "kaho", "kya", "kiya", "kaisy", "kaise", "rahy", "rahe", 
+    "hain", "hai", "hon", "hoon", "nahi", "nhi", "chek", "ab", "pe", "per", 
+    "mai", "main", "ko", "se", "aur", "or", "bhi", "yeh", "ye", "woh", "wo",
+    "theek", "thik", "acha", "batao", "kaky", "bhai", "mera", "meri", "ap", "aap"
+]
+
+def is_probable_roman_urdu(text: str) -> bool:
+    tokens = re.findall(r'\b[a-zA-Z]+\b', text.lower())
+    match_count = sum(1 for t in tokens if t in ROMAN_URDU_MARKERS)
+    return match_count >= 1
+
+# Bulletproof Translation Engine (Roman Urdu + Script + English)
 def translate_robust(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
@@ -103,56 +116,66 @@ def translate_robust(text: str, target_lang: str) -> str:
 
     target_lang = target_lang.strip().lower()
     is_script_urdu = has_urdu_arabic_script(clean)
-    
-    # Tier 1: Google Single Endpoint (Handles Urdu Script & Roman Urdu)
-    try:
-        source_param = "ur" if is_script_urdu else "auto"
-        q_enc = urllib.parse.quote(clean.encode('utf-8'))
-        url_g = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source_param}&tl={target_lang}&dt=t&q={q_enc}"
-        req_g = urllib.request.Request(url_g, headers={
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36'
-        })
-        with urllib.request.urlopen(req_g, timeout=5) as response:
-            res_json = json.loads(response.read().decode('utf-8'))
-            if res_json and isinstance(res_json, list) and len(res_json) > 0 and res_json[0]:
-                out = "".join([part[0] for part in res_json[0] if part and part[0]]).strip()
-                if out and out.lower() != clean.lower():
-                    return out
-    except Exception as e:
-        print(f"[Tier 1 Error]: {e}")
+    is_roman_urdu = is_probable_roman_urdu(clean)
 
-    # Tier 2: MyMemory API Fallback
+    # Agar Urdu script ya Roman Urdu ho aur target English ho
+    if is_script_urdu:
+        source_candidates = ["ur"]
+    elif is_roman_urdu:
+        source_candidates = ["ur", "auto"]
+    else:
+        source_candidates = ["auto"]
+
+    # Method 1: Google Translate Direct GTX API
+    for src in source_candidates:
+        try:
+            q_enc = urllib.parse.quote(clean.encode('utf-8'))
+            url_g = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={src}&tl={target_lang}&dt=t&q={q_enc}"
+            req_g = urllib.request.Request(url_g, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            with urllib.request.urlopen(req_g, timeout=4) as response:
+                res_json = json.loads(response.read().decode('utf-8'))
+                if res_json and isinstance(res_json, list) and len(res_json) > 0 and res_json[0]:
+                    out = "".join([part[0] for part in res_json[0] if part and part[0]]).strip()
+                    # Agar translation original se mukhtalif ho toh foran return karein
+                    if out and out.lower() != clean.lower():
+                        return out
+        except Exception as e:
+            print(f"[Google GTX Error with src {src}]: {e}")
+
+    # Method 2: MyMemory API Fallback (Strict Pair)
     try:
-        src_pair = "ur" if is_script_urdu else ("ur" if target_lang != "ur" else "en")
+        src_pair = "ur" if (is_script_urdu or is_roman_urdu) else "auto"
         if src_pair != target_lang:
             q_enc = urllib.parse.quote(clean.encode('utf-8'))
             pair = f"{src_pair}|{target_lang}"
             url_mm = f"https://api.mymemory.translated.net/get?q={q_enc}&langpair={pair}"
             req_mm = urllib.request.Request(url_mm, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req_mm, timeout=5) as response:
+            with urllib.request.urlopen(req_mm, timeout=4) as response:
                 res_data = json.loads(response.read().decode('utf-8'))
                 if res_data and "responseData" in res_data and res_data["responseData"]["translatedText"]:
                     out_text = res_data["responseData"]["translatedText"].strip()
-                    if out_text and not out_text.startswith("PLEASE SELECT") and not out_text.startswith("MYMEMORY WARNING") and out_text.lower() != "bruh":
+                    if out_text and not out_text.startswith("PLEASE SELECT") and not out_text.startswith("MYMEMORY WARNING") and out_text.lower() != clean.lower():
                         return out_text
     except Exception as e:
-        print(f"[Tier 2 Error]: {e}")
+        print(f"[MyMemory Fallback Error]: {e}")
 
-    # Tier 3: Lingva Relay
+    # Method 3: Lingva Relay
     try:
         q_enc = urllib.parse.quote(clean.encode('utf-8'))
-        src_lingva = "ur" if (is_script_urdu or target_lang == "en") else "auto"
-        if src_lingva != target_lang:
-            url_l = f"https://lingva.ml/api/v1/{src_lingva}/{target_lang}/{q_enc}"
+        src_l = "ur" if (is_script_urdu or is_roman_urdu) else "auto"
+        if src_l != target_lang:
+            url_l = f"https://lingva.ml/api/v1/{src_l}/{target_lang}/{q_enc}"
             req_l = urllib.request.Request(url_l, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req_l, timeout=5) as response:
+            with urllib.request.urlopen(req_l, timeout=4) as response:
                 res_json = json.loads(response.read().decode('utf-8'))
                 if "translation" in res_json and res_json["translation"]:
                     out_l = res_json["translation"].strip()
-                    if out_l:
+                    if out_l and out_l.lower() != clean.lower():
                         return out_l
     except Exception as e:
-        print(f"[Tier 3 Error]: {e}")
+        print(f"[Lingva Relay Error]: {e}")
 
     return clean
 
@@ -194,7 +217,6 @@ async def direct_login(req: DirectLoginRequest):
 
     return {"status": "ok", "phone": phone}
 
-# Lifetime Contacts Registration (Both ways)
 @app.post("/api/contacts/add")
 async def add_permanent_contact(req: AddContactRequest):
     u = req.user_phone.strip()
@@ -259,7 +281,6 @@ async def translate_text(req: TranslationRequest):
     translated = translate_robust(clean, target_lang)
     return {"translated_text": translated}
 
-# Stable Chats Listing (Messages + Saved Contacts)
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
     p = phone.strip()
