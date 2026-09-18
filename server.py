@@ -19,6 +19,8 @@ DB_PATH = os.path.join(BASE_DIR, "syncora.db")
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    
+    # 1. Users Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             phone TEXT PRIMARY KEY,
@@ -28,6 +30,19 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    
+    # 2. Lifetime Contacts Table (Never disappears on refresh)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_contacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_phone TEXT,
+            contact_phone TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_phone, contact_phone)
+        )
+    """)
+
+    # 3. Messages Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,6 +72,10 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 class DirectLoginRequest(BaseModel):
     phone: str
 
+class AddContactRequest(BaseModel):
+    user_phone: str
+    contact_phone: str
+
 class TranslationRequest(BaseModel):
     text: str
     target_lang: str = "en"
@@ -74,13 +93,13 @@ def get_chat_id(u1: str, u2: str) -> str:
 def is_urdu_or_arabic(text: str) -> bool:
     return bool(re.search(r'[\u0600-\u06FF]', text))
 
-# MULTI-TIER ROTARY TRANSLATION (ZERO 429 BLOCK)
+# Multi-tier Rotary Translation (Zero 429 Block)
 def translate_robust(text: str, source_lang: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
         return ""
 
-    # 1. Tier 1: MyMemory Fast Public API (Never blocks IP)
+    # Tier 1: MyMemory Fast Public API
     try:
         q_enc = urllib.parse.quote(clean.encode('utf-8'))
         pair = f"{source_lang}|{target_lang}" if source_lang != "auto" else f"ur|{target_lang}"
@@ -95,7 +114,7 @@ def translate_robust(text: str, source_lang: str, target_lang: str) -> str:
     except Exception as e:
         print(f"[Tier 1 MM Fallback]: {e}")
 
-    # 2. Tier 2: Google Alternate Single API
+    # Tier 2: Google Alternate Single API
     try:
         q_enc = urllib.parse.quote(clean.encode('utf-8'))
         url_g = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source_lang}&tl={target_lang}&dt=t&q={q_enc}"
@@ -111,7 +130,7 @@ def translate_robust(text: str, source_lang: str, target_lang: str) -> str:
     except Exception as e:
         print(f"[Tier 2 Google Error]: {e}")
 
-    # 3. Tier 3: Lingva Public Relay
+    # Tier 3: Lingva Public Relay
     try:
         q_enc = urllib.parse.quote(clean.encode('utf-8'))
         src = "ur" if source_lang == "auto" else source_lang
@@ -164,6 +183,24 @@ async def direct_login(req: DirectLoginRequest):
 
     return {"status": "ok", "phone": phone}
 
+# API: Save contact permanently in database
+@app.post("/api/contacts/add")
+async def add_permanent_contact(req: AddContactRequest):
+    u = req.user_phone.strip()
+    c = req.contact_phone.strip()
+    if not u or not c or u == c:
+        return JSONResponse(status_code=400, content={"error": "Invalid phones"})
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    # Save both ways so sender and receiver both have each other saved permanently
+    cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (u, c))
+    cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (c, u))
+    cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (c, c))
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "message": "Contact saved permanently"}
+
 @app.get("/api/user/status/{phone}")
 async def get_user_status(phone: str):
     return {"phone": phone, "online": manager.is_online(phone.strip())}
@@ -212,17 +249,35 @@ async def translate_text(req: TranslationRequest):
     translated = translate_robust(clean, source_param, target_lang)
     return {"translated_text": translated}
 
+# API: Chats endpoint ab Saved Contacts + Messages dono ko combine karta hai (Never empty on refresh)
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
+    p = phone.strip()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    
+    # 1. Jo messages se aate hain
     cursor.execute("""
         SELECT DISTINCT CASE WHEN sender = ? THEN receiver ELSE sender END AS partner
         FROM messages WHERE sender = ? OR receiver = ?
-    """, (phone, phone, phone))
-    partners = [row[0] for row in cursor.fetchall()]
+    """, (p, p, p))
+    msg_partners = [row[0] for row in cursor.fetchall() if row[0]]
+
+    # 2. Jo contacts table mein permanently saved hain
+    cursor.execute("""
+        SELECT contact_phone FROM user_contacts WHERE user_phone = ?
+    """, (p,))
+    saved_contacts = [row[0] for row in cursor.fetchall() if row[0]]
+
     conn.close()
-    return {"chats": partners}
+
+    # Combine & deduplicate
+    all_unique = []
+    for item in (saved_contacts + msg_partners):
+        if item and item != p and item not in all_unique:
+            all_unique.append(item)
+
+    return {"chats": all_unique}
 
 @app.get("/api/messages/{phone}/{partner}")
 async def get_conversation(phone: str, partner: str):
@@ -306,6 +361,9 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
 
                 conn = sqlite3.connect(DB_PATH)
                 cursor = conn.cursor()
+                # Ensure permanent contacts save on first message
+                cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (phone, receiver))
+                cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (receiver, phone))
                 cursor.execute("""
                     INSERT INTO messages (chat_id, sender, receiver, msg_type, content, translated_content, status)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
