@@ -173,12 +173,12 @@
         .tick-icon { font-size: 11px; font-weight: 800; }
         .bubble.sent .tick-icon { color: #000; }
 
-        /* Private Voice Note Audio Player UI */
+        /* Pure Secret Voice Note UI (No text on screen) */
         .voice-card-private {
             display: flex; align-items: center; gap: 12px; padding: 4px 2px;
         }
         .btn-play-voice-circle {
-            width: 42px; height: 42px; border-radius: 50%; background: #000; color: var(--accent-amber);
+            width: 44px; height: 44px; border-radius: 50%; background: #000; color: var(--accent-amber);
             border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
             font-size: 18px; flex-shrink: 0; transition: transform 0.1s;
         }
@@ -431,7 +431,7 @@
 
             <div id="voice-edit-block" style="display:block; text-align:left;">
                 <label style="font-size: 11px; color: var(--text-muted);">Spoken Words (Verification):</label>
-                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Verify or edit spoken words...">
+                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Spoken transcript...">
             </div>
 
             <div class="lang-options-drawer" id="lang-drawer">
@@ -445,7 +445,7 @@
                     <option value="es">Spanish (Español)</option>
                 </select>
                 <button class="modal-btn-choice btn-choice-trans" id="btn-modal-confirm-trans" onclick="confirmDispatchTranslation()">
-                    🌐 Translate & Send AI Voice
+                    🌐 Translate & Send AI Voice Note
                 </button>
             </div>
 
@@ -637,7 +637,7 @@
         // Text-to-Speech Playback
         function playSpokenVoice(text, lang) {
             if (!('speechSynthesis' in window)) {
-                alert("Speech Synthesis is not supported in this browser.");
+                alert("Speech playback not supported in this browser.");
                 return;
             }
             window.speechSynthesis.cancel();
@@ -851,7 +851,7 @@
                         if (data.action === "new_message") {
                             await registerPermanentContact(data.sender);
                             if (data.sender === activePartner) {
-                                appendBubble(data.content, "received", data.translated, data.msg_type, data.time, data.id, data.status);
+                                appendBubble(data.content, "received", data.translated, data.msg_type, data.time, data.id, data.status, data.lang || "en");
                             }
                             loadRecentChats();
                         } 
@@ -1282,6 +1282,7 @@
                 recordedChunks = [];
                 capturedLiveText = "";
 
+                // Voice capture logic
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
@@ -1329,7 +1330,7 @@
                     };
 
                     document.getElementById("voice-hint-field").value = capturedLiveText.trim();
-                    document.getElementById("send-modal-preview").innerText = "Voice Recorded (Privacy Protected)";
+                    document.getElementById("send-modal-preview").innerText = capturedLiveText.trim() ? `"${capturedLiveText.trim()}"` : "Voice Note Captured";
                     document.getElementById("send-modal").style.display = "flex";
                 };
 
@@ -1432,7 +1433,12 @@
             btn.innerText = "Translating...";
             btn.disabled = true;
 
-            const textToTranslate = document.getElementById("voice-hint-field").value.trim() || (pendingPayload.type === 'text' ? pendingPayload.content : "");
+            // Captured text or fallback to input text
+            let textToTranslate = document.getElementById("voice-hint-field").value.trim();
+            if (!textToTranslate && pendingPayload.type === 'text') {
+                textToTranslate = pendingPayload.content;
+            }
+
             let translatedText = "";
 
             if (textToTranslate) {
@@ -1452,9 +1458,8 @@
             btn.innerText = origText;
             btn.disabled = false;
 
-            let finalContent = (pendingPayload.type === "voice") ? pendingPayload.content : (textToTranslate || pendingPayload.content);
+            const finalContent = (pendingPayload.type === "voice") ? pendingPayload.content : (textToTranslate || pendingPayload.content);
             
-            // Deliver voice or text
             executeDispatch(finalContent, translatedText, pendingPayload.type, targetLang);
             cancelDispatch();
         }
@@ -1505,22 +1510,22 @@
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
             } 
             else if (type === "voice") {
-                // PURE PRIVATE VOICE NOTE: Zero text on screen!
+                // PURE SECRET VOICE NOTE: Zero text on screen!
                 const safeTrans = (translated || "").replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 
                 if (translated && translated.trim() !== "") {
-                    // Translated Speech Note: Sirf Play button aur target language indicator
+                    // Translated Speech: Only Play button with audio speech
                     body = `
                         <div class="voice-card-private">
                             <button class="btn-play-voice-circle" onclick="playSpokenVoice('${safeTrans}', '${lang}')" title="Play Voice Note">▶</button>
                             <div class="voice-info-wrap">
                                 <span class="voice-title-label">🎙️ AI Voice Note (${lang.toUpperCase()})</span>
-                                <span class="voice-sub-label">Click ▶ to listen privately</span>
+                                <span class="voice-sub-label">Click ▶ to listen</span>
                             </div>
                         </div>
                     `;
                 } else {
-                    // Original Audio Note: Standard Audio player (Zero text)
+                    // Original Audio file
                     body = `
                         <div class="voice-card-private">
                             <audio controls preload="metadata" data-extension-bypass="true" style="max-width:220px; height:36px; outline:none;">
@@ -1536,7 +1541,7 @@
                 body = `<a href="${content}" target="_blank" style="color:inherit; text-decoration:underline;">📄 Document File</a>`;
             }
 
-            // ONLY show text translation if the message was pure TEXT (Voice me text kabi show nahi hoga)
+            // ONLY show text translation if the message was pure text
             if (type === "text" && translated && translated.trim() !== "") {
                 body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
             }
