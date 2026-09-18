@@ -90,7 +90,6 @@ def get_chat_id(u1: str, u2: str) -> str:
 def has_urdu_arabic_script(text: str) -> bool:
     return bool(re.search(r'[\u0600-\u06FF]', text))
 
-# Smart multi-tier translation pipeline
 def translate_robust(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
@@ -99,7 +98,7 @@ def translate_robust(text: str, target_lang: str) -> str:
     target_lang = target_lang.strip().lower()
     is_script_urdu = has_urdu_arabic_script(clean)
     
-    # 1. Tier 1: Google Translate Single endpoint (Best for Roman Urdu & Nastaliq)
+    # Tier 1: Google Single (Handles Roman Urdu & Urdu Script)
     try:
         source_param = "ur" if is_script_urdu else "auto"
         q_enc = urllib.parse.quote(clean.encode('utf-8'))
@@ -116,9 +115,8 @@ def translate_robust(text: str, target_lang: str) -> str:
     except Exception as e:
         print(f"[Tier 1 Google Single Error]: {e}")
 
-    # 2. Tier 2: MyMemory API with proper distinct language pairs
+    # Tier 2: MyMemory API Fallback
     try:
-        # Avoid same language pair warning
         src_pair = "ur" if is_script_urdu else ("ur" if target_lang != "ur" else "en")
         if src_pair != target_lang:
             q_enc = urllib.parse.quote(clean.encode('utf-8'))
@@ -129,13 +127,12 @@ def translate_robust(text: str, target_lang: str) -> str:
                 res_data = json.loads(response.read().decode('utf-8'))
                 if res_data and "responseData" in res_data and res_data["responseData"]["translatedText"]:
                     out_text = res_data["responseData"]["translatedText"].strip()
-                    # Filter warnings & nonsense slang
                     if out_text and not out_text.startswith("PLEASE SELECT") and not out_text.startswith("MYMEMORY WARNING") and out_text.lower() != "bruh":
                         return out_text
     except Exception as e:
         print(f"[Tier 2 MyMemory Error]: {e}")
 
-    # 3. Tier 3: Lingva Public Relay
+    # Tier 3: Lingva Relay
     try:
         q_enc = urllib.parse.quote(clean.encode('utf-8'))
         src_lingva = "ur" if (is_script_urdu or target_lang == "en") else "auto"
