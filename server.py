@@ -9,6 +9,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, F
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import speech_recognition as sr
+from pydub import AudioSegment
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
@@ -98,7 +100,7 @@ def translate_robust(text: str, target_lang: str) -> str:
     target_lang = target_lang.strip().lower()
     is_script_urdu = has_urdu_arabic_script(clean)
     
-    # Tier 1: Google Single
+    # Tier 1: Google Single (Best for Roman Urdu & Nastaliq)
     try:
         source_param = "ur" if is_script_urdu else "auto"
         q_enc = urllib.parse.quote(clean.encode('utf-8'))
@@ -131,22 +133,6 @@ def translate_robust(text: str, target_lang: str) -> str:
                         return out_text
     except Exception as e:
         print(f"[Tier 2 MyMemory Error]: {e}")
-
-    # Tier 3: Lingva Relay
-    try:
-        q_enc = urllib.parse.quote(clean.encode('utf-8'))
-        src_lingva = "ur" if (is_script_urdu or target_lang == "en") else "auto"
-        if src_lingva != target_lang:
-            url_l = f"https://lingva.ml/api/v1/{src_lingva}/{target_lang}/{q_enc}"
-            req_l = urllib.request.Request(url_l, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req_l, timeout=4) as response:
-                res_json = json.loads(response.read().decode('utf-8'))
-                if "translation" in res_json and res_json["translation"]:
-                    out_l = res_json["translation"].strip()
-                    if out_l:
-                        return out_l
-    except Exception as e:
-        print(f"[Tier 3 Lingva Error]: {e}")
 
     return clean
 
@@ -250,6 +236,58 @@ async def translate_text(req: TranslationRequest):
     target_lang = req.target_lang.strip().lower() if req.target_lang else "en"
     translated = translate_robust(clean, target_lang)
     return {"translated_text": translated}
+
+# DEDICATED SERVER-SIDE AUDIO TRANSLATION PIPELINE
+@app.post("/api/translate-audio")
+async def translate_audio_endpoint(
+    audio_file: UploadFile = File(...),
+    target_lang: str = Form("en"),
+    transcript_hint: str = Form("")
+):
+    ext = os.path.splitext(audio_file.filename)[1]
+    if not ext:
+        ext = ".webm"
+    raw_filename = f"rec_{os.urandom(6).hex()}{ext}"
+    raw_path = os.path.join(UPLOAD_DIR, raw_filename)
+    
+    with open(raw_path, "wb") as f:
+        f.write(await audio_file.read())
+
+    spoken_text = transcript_hint.strip()
+
+    # Agar frontend se transcript hint nahi mila, to audio decode karke nikalte hain
+    if not spoken_text:
+        try:
+            wav_path = raw_path.rsplit(".", 1)[0] + ".wav"
+            audio_segment = AudioSegment.from_file(raw_path)
+            audio_segment.export(wav_path, format="wav")
+
+            recognizer = sr.Recognizer()
+            with sr.AudioFile(wav_path) as source:
+                audio_data = recognizer.record(source)
+                try:
+                    spoken_text = recognizer.recognize_google(audio_data, language="ur-PK")
+                except Exception:
+                    try:
+                        spoken_text = recognizer.recognize_google(audio_data, language="en-US")
+                    except Exception:
+                        spoken_text = ""
+            
+            if os.path.exists(wav_path):
+                os.remove(wav_path)
+        except Exception as err:
+            print(f"[Audio STT Processing Error]: {err}")
+
+    # Text ko target language me translate karein
+    translated_text = ""
+    if spoken_text:
+        translated_text = translate_robust(spoken_text, target_lang)
+
+    return {
+        "audio_url": f"/uploads/{raw_filename}",
+        "spoken_text": spoken_text,
+        "translated_text": translated_text
+    }
 
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
@@ -384,7 +422,6 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                     "msg_type": msg_type,
                     "content": content,
                     "translated": translated,
-                    "lang": payload.get("lang", "en"),
                     "status": initial_status,
                     "time": "now"
                 })
