@@ -173,7 +173,7 @@
         .tick-icon { font-size: 11px; font-weight: 800; }
         .bubble.sent .tick-icon { color: #000; }
 
-        /* Secret Voice Note Card (Zero text on screen) */
+        /* Secret Voice Note Card */
         .voice-card-private {
             display: flex; align-items: center; gap: 12px; padding: 4px 2px;
         }
@@ -435,12 +435,12 @@
 
             <div id="voice-edit-block" style="display:block; text-align:left;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <label style="font-size: 11px; color: var(--text-muted);">Captured Words (Translate honge):</label>
+                    <label style="font-size: 11px; color: var(--text-muted);">Message / Captured Words:</label>
                     <button type="button" onclick="triggerMobileSpeechRetry()" style="background:var(--accent-amber-dim); border:1px solid rgba(245,158,11,0.4); color:var(--accent-amber); border-radius:6px; font-size:11px; padding:2px 8px; cursor:pointer;">
-                        🎤 Tap to Speak
+                        🎤 Speak
                     </button>
                 </div>
-                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Agar words miss hue hon to yahan bolen ya likhen...">
+                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Type or verify message text...">
             </div>
 
             <div class="lang-options-drawer" id="lang-drawer">
@@ -454,7 +454,7 @@
                     <option value="es">Spanish (Español)</option>
                 </select>
                 <button class="modal-btn-choice btn-choice-trans" id="btn-modal-confirm-trans" onclick="confirmDispatchTranslation()">
-                    🌐 Translate & Send AI Voice
+                    🌐 Translate & Send
                 </button>
             </div>
 
@@ -1332,7 +1332,6 @@
             }
         });
 
-        /* --- MOBILE AUDIO ENGINE WITH ZERO-FAIL VERIFICATION --- */
         function triggerMobileSpeechRetry() {
             const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SR) {
@@ -1344,7 +1343,7 @@
                 rec.lang = 'ur-PK';
                 rec.interimResults = false;
                 const hintField = document.getElementById("voice-hint-field");
-                hintField.placeholder = "Listening now... Bolen!";
+                hintField.placeholder = "Listening... Bolen!";
                 rec.onresult = (ev) => {
                     const text = ev.results[0][0].transcript;
                     hintField.value = text;
@@ -1382,7 +1381,6 @@
                 recordedChunks = [];
                 capturedLiveText = "";
 
-                // Parallel speech recognizer
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
@@ -1403,6 +1401,13 @@
                                 liveDisplay.innerText = capturedLiveText;
                             }
                         };
+
+                        speechRecognitionEngine.onend = () => {
+                            if (isRecording && speechRecognitionEngine) {
+                                try { speechRecognitionEngine.start(); } catch(e){}
+                            }
+                        };
+
                         speechRecognitionEngine.start();
                     } catch(e){}
                 }
@@ -1430,7 +1435,7 @@
                     };
 
                     document.getElementById("voice-hint-field").value = capturedLiveText.trim();
-                    document.getElementById("send-modal-preview").innerText = capturedLiveText.trim() ? "Voice Captured" : "Voice Note Ready (Tap to verify words)";
+                    document.getElementById("send-modal-preview").innerText = capturedLiveText.trim() ? "Voice Captured" : "Voice Note Ready";
                     document.getElementById("send-modal").style.display = "flex";
                 };
 
@@ -1497,6 +1502,7 @@
             }
         }
 
+        /* --- STABLE TEXT & VOICE STAGING PIPELINE --- */
         function stageMessageForDispatch() {
             autoSelectFallbackPartner();
 
@@ -1557,7 +1563,7 @@
             btn.innerText = origText;
             btn.disabled = false;
 
-            let finalContent = (pendingPayload.type === "voice") ? pendingPayload.content : (textToTranslate || pendingPayload.content);
+            let finalContent = (pendingPayload.type === "voice") ? pendingPayload.content : textToTranslate;
             
             executeDispatch(finalContent, translatedText, pendingPayload.type, targetLang);
             cancelDispatch();
@@ -1609,7 +1615,6 @@
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
             } 
             else if (type === "voice") {
-                // Secret Voice Note: Zero Text on Screen
                 const safeTrans = (translated || "").replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 
                 if (translated && translated.trim() !== "") {
@@ -1638,6 +1643,7 @@
                 body = `<a href="${content}" target="_blank" style="color:inherit; text-decoration:underline;">📄 Document File</a>`;
             }
 
+            // Display translation for text messages
             if (type === "text" && translated && translated.trim() !== "") {
                 body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
             }
