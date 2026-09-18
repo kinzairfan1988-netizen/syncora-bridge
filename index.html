@@ -326,7 +326,7 @@
     <div class="contacts-overlay" id="contacts-modal">
         <div class="contacts-card">
             <h3 style="font-size: 17px; color: var(--accent-amber); font-family: 'Space Grotesk', sans-serif;">Start New Conversation</h3>
-            <p style="font-size: 12px; color: var(--text-muted);">Phone book se contact chunein ya direct number likhein.</p>
+            <p style="font-size: 12px; color: var(--text-muted);">Number enter karein, yeh lifetime ke liye list mein save ho jayega.</p>
 
             <button class="btn-contact-opt" onclick="pickFromPhoneContacts()">
                 <span>📖</span> Select from Phone Contacts
@@ -343,7 +343,7 @@
             </div>
 
             <input type="tel" id="manual-contact-input" class="auth-input" placeholder="Enter Mobile Number (0301...)" style="margin-bottom: 6px;">
-            <button class="btn-auth" onclick="openManualChat()">Open Chat</button>
+            <button class="btn-auth" onclick="openManualChat()">Add & Open Chat</button>
 
             <button onclick="closeContactsModal()" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; margin-top: 4px;">
                 Close
@@ -526,7 +526,6 @@
     </div>
 
     <script>
-        // Global Error Guard against third-party extension injection (e.g. 200.js / IDM)
         window.addEventListener('error', function (e) {
             if (e.filename && (e.filename.includes('200.js') || e.filename.includes('extension'))) {
                 e.stopImmediatePropagation();
@@ -536,7 +535,7 @@
         }, true);
 
         const urlParams = new URLSearchParams(window.location.search);
-        let directChatParam = urlParams.get('chat') || urlParams.get('invite') || urlParams.get('room') || "";
+        let directChatParam = urlParams.get('chat') || urlParams.get('invite') || "";
         
         let myPhone = localStorage.getItem("syncora_user_phone") || "";
         let activePartner = localStorage.getItem("syncora_active_partner") || "";
@@ -589,10 +588,15 @@
                 document.getElementById("auth-overlay").style.display = "none";
                 document.getElementById("my-status-label").innerText = `● ${myPhone}`;
                 initSocketSafe();
-                await loadRecentChats();
                 loadUserProfileData();
 
-                // Auto partner recovery logic
+                // If opened via invite/direct link, save contact permanently right away!
+                if (directChatParam && directChatParam !== myPhone && !directChatParam.startsWith("call-")) {
+                    await registerPermanentContact(directChatParam);
+                }
+
+                await loadRecentChats();
+
                 if (directChatParam && directChatParam !== myPhone && !directChatParam.startsWith("call-")) {
                     selectChat(directChatParam);
                 } else if (activePartner && activePartner !== myPhone) {
@@ -610,6 +614,17 @@
             if (localMediaStream) { localMediaStream.getTracks().forEach(t => t.stop()); }
             if (callSpeechRec) { try { callSpeechRec.stop(); } catch(e){} }
         };
+
+        async function registerPermanentContact(partnerPhone) {
+            if (!myPhone || !partnerPhone || myPhone === partnerPhone) return;
+            try {
+                await fetch("/api/contacts/add", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ user_phone: myPhone, contact_phone: partnerPhone })
+                });
+            } catch(e){}
+        }
 
         async function executeDirectLogin() {
             const input = document.getElementById("my-phone-input").value.trim();
@@ -631,8 +646,13 @@
                     document.getElementById("auth-overlay").style.display = "none";
                     document.getElementById("my-status-label").innerText = `● ${myPhone}`;
                     initSocketSafe();
-                    await loadRecentChats();
                     loadUserProfileData();
+
+                    if (directChatParam && directChatParam !== myPhone && !directChatParam.startsWith("call-")) {
+                        await registerPermanentContact(directChatParam);
+                    }
+
+                    await loadRecentChats();
 
                     if (allChatsCache.length > 0) {
                         selectChat(allChatsCache[0]);
@@ -658,6 +678,8 @@
                         selectedNumber = selectedNumber.replace(/\s+/g, '').replace(/-/g, '');
                         if (selectedNumber) {
                             closeContactsModal();
+                            await registerPermanentContact(selectedNumber);
+                            await loadRecentChats();
                             selectChat(selectedNumber);
                         }
                     }
@@ -675,13 +697,16 @@
             window.open(`https://api.whatsapp.com/send?text=${waMsg}`, '_blank');
         }
 
-        function openManualChat() {
+        async function openManualChat() {
             const num = document.getElementById("manual-contact-input").value.trim();
             if (!num || num === myPhone) {
                 alert("Valid mobile number enter karein.");
                 return;
             }
             closeContactsModal();
+            // Save permanently in database
+            await registerPermanentContact(num);
+            await loadRecentChats();
             selectChat(num);
         }
 
@@ -776,6 +801,7 @@
                         if (data.action === "pong") return;
                         
                         if (data.action === "new_message") {
+                            await registerPermanentContact(data.sender);
                             if (data.sender === activePartner) {
                                 appendBubble(data.content, "received", data.translated, data.msg_type, data.time, data.id, data.status);
                             }
@@ -1387,13 +1413,12 @@
             autoSelectFallbackPartner();
 
             if (!activePartner) {
-                alert("Koi contact select nahi hai! Sidebar se contact choose karein.");
+                alert("Target contact select nahi hai! Sidebar se contact chunein.");
                 return;
             }
 
             const tempId = "msg_temp_" + Date.now();
             
-            // Visual render immediately (never blocks UI)
             try {
                 appendBubble(content, "sent", translated, msgType, "now", tempId, "sent");
             } catch(e) {}
