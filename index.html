@@ -173,7 +173,7 @@
         .tick-icon { font-size: 11px; font-weight: 800; }
         .bubble.sent .tick-icon { color: #000; }
 
-        /* Pure Secret Voice Note UI (Zero text visible on screen) */
+        /* Secret Voice Note Card */
         .voice-card-private {
             display: flex; align-items: center; gap: 12px; padding: 4px 2px;
         }
@@ -315,7 +315,7 @@
 
             .stage-header { padding: 8px 10px; gap: 4px; }
             .chat-avatar { width: 34px; height: 34px; font-size: 11px; }
-            #active-partner-label { font-size: 13px !important; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            #active-partner-label { font-size: 13px !important; max-width: 95px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
             
             .btn-call-action { height: 30px; padding: 0 8px; font-size: 11px; gap: 3px; }
             .btn-call-action.trans-call-btn { padding: 0 8px; font-size: 11px; }
@@ -332,7 +332,6 @@
 </head>
 <body onclick="unlockMobileAudio()">
 
-    <!-- Native Audio Sink for Calling Audio Output -->
     <audio id="remote-audio-sink" autoplay playsinline></audio>
 
     <div class="auth-overlay" id="auth-overlay">
@@ -450,12 +449,12 @@
                     <option value="es">Spanish (Español)</option>
                 </select>
                 <button class="modal-btn-choice btn-choice-trans" id="btn-modal-confirm-trans" onclick="confirmDispatchTranslation()">
-                    🌐 Translate & Send AI Voice Note
+                    🌐 Translate & Send
                 </button>
             </div>
 
             <button class="modal-btn-choice" onclick="confirmDispatchOriginal()" style="margin-top: 4px;">
-                ✉️ Send Original Voice (No Translation)
+                ✉️ Send Original (No Translation)
             </button>
 
             <button onclick="cancelDispatch()" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer;">
@@ -507,7 +506,6 @@
                 </div>
 
                 <div style="display:flex; align-items:center; gap: 4px;">
-                    <!-- Direct Mobile Accessible Actions -->
                     <div class="mobile-header-actions">
                         <button class="icon-btn" onclick="openContactsModal()" title="Contacts">👥</button>
                         <button class="icon-btn" onclick="shareInviteOnWhatsApp()" title="Invite on WhatsApp">🔗</button>
@@ -587,7 +585,9 @@
         
         let myPhone = localStorage.getItem("syncora_user_phone") || "";
         let activePartner = localStorage.getItem("syncora_active_partner") || "";
-        let allChatsCache = [];
+        
+        // Permanent Local Cache for Zero Disappearing on Refresh
+        let allChatsCache = JSON.parse(localStorage.getItem("syncora_cached_chats") || "[]");
 
         let socket = null;
         let isConnectingSocket = false;
@@ -611,14 +611,11 @@
         let isMicMuted = false;
         let callSpeechRec = null;
 
-        // Enterprise Grade Universal ICE Pool (Bypasses 4G / CGNAT / Strict Firewalls)
         const rtcConfig = {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
                 { urls: "stun:stun1.l.google.com:19302" },
                 { urls: "stun:stun2.l.google.com:19302" },
-                { urls: "stun:stun3.l.google.com:19302" },
-                { urls: "stun:stun4.l.google.com:19302" },
                 {
                     urls: "turn:openrelay.metered.ca:80",
                     username: "openrelayproject",
@@ -641,6 +638,9 @@
         };
 
         window.onload = async () => {
+            // Render from instant local cache so UI is NEVER blank
+            renderChatListFromCache();
+
             if (myPhone) {
                 document.getElementById("auth-overlay").style.display = "none";
                 document.getElementById("my-status-label").innerText = `● ${myPhone}`;
@@ -674,13 +674,16 @@
             if (callSpeechRec) { try { callSpeechRec.stop(); } catch(e){} }
         };
 
-        // Mobile Unlocked Text-to-Speech Playback
+        function renderChatListFromCache() {
+            const list = document.getElementById("chat-list");
+            if (!list) return;
+            list.innerHTML = "";
+            allChatsCache.forEach(partner => renderChatItem(partner));
+        }
+
         function playSpokenVoice(text, lang) {
             unlockMobileAudio();
-            if (!('speechSynthesis' in window)) {
-                alert("Speech playback not supported in this browser.");
-                return;
-            }
+            if (!('speechSynthesis' in window)) return;
             window.speechSynthesis.cancel();
             const clean = (text || "").trim();
             if (!clean) return;
@@ -711,6 +714,14 @@
 
         async function registerPermanentContact(partnerPhone) {
             if (!myPhone || !partnerPhone || myPhone === partnerPhone) return;
+            
+            // Save in Local Cache immediately
+            if (!allChatsCache.includes(partnerPhone)) {
+                allChatsCache.unshift(partnerPhone);
+                localStorage.setItem("syncora_cached_chats", JSON.stringify(allChatsCache));
+                renderChatListFromCache();
+            }
+
             try {
                 await fetch("/api/contacts/add", {
                     method: "POST",
@@ -860,6 +871,7 @@
                 if (socket) { socket.close(); socket = null; }
                 localStorage.removeItem("syncora_user_phone");
                 localStorage.removeItem("syncora_active_partner");
+                localStorage.removeItem("syncora_cached_chats");
                 myPhone = "";
                 activePartner = "";
                 closeSettingsModal();
@@ -945,10 +957,14 @@
             try {
                 const res = await fetch(`/api/chats/${myPhone}`);
                 const data = await res.json();
-                allChatsCache = data.chats || [];
-                const list = document.getElementById("chat-list");
-                list.innerHTML = "";
-                allChatsCache.forEach(partner => renderChatItem(partner));
+                const fresh = data.chats || [];
+                
+                // Merge with local cache so nothing disappears
+                fresh.forEach(p => {
+                    if (!allChatsCache.includes(p)) allChatsCache.push(p);
+                });
+                localStorage.setItem("syncora_cached_chats", JSON.stringify(allChatsCache));
+                renderChatListFromCache();
             } catch(e){}
         }
 
@@ -1027,7 +1043,7 @@
             }
         }
 
-        /* --- WEBRTC CALL ENGINE (Full Hardware Media Sink Integration) --- */
+        /* --- WEBRTC CALL ENGINE --- */
         async function startCallSession(type, isTranslateMode = false) {
             unlockMobileAudio();
             if (!activePartner) { alert("Pehle contact select karein!"); return; }
@@ -1110,15 +1126,12 @@
                     if (rv) { rv.srcObject = remoteStream; rv.play().catch(() => {}); }
                 }
                 
-                // Direct hardware speaker lock
                 const audioSink = document.getElementById("remote-audio-sink");
                 if (audioSink) {
                     audioSink.srcObject = remoteStream;
                     audioSink.muted = false;
                     audioSink.volume = 1.0;
-                    audioSink.play().catch(e => {
-                        console.log("Audio play gesture required:", e);
-                    });
+                    audioSink.play().catch(() => {});
                 }
             };
 
@@ -1319,7 +1332,7 @@
             }
         });
 
-        /* --- BULLETPROOF AUDIO & SPEECH DISPATCH --- */
+        /* --- BULLETPROOF MOBILE AUDIO & SPEECH DISPATCH --- */
         function toggleVoiceRecording() {
             unlockMobileAudio();
             if (!isRecording) startVoiceRecording();
@@ -1345,7 +1358,6 @@
                 recordedChunks = [];
                 capturedLiveText = "";
 
-                // Live speech recognition for transcript
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
@@ -1393,7 +1405,7 @@
                     };
 
                     document.getElementById("voice-hint-field").value = capturedLiveText.trim();
-                    document.getElementById("send-modal-preview").innerText = capturedLiveText.trim() ? `"${capturedLiveText.trim()}"` : "Voice Recorded (Privacy Protected)";
+                    document.getElementById("send-modal-preview").innerText = "Voice Captured (Translate ready)";
                     document.getElementById("send-modal").style.display = "flex";
                 };
 
@@ -1485,6 +1497,7 @@
             cancelDispatch();
         }
 
+        // Universal Mobile/Web Translation Execution
         async function confirmDispatchTranslation() {
             if (!pendingPayload) return;
 
@@ -1520,7 +1533,7 @@
             btn.innerText = origText;
             btn.disabled = false;
 
-            const finalContent = (pendingPayload.type === "voice") ? pendingPayload.content : (textToTranslate || pendingPayload.content);
+            let finalContent = (pendingPayload.type === "voice") ? pendingPayload.content : (textToTranslate || pendingPayload.content);
             
             executeDispatch(finalContent, translatedText, pendingPayload.type, targetLang);
             cancelDispatch();
@@ -1572,7 +1585,7 @@
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
             } 
             else if (type === "voice") {
-                // PURE SECRET VOICE NOTE: Zero text on screen!
+                // Secret Voice Note: Zero Text on Screen
                 const safeTrans = (translated || "").replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 
                 if (translated && translated.trim() !== "") {
@@ -1601,6 +1614,7 @@
                 body = `<a href="${content}" target="_blank" style="color:inherit; text-decoration:underline;">📄 Document File</a>`;
             }
 
+            // ONLY show text translation if pure text
             if (type === "text" && translated && translated.trim() !== "") {
                 body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
             }
