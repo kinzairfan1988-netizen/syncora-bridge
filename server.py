@@ -99,7 +99,7 @@ ROMAN_URDU_MARKERS = [
     "karo", "karein", "kaho", "kya", "kiya", "kaisy", "kaise", "rahy", "rahe", 
     "hain", "hai", "hon", "hoon", "nahi", "nhi", "chek", "ab", "pe", "per", 
     "mai", "main", "ko", "se", "aur", "or", "bhi", "yeh", "ye", "woh", "wo",
-    "theek", "thik", "acha", "batao", "kaky", "bhai", "mera", "meri", "ap", "aap", "sun"
+    "theek", "thik", "acha", "batao", "kaky", "bhai", "mera", "meri", "ap", "aap", "sun", "kya"
 ]
 
 def is_probable_roman_urdu(text: str) -> bool:
@@ -107,7 +107,7 @@ def is_probable_roman_urdu(text: str) -> bool:
     match_count = sum(1 for t in tokens if t in ROMAN_URDU_MARKERS)
     return match_count >= 1
 
-# Demo-grade Robust Translation Pipeline
+# Bulletproof Clean Translation Engine (No 'auto' param errors)
 def translate_robust(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
@@ -117,47 +117,46 @@ def translate_robust(text: str, target_lang: str) -> str:
     is_script_urdu = has_urdu_arabic_script(clean)
     is_roman_urdu = is_probable_roman_urdu(clean)
 
-    # Strategy: Try forcing Urdu source first if Roman Urdu or Nastaliq detected
-    if is_script_urdu:
-        source_candidates = ["ur"]
-    elif is_roman_urdu:
-        source_candidates = ["ur", "auto"]
+    # Determine source language strictly as 'ur' or 'en'
+    if is_script_urdu or is_roman_urdu:
+        source_lang = "ur"
     else:
-        source_candidates = ["auto", "ur"]
+        source_lang = "en"
+
+    # If source and target are same, return clean text directly
+    if source_lang == target_lang:
+        return clean
 
     # Tier 1: Google GTX Single Endpoint
-    for src in source_candidates:
-        try:
-            q_enc = urllib.parse.quote(clean.encode('utf-8'))
-            url_g = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={src}&tl={target_lang}&dt=t&q={q_enc}"
-            req_g = urllib.request.Request(url_g, headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            })
-            with urllib.request.urlopen(req_g, timeout=4) as response:
-                res_json = json.loads(response.read().decode('utf-8'))
-                if res_json and isinstance(res_json, list) and len(res_json) > 0 and res_json[0]:
-                    out = "".join([part[0] for part in res_json[0] if part and part[0]]).strip()
-                    if out and out.lower() != clean.lower():
-                        return out
-        except Exception:
-            pass
-
-    # Tier 2: MyMemory API Fallback
     try:
-        src_pair = "ur" if (is_script_urdu or is_roman_urdu) else "auto"
-        if src_pair != target_lang:
-            q_enc = urllib.parse.quote(clean.encode('utf-8'))
-            pair = f"{src_pair}|{target_lang}"
-            url_mm = f"https://api.mymemory.translated.net/get?q={q_enc}&langpair={pair}"
-            req_mm = urllib.request.Request(url_mm, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req_mm, timeout=4) as response:
-                res_data = json.loads(response.read().decode('utf-8'))
-                if res_data and "responseData" in res_data and res_data["responseData"]["translatedText"]:
-                    out_text = res_data["responseData"]["translatedText"].strip()
-                    if out_text and not out_text.startswith("PLEASE SELECT") and not out_text.startswith("MYMEMORY WARNING") and out_text.lower() != clean.lower():
-                        return out_text
-    except Exception:
-        pass
+        q_enc = urllib.parse.quote(clean.encode('utf-8'))
+        url_g = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source_lang}&tl={target_lang}&dt=t&q={q_enc}"
+        req_g = urllib.request.Request(url_g, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+        with urllib.request.urlopen(req_g, timeout=4) as response:
+            res_json = json.loads(response.read().decode('utf-8'))
+            if res_json and isinstance(res_json, list) and len(res_json) > 0 and res_json[0]:
+                out = "".join([part[0] for part in res_json[0] if part and part[0]]).strip()
+                if out and "INVALID SOURCE" not in out.upper():
+                    return out
+    except Exception as e:
+        print(f"[Google GTX Error]: {e}")
+
+    # Tier 2: MyMemory API Fallback (Strict 2-letter codes)
+    try:
+        q_enc = urllib.parse.quote(clean.encode('utf-8'))
+        pair = f"{source_lang}|{target_lang}"
+        url_mm = f"https://api.mymemory.translated.net/get?q={q_enc}&langpair={pair}"
+        req_mm = urllib.request.Request(url_mm, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req_mm, timeout=4) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            if res_data and "responseData" in res_data and res_data["responseData"]["translatedText"]:
+                out_text = res_data["responseData"]["translatedText"].strip()
+                if out_text and "WARNING" not in out_text.upper() and "INVALID" not in out_text.upper():
+                    return out_text
+    except Exception as e:
+        print(f"[MyMemory Error]: {e}")
 
     return clean
 
