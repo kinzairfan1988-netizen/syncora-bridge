@@ -173,7 +173,6 @@
         .tick-icon { font-size: 11px; font-weight: 800; }
         .bubble.sent .tick-icon { color: #000; }
 
-        /* Secret Voice Note Card */
         .voice-card-private {
             display: flex; align-items: center; gap: 12px; padding: 4px 2px;
         }
@@ -427,20 +426,15 @@
         </div>
     </div>
 
-    <!-- SEND CONFIRMATION MODAL -->
+    <!-- SEND CONFIRMATION MODAL (Unified for Text & Voice) -->
     <div class="send-modal-backdrop" id="send-modal">
         <div class="send-modal-card">
-            <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Ready to Send</h3>
-            <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Confirm your message</p>
+            <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Confirm Dispatch</h3>
+            <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Review message text</p>
 
             <div id="voice-edit-block" style="display:block; text-align:left;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <label style="font-size: 11px; color: var(--text-muted);">Message / Captured Words:</label>
-                    <button type="button" onclick="triggerMobileSpeechRetry()" style="background:var(--accent-amber-dim); border:1px solid rgba(245,158,11,0.4); color:var(--accent-amber); border-radius:6px; font-size:11px; padding:2px 8px; cursor:pointer;">
-                        🎤 Speak
-                    </button>
-                </div>
-                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Type or verify message text...">
+                <label style="font-size: 11px; color: var(--text-muted);">Message / Content:</label>
+                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Edit text if needed...">
             </div>
 
             <div class="lang-options-drawer" id="lang-drawer">
@@ -459,7 +453,7 @@
             </div>
 
             <button class="modal-btn-choice" onclick="confirmDispatchOriginal()" style="margin-top: 4px;">
-                ✉️ Send Original (No Translation)
+                ✉️ Send Without Translation
             </button>
 
             <button onclick="cancelDispatch()" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer;">
@@ -1332,30 +1326,6 @@
             }
         });
 
-        function triggerMobileSpeechRetry() {
-            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SR) {
-                alert("Please type the words in the box below.");
-                return;
-            }
-            try {
-                const rec = new SR();
-                rec.lang = 'ur-PK';
-                rec.interimResults = false;
-                const hintField = document.getElementById("voice-hint-field");
-                hintField.placeholder = "Listening... Bolen!";
-                rec.onresult = (ev) => {
-                    const text = ev.results[0][0].transcript;
-                    hintField.value = text;
-                    hintField.placeholder = "Words verified";
-                };
-                rec.onerror = () => {
-                    hintField.placeholder = "Type words if not heard";
-                };
-                rec.start();
-            } catch(e){}
-        }
-
         function toggleVoiceRecording() {
             unlockMobileAudio();
             if (!isRecording) startVoiceRecording();
@@ -1435,7 +1405,7 @@
                     };
 
                     document.getElementById("voice-hint-field").value = capturedLiveText.trim();
-                    document.getElementById("send-modal-preview").innerText = capturedLiveText.trim() ? "Voice Captured" : "Voice Note Ready";
+                    document.getElementById("send-modal-preview").innerText = "Voice Note Captured";
                     document.getElementById("send-modal").style.display = "flex";
                 };
 
@@ -1502,7 +1472,7 @@
             }
         }
 
-        /* --- STABLE TEXT & VOICE STAGING PIPELINE --- */
+        /* --- UNIFIED STAGING PIPELINE FOR TEXT & VOICE --- */
         function stageMessageForDispatch() {
             autoSelectFallbackPartner();
 
@@ -1540,13 +1510,13 @@
             btn.disabled = true;
 
             let textToTranslate = document.getElementById("voice-hint-field").value.trim();
-            if (!textToTranslate && pendingPayload.type === 'text') {
+            if (!textToTranslate) {
                 textToTranslate = pendingPayload.content;
             }
 
             let translatedText = "";
 
-            if (textToTranslate) {
+            if (textToTranslate && pendingPayload.type === 'text') {
                 try {
                     const res = await fetch("/translate", {
                         method: "POST",
@@ -1557,6 +1527,19 @@
                     translatedText = (data && data.translated_text && data.translated_text.trim()) ? data.translated_text : textToTranslate;
                 } catch (e) {
                     translatedText = textToTranslate;
+                }
+            } else if (pendingPayload.type === 'voice') {
+                // For Voice Note: Translate hint/transcript if available
+                if (textToTranslate) {
+                    try {
+                        const res = await fetch("/translate", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
+                        });
+                        const data = await res.json();
+                        translatedText = (data && data.translated_text && data.translated_text.trim()) ? data.translated_text : "";
+                    } catch (e) {}
                 }
             }
 
@@ -1643,7 +1626,6 @@
                 body = `<a href="${content}" target="_blank" style="color:inherit; text-decoration:underline;">📄 Document File</a>`;
             }
 
-            // Display translation for text messages
             if (type === "text" && translated && translated.trim() !== "") {
                 body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
             }
