@@ -98,7 +98,7 @@ def translate_robust(text: str, target_lang: str) -> str:
     target_lang = target_lang.strip().lower()
     is_script_urdu = has_urdu_arabic_script(clean)
     
-    # Tier 1: Google Single (Handles Roman Urdu & Urdu Script)
+    # Tier 1: Google Single
     try:
         source_param = "ur" if is_script_urdu else "auto"
         q_enc = urllib.parse.quote(clean.encode('utf-8'))
@@ -384,6 +384,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                     "msg_type": msg_type,
                     "content": content,
                     "translated": translated,
+                    "lang": payload.get("lang", "en"),
                     "status": initial_status,
                     "time": "now"
                 })
