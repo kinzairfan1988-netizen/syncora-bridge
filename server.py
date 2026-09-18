@@ -17,7 +17,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 DB_PATH = os.path.join(BASE_DIR, "syncora.db")
 
 def init_db():
-    conn = sqlite3.connect(DB_PATH, timeout=15)
+    conn = sqlite3.connect(DB_PATH, timeout=20)
     cursor = conn.cursor()
     
     cursor.execute("""
@@ -68,7 +68,7 @@ def init_db():
 
 init_db()
 
-app = FastAPI(title="Syncora Terminal Core Engine")
+app = FastAPI(title="Syncora Terminal Demo Engine")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 class DirectLoginRequest(BaseModel):
@@ -95,12 +95,11 @@ def get_chat_id(u1: str, u2: str) -> str:
 def has_urdu_arabic_script(text: str) -> bool:
     return bool(re.search(r'[\u0600-\u06FF]', text))
 
-# Aam Roman Urdu markers jo batate hain ke text English nahi balki Urdu hai
 ROMAN_URDU_MARKERS = [
     "karo", "karein", "kaho", "kya", "kiya", "kaisy", "kaise", "rahy", "rahe", 
     "hain", "hai", "hon", "hoon", "nahi", "nhi", "chek", "ab", "pe", "per", 
     "mai", "main", "ko", "se", "aur", "or", "bhi", "yeh", "ye", "woh", "wo",
-    "theek", "thik", "acha", "batao", "kaky", "bhai", "mera", "meri", "ap", "aap"
+    "theek", "thik", "acha", "batao", "kaky", "bhai", "mera", "meri", "ap", "aap", "sun"
 ]
 
 def is_probable_roman_urdu(text: str) -> bool:
@@ -108,7 +107,7 @@ def is_probable_roman_urdu(text: str) -> bool:
     match_count = sum(1 for t in tokens if t in ROMAN_URDU_MARKERS)
     return match_count >= 1
 
-# Bulletproof Translation Engine (Roman Urdu + Script + English)
+# Demo-grade Robust Translation Pipeline
 def translate_robust(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
@@ -118,15 +117,15 @@ def translate_robust(text: str, target_lang: str) -> str:
     is_script_urdu = has_urdu_arabic_script(clean)
     is_roman_urdu = is_probable_roman_urdu(clean)
 
-    # Agar Urdu script ya Roman Urdu ho aur target English ho
+    # Strategy: Try forcing Urdu source first if Roman Urdu or Nastaliq detected
     if is_script_urdu:
         source_candidates = ["ur"]
     elif is_roman_urdu:
         source_candidates = ["ur", "auto"]
     else:
-        source_candidates = ["auto"]
+        source_candidates = ["auto", "ur"]
 
-    # Method 1: Google Translate Direct GTX API
+    # Tier 1: Google GTX Single Endpoint
     for src in source_candidates:
         try:
             q_enc = urllib.parse.quote(clean.encode('utf-8'))
@@ -138,13 +137,12 @@ def translate_robust(text: str, target_lang: str) -> str:
                 res_json = json.loads(response.read().decode('utf-8'))
                 if res_json and isinstance(res_json, list) and len(res_json) > 0 and res_json[0]:
                     out = "".join([part[0] for part in res_json[0] if part and part[0]]).strip()
-                    # Agar translation original se mukhtalif ho toh foran return karein
                     if out and out.lower() != clean.lower():
                         return out
-        except Exception as e:
-            print(f"[Google GTX Error with src {src}]: {e}")
+        except Exception:
+            pass
 
-    # Method 2: MyMemory API Fallback (Strict Pair)
+    # Tier 2: MyMemory API Fallback
     try:
         src_pair = "ur" if (is_script_urdu or is_roman_urdu) else "auto"
         if src_pair != target_lang:
@@ -158,24 +156,8 @@ def translate_robust(text: str, target_lang: str) -> str:
                     out_text = res_data["responseData"]["translatedText"].strip()
                     if out_text and not out_text.startswith("PLEASE SELECT") and not out_text.startswith("MYMEMORY WARNING") and out_text.lower() != clean.lower():
                         return out_text
-    except Exception as e:
-        print(f"[MyMemory Fallback Error]: {e}")
-
-    # Method 3: Lingva Relay
-    try:
-        q_enc = urllib.parse.quote(clean.encode('utf-8'))
-        src_l = "ur" if (is_script_urdu or is_roman_urdu) else "auto"
-        if src_l != target_lang:
-            url_l = f"https://lingva.ml/api/v1/{src_l}/{target_lang}/{q_enc}"
-            req_l = urllib.request.Request(url_l, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req_l, timeout=4) as response:
-                res_json = json.loads(response.read().decode('utf-8'))
-                if "translation" in res_json and res_json["translation"]:
-                    out_l = res_json["translation"].strip()
-                    if out_l and out_l.lower() != clean.lower():
-                        return out_l
-    except Exception as e:
-        print(f"[Lingva Relay Error]: {e}")
+    except Exception:
+        pass
 
     return clean
 
@@ -209,7 +191,7 @@ async def direct_login(req: DirectLoginRequest):
     if not phone or len(phone) < 7:
         return JSONResponse(status_code=400, content={"error": "Valid mobile number required"})
 
-    conn = sqlite3.connect(DB_PATH, timeout=15)
+    conn = sqlite3.connect(DB_PATH, timeout=20)
     cursor = conn.cursor()
     cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (phone, phone))
     conn.commit()
@@ -224,7 +206,7 @@ async def add_permanent_contact(req: AddContactRequest):
     if not u or not c or u == c:
         return JSONResponse(status_code=400, content={"error": "Invalid phones"})
 
-    conn = sqlite3.connect(DB_PATH, timeout=15)
+    conn = sqlite3.connect(DB_PATH, timeout=20)
     cursor = conn.cursor()
     cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (u, c))
     cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (c, u))
@@ -240,7 +222,7 @@ async def get_user_status(phone: str):
 
 @app.get("/api/user/profile/{phone}")
 async def get_user_profile(phone: str):
-    conn = sqlite3.connect(DB_PATH, timeout=15)
+    conn = sqlite3.connect(DB_PATH, timeout=20)
     cursor = conn.cursor()
     cursor.execute("SELECT phone, display_name, about_status, avatar_url, created_at FROM users WHERE phone = ?", (phone,))
     row = cursor.fetchone()
@@ -257,7 +239,7 @@ async def get_user_profile(phone: str):
 
 @app.post("/api/user/profile/update")
 async def update_user_profile(req: ProfileUpdate):
-    conn = sqlite3.connect(DB_PATH, timeout=15)
+    conn = sqlite3.connect(DB_PATH, timeout=20)
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO users (phone, display_name, about_status, avatar_url)
@@ -284,7 +266,7 @@ async def translate_text(req: TranslationRequest):
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
     p = phone.strip()
-    conn = sqlite3.connect(DB_PATH, timeout=15)
+    conn = sqlite3.connect(DB_PATH, timeout=20)
     cursor = conn.cursor()
     
     cursor.execute("""
@@ -310,7 +292,7 @@ async def get_user_chats(phone: str):
 @app.get("/api/messages/{phone}/{partner}")
 async def get_conversation(phone: str, partner: str):
     chat_id = get_chat_id(phone, partner)
-    conn = sqlite3.connect(DB_PATH, timeout=15)
+    conn = sqlite3.connect(DB_PATH, timeout=20)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -352,7 +334,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
     await manager.connect(phone, websocket)
     
     try:
-        conn = sqlite3.connect(DB_PATH, timeout=15)
+        conn = sqlite3.connect(DB_PATH, timeout=20)
         cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT sender FROM messages WHERE receiver = ? AND status = 'sent'", (phone,))
         senders = [row[0] for row in cursor.fetchall()]
@@ -389,7 +371,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                 is_rec_online = manager.is_online(receiver)
                 initial_status = "delivered" if is_rec_online else "sent"
 
-                conn = sqlite3.connect(DB_PATH, timeout=15)
+                conn = sqlite3.connect(DB_PATH, timeout=20)
                 cursor = conn.cursor()
                 cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (phone, receiver))
                 cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (receiver, phone))
