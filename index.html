@@ -173,7 +173,7 @@
         .tick-icon { font-size: 11px; font-weight: 800; }
         .bubble.sent .tick-icon { color: #000; }
 
-        /* Secret Voice Note Card */
+        /* Pure Secret Voice Note UI (Zero text visible on screen) */
         .voice-card-private {
             display: flex; align-items: center; gap: 12px; padding: 4px 2px;
         }
@@ -586,7 +586,6 @@
         let myPhone = localStorage.getItem("syncora_user_phone") || "";
         let activePartner = localStorage.getItem("syncora_active_partner") || "";
         
-        // Permanent Local Cache for Zero Disappearing on Refresh
         let allChatsCache = JSON.parse(localStorage.getItem("syncora_cached_chats") || "[]");
 
         let socket = null;
@@ -638,7 +637,6 @@
         };
 
         window.onload = async () => {
-            // Render from instant local cache so UI is NEVER blank
             renderChatListFromCache();
 
             if (myPhone) {
@@ -715,7 +713,6 @@
         async function registerPermanentContact(partnerPhone) {
             if (!myPhone || !partnerPhone || myPhone === partnerPhone) return;
             
-            // Save in Local Cache immediately
             if (!allChatsCache.includes(partnerPhone)) {
                 allChatsCache.unshift(partnerPhone);
                 localStorage.setItem("syncora_cached_chats", JSON.stringify(allChatsCache));
@@ -959,7 +956,6 @@
                 const data = await res.json();
                 const fresh = data.chats || [];
                 
-                // Merge with local cache so nothing disappears
                 fresh.forEach(p => {
                     if (!allChatsCache.includes(p)) allChatsCache.push(p);
                 });
@@ -1332,7 +1328,7 @@
             }
         });
 
-        /* --- BULLETPROOF MOBILE AUDIO & SPEECH DISPATCH --- */
+        /* --- BULLETPROOF AUDIO & SPEECH DISPATCH --- */
         function toggleVoiceRecording() {
             unlockMobileAudio();
             if (!isRecording) startVoiceRecording();
@@ -1497,7 +1493,6 @@
             cancelDispatch();
         }
 
-        // Universal Mobile/Web Translation Execution
         async function confirmDispatchTranslation() {
             if (!pendingPayload) return;
 
@@ -1614,7 +1609,6 @@
                 body = `<a href="${content}" target="_blank" style="color:inherit; text-decoration:underline;">📄 Document File</a>`;
             }
 
-            // ONLY show text translation if pure text
             if (type === "text" && translated && translated.trim() !== "") {
                 body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
             }
