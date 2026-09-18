@@ -130,10 +130,10 @@
             position: relative; height: 100%; overflow: hidden;
         }
         .stage-header {
-            padding: 10px 14px; background: var(--surface-panel);
+            padding: 8px 12px; background: var(--surface-panel);
             border-bottom: 1px solid var(--border-graphite);
             display: flex; align-items: center; justify-content: space-between;
-            flex-shrink: 0; z-index: 10; min-height: 60px;
+            flex-shrink: 0; z-index: 10; min-height: 60px; gap: 6px;
         }
         .call-buttons-group { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
         .btn-call-action {
@@ -173,7 +173,7 @@
         .tick-icon { font-size: 11px; font-weight: 800; }
         .bubble.sent .tick-icon { color: #000; }
 
-        /* Pure Secret Voice Note UI */
+        /* Pure Secret Voice Note UI (Zero text visible on screen) */
         .voice-card-private {
             display: flex; align-items: center; gap: 12px; padding: 4px 2px;
         }
@@ -313,9 +313,9 @@
             body.in-chat .sidebar-panel { display: none !important; }
             body.in-chat .stage-panel { display: flex !important; flex-direction: column; height: 100dvh; }
 
-            .stage-header { padding: 8px 10px; gap: 6px; }
-            .chat-avatar { width: 36px; height: 36px; font-size: 12px; }
-            #active-partner-label { font-size: 13px !important; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .stage-header { padding: 8px 10px; gap: 4px; }
+            .chat-avatar { width: 34px; height: 34px; font-size: 11px; }
+            #active-partner-label { font-size: 13px !important; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
             
             .btn-call-action { height: 30px; padding: 0 8px; font-size: 11px; gap: 3px; }
             .btn-call-action.trans-call-btn { padding: 0 8px; font-size: 11px; }
@@ -323,12 +323,17 @@
             .stage-input-bar { padding: 6px 10px; }
             .main-text-input { font-size: 14px; padding: 6px 2px; }
             .btn-send-permanent { width: 38px; height: 38px; font-size: 15px; }
+            
+            .mobile-header-actions { display: flex !important; align-items: center; gap: 4px; }
         }
+
+        .mobile-header-actions { display: none; }
     </style>
 </head>
 <body onclick="unlockMobileAudio()">
 
-    <audio id="remote-audio-sink" autoplay playsinline style="display:none;"></audio>
+    <!-- Native Audio Sink for Calling Audio Output -->
+    <audio id="remote-audio-sink" autoplay playsinline></audio>
 
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
@@ -492,19 +497,28 @@
 
         <main class="stage-panel" id="stage-panel">
             <header class="stage-header">
-                <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                    <button class="icon-btn" onclick="backToSidebar()" id="mobile-back-btn" style="display:inline-block; font-size: 20px;">←</button>
+                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
+                    <button class="icon-btn" onclick="backToSidebar()" id="mobile-back-btn" style="display:inline-block; font-size: 18px;">←</button>
                     <div class="chat-avatar" id="active-avatar">--</div>
                     <div style="overflow: hidden;">
-                        <div style="font-size: 14px; font-weight: 700;" id="active-partner-label">Select Chat</div>
+                        <div style="font-size: 13px; font-weight: 700;" id="active-partner-label">Select Chat</div>
                         <div style="font-size: 10px; color: var(--text-muted);" id="active-partner-status">Offline</div>
                     </div>
                 </div>
 
-                <div class="call-buttons-group" id="call-buttons-dock" style="display: flex;">
-                    <button class="btn-call-action" onclick="startCallSession('audio', false)" title="Normal Audio Call">📞 Audio</button>
-                    <button class="btn-call-action" onclick="startCallSession('video', false)" title="Normal Video Call">📹 Video</button>
-                    <button class="btn-call-action trans-call-btn" onclick="startCallSession('audio', true)" title="Call with Live AI Translation">🌐 Translate</button>
+                <div style="display:flex; align-items:center; gap: 4px;">
+                    <!-- Direct Mobile Accessible Actions -->
+                    <div class="mobile-header-actions">
+                        <button class="icon-btn" onclick="openContactsModal()" title="Contacts">👥</button>
+                        <button class="icon-btn" onclick="shareInviteOnWhatsApp()" title="Invite on WhatsApp">🔗</button>
+                        <button class="icon-btn" onclick="openSettingsModal()" title="Settings">⚙️</button>
+                    </div>
+
+                    <div class="call-buttons-group" id="call-buttons-dock" style="display: flex;">
+                        <button class="btn-call-action" onclick="startCallSession('audio', false)" title="Normal Audio Call">📞</button>
+                        <button class="btn-call-action" onclick="startCallSession('video', false)" title="Normal Video Call">📹</button>
+                        <button class="btn-call-action trans-call-btn" onclick="startCallSession('audio', true)" title="Call with Live AI Translation">🌐 Trans</button>
+                    </div>
                 </div>
             </header>
 
@@ -556,8 +570,8 @@
             if (mobileAudioUnlocked) return;
             try {
                 if ('speechSynthesis' in window) {
-                    const silentUtterance = new SpeechSynthesisUtterance('');
-                    silentUtterance.volume = 0;
+                    const silentUtterance = new SpeechSynthesisUtterance(' ');
+                    silentUtterance.volume = 0.01;
                     window.speechSynthesis.speak(silentUtterance);
                 }
                 const audioSink = document.getElementById("remote-audio-sink");
@@ -597,24 +611,33 @@
         let isMicMuted = false;
         let callSpeechRec = null;
 
+        // Enterprise Grade Universal ICE Pool (Bypasses 4G / CGNAT / Strict Firewalls)
         const rtcConfig = {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
                 { urls: "stun:stun1.l.google.com:19302" },
                 { urls: "stun:stun2.l.google.com:19302" },
-                { urls: "stun:stun.relay.metered.ca:80" },
+                { urls: "stun:stun3.l.google.com:19302" },
+                { urls: "stun:stun4.l.google.com:19302" },
                 {
-                    urls: "turn:standard.relay.metered.ca:80",
+                    urls: "turn:openrelay.metered.ca:80",
                     username: "openrelayproject",
                     credential: "openrelayproject"
                 },
                 {
-                    urls: "turn:standard.relay.metered.ca:443",
+                    urls: "turn:openrelay.metered.ca:443",
+                    username: "openrelayproject",
+                    credential: "openrelayproject"
+                },
+                {
+                    urls: "turn:openrelay.metered.ca:443?transport=tcp",
                     username: "openrelayproject",
                     credential: "openrelayproject"
                 }
             ],
-            iceCandidatePoolSize: 10
+            iceCandidatePoolSize: 10,
+            bundlePolicy: "max-bundle",
+            rtcpMuxPolicy: "require"
         };
 
         window.onload = async () => {
@@ -765,7 +788,7 @@
         function shareInviteOnWhatsApp() {
             const origin = window.location.origin;
             const directLink = `${origin}/?chat=${encodeURIComponent(myPhone)}`;
-            const waMsg = encodeURIComponent(`Connect with me on Syncora Terminal for live text & voice translation:\n${directLink}`);
+            const waMsg = encodeURIComponent(`Connect with me on Syncora Terminal for live text, audio call & voice translation:\n${directLink}`);
             window.open(`https://api.whatsapp.com/send?text=${waMsg}`, '_blank');
         }
 
@@ -899,7 +922,6 @@
                                 document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${data.translated}`;
                                 
-                                // REVOLUTIONARY FIX: Audio will speak automatically on receiver's phone!
                                 if (data.translated && data.translated.trim()) {
                                     playSpokenVoice(data.translated, data.lang || "en");
                                 }
@@ -1005,7 +1027,7 @@
             }
         }
 
-        /* --- WEBRTC CALL ENGINE --- */
+        /* --- WEBRTC CALL ENGINE (Full Hardware Media Sink Integration) --- */
         async function startCallSession(type, isTranslateMode = false) {
             unlockMobileAudio();
             if (!activePartner) { alert("Pehle contact select karein!"); return; }
@@ -1082,15 +1104,21 @@
 
             peerConnection.ontrack = (event) => {
                 const remoteStream = event.streams[0] || new MediaStream([event.track]);
+                
                 if (currentCallType === "video") {
                     const rv = document.getElementById("remote-video");
                     if (rv) { rv.srcObject = remoteStream; rv.play().catch(() => {}); }
                 }
+                
+                // Direct hardware speaker lock
                 const audioSink = document.getElementById("remote-audio-sink");
                 if (audioSink) {
                     audioSink.srcObject = remoteStream;
                     audioSink.muted = false;
-                    audioSink.play().catch(e => {});
+                    audioSink.volume = 1.0;
+                    audioSink.play().catch(e => {
+                        console.log("Audio play gesture required:", e);
+                    });
                 }
             };
 
@@ -1099,6 +1127,8 @@
                     const state = peerConnection.iceConnectionState;
                     if (state === "connected" || state === "completed") {
                         document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected (Live)";
+                        const audioSink = document.getElementById("remote-audio-sink");
+                        if (audioSink) { audioSink.play().catch(() => {}); }
                     } else if (state === "disconnected" || state === "failed") {
                         document.getElementById("call-status-text").innerText = "Reconnecting...";
                     }
@@ -1254,7 +1284,9 @@
                 callSpeechRec = null; 
             }
             const audioSink = document.getElementById("remote-audio-sink");
-            if (audioSink) { audioSink.srcObject = null; }
+            if (audioSink) { 
+                audioSink.srcObject = null; 
+            }
 
             document.getElementById("call-modal").style.display = "none";
             document.getElementById("call-video-container").style.display = "none";
@@ -1313,6 +1345,7 @@
                 recordedChunks = [];
                 capturedLiveText = "";
 
+                // Live speech recognition for transcript
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
@@ -1360,7 +1393,7 @@
                     };
 
                     document.getElementById("voice-hint-field").value = capturedLiveText.trim();
-                    document.getElementById("send-modal-preview").innerText = "Voice Recorded (Privacy Protected)";
+                    document.getElementById("send-modal-preview").innerText = capturedLiveText.trim() ? `"${capturedLiveText.trim()}"` : "Voice Recorded (Privacy Protected)";
                     document.getElementById("send-modal").style.display = "flex";
                 };
 
@@ -1539,7 +1572,7 @@
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
             } 
             else if (type === "voice") {
-                // Pure Secret Voice Note: Zero Text on Screen
+                // PURE SECRET VOICE NOTE: Zero text on screen!
                 const safeTrans = (translated || "").replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 
                 if (translated && translated.trim() !== "") {
@@ -1568,7 +1601,6 @@
                 body = `<a href="${content}" target="_blank" style="color:inherit; text-decoration:underline;">📄 Document File</a>`;
             }
 
-            // ONLY show text translation if pure text
             if (type === "text" && translated && translated.trim() !== "") {
                 body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
             }
