@@ -173,7 +173,7 @@
         .tick-icon { font-size: 11px; font-weight: 800; }
         .bubble.sent .tick-icon { color: #000; }
 
-        /* Pure Secret Voice Note UI (Zero text visible on screen) */
+        /* Secret Voice Note Card (Zero text on screen) */
         .voice-card-private {
             display: flex; align-items: center; gap: 12px; padding: 4px 2px;
         }
@@ -434,8 +434,13 @@
             <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Confirm your message</p>
 
             <div id="voice-edit-block" style="display:block; text-align:left;">
-                <label style="font-size: 11px; color: var(--text-muted);">Spoken / Message Words:</label>
-                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Type or verify message text...">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <label style="font-size: 11px; color: var(--text-muted);">Captured Words (Translate honge):</label>
+                    <button type="button" onclick="triggerMobileSpeechRetry()" style="background:var(--accent-amber-dim); border:1px solid rgba(245,158,11,0.4); color:var(--accent-amber); border-radius:6px; font-size:11px; padding:2px 8px; cursor:pointer;">
+                        🎤 Tap to Speak
+                    </button>
+                </div>
+                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Agar words miss hue hon to yahan bolen ya likhen...">
             </div>
 
             <div class="lang-options-drawer" id="lang-drawer">
@@ -449,7 +454,7 @@
                     <option value="es">Spanish (Español)</option>
                 </select>
                 <button class="modal-btn-choice btn-choice-trans" id="btn-modal-confirm-trans" onclick="confirmDispatchTranslation()">
-                    🌐 Translate & Send
+                    🌐 Translate & Send AI Voice
                 </button>
             </div>
 
@@ -585,7 +590,6 @@
         
         let myPhone = localStorage.getItem("syncora_user_phone") || "";
         let activePartner = localStorage.getItem("syncora_active_partner") || "";
-        
         let allChatsCache = JSON.parse(localStorage.getItem("syncora_cached_chats") || "[]");
 
         let socket = null;
@@ -1328,7 +1332,31 @@
             }
         });
 
-        /* --- BULLETPROOF AUDIO & SPEECH DISPATCH --- */
+        /* --- MOBILE AUDIO ENGINE WITH ZERO-FAIL VERIFICATION --- */
+        function triggerMobileSpeechRetry() {
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SR) {
+                alert("Please type the words in the box below.");
+                return;
+            }
+            try {
+                const rec = new SR();
+                rec.lang = 'ur-PK';
+                rec.interimResults = false;
+                const hintField = document.getElementById("voice-hint-field");
+                hintField.placeholder = "Listening now... Bolen!";
+                rec.onresult = (ev) => {
+                    const text = ev.results[0][0].transcript;
+                    hintField.value = text;
+                    hintField.placeholder = "Words verified";
+                };
+                rec.onerror = () => {
+                    hintField.placeholder = "Type words if not heard";
+                };
+                rec.start();
+            } catch(e){}
+        }
+
         function toggleVoiceRecording() {
             unlockMobileAudio();
             if (!isRecording) startVoiceRecording();
@@ -1354,6 +1382,7 @@
                 recordedChunks = [];
                 capturedLiveText = "";
 
+                // Parallel speech recognizer
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
@@ -1401,7 +1430,7 @@
                     };
 
                     document.getElementById("voice-hint-field").value = capturedLiveText.trim();
-                    document.getElementById("send-modal-preview").innerText = "Voice Captured (Translate ready)";
+                    document.getElementById("send-modal-preview").innerText = capturedLiveText.trim() ? "Voice Captured" : "Voice Note Ready (Tap to verify words)";
                     document.getElementById("send-modal").style.display = "flex";
                 };
 
