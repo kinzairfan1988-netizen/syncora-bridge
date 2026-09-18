@@ -20,7 +20,6 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # 1. Users Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             phone TEXT PRIMARY KEY,
@@ -31,7 +30,6 @@ def init_db():
         )
     """)
     
-    # 2. Lifetime Contacts Table (Never disappears on refresh)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS user_contacts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,7 +40,6 @@ def init_db():
         )
     """)
 
-    # 3. Messages Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,58 +87,69 @@ def get_chat_id(u1: str, u2: str) -> str:
     cleaned = sorted([u1.strip(), u2.strip()])
     return f"chat_{cleaned[0]}_{cleaned[1]}"
 
-def is_urdu_or_arabic(text: str) -> bool:
+def has_urdu_arabic_script(text: str) -> bool:
     return bool(re.search(r'[\u0600-\u06FF]', text))
 
-# Multi-tier Rotary Translation (Zero 429 Block)
-def translate_robust(text: str, source_lang: str, target_lang: str) -> str:
+# Smart multi-tier translation pipeline
+def translate_robust(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
         return ""
 
-    # Tier 1: MyMemory Fast Public API
+    target_lang = target_lang.strip().lower()
+    is_script_urdu = has_urdu_arabic_script(clean)
+    
+    # 1. Tier 1: Google Translate Single endpoint (Best for Roman Urdu & Nastaliq)
     try:
+        source_param = "ur" if is_script_urdu else "auto"
         q_enc = urllib.parse.quote(clean.encode('utf-8'))
-        pair = f"{source_lang}|{target_lang}" if source_lang != "auto" else f"ur|{target_lang}"
-        url_mm = f"https://api.mymemory.translated.net/get?q={q_enc}&langpair={pair}"
-        req_mm = urllib.request.Request(url_mm, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req_mm, timeout=4) as response:
-            res_data = json.loads(response.read().decode('utf-8'))
-            if res_data and "responseData" in res_data and res_data["responseData"]["translatedText"]:
-                out_text = res_data["responseData"]["translatedText"].strip()
-                if out_text and not out_text.startswith("MYMEMORY WARNING"):
-                    return out_text
-    except Exception as e:
-        print(f"[Tier 1 MM Fallback]: {e}")
-
-    # Tier 2: Google Alternate Single API
-    try:
-        q_enc = urllib.parse.quote(clean.encode('utf-8'))
-        url_g = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source_lang}&tl={target_lang}&dt=t&q={q_enc}"
+        url_g = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source_param}&tl={target_lang}&dt=t&q={q_enc}"
         req_g = urllib.request.Request(url_g, headers={
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         })
         with urllib.request.urlopen(req_g, timeout=4) as response:
             res_json = json.loads(response.read().decode('utf-8'))
             if res_json and isinstance(res_json, list) and len(res_json) > 0 and res_json[0]:
                 out = "".join([part[0] for part in res_json[0] if part and part[0]]).strip()
-                if out:
+                if out and out.lower() != clean.lower():
                     return out
     except Exception as e:
-        print(f"[Tier 2 Google Error]: {e}")
+        print(f"[Tier 1 Google Single Error]: {e}")
 
-    # Tier 3: Lingva Public Relay
+    # 2. Tier 2: MyMemory API with proper distinct language pairs
+    try:
+        # Avoid same language pair warning
+        src_pair = "ur" if is_script_urdu else ("ur" if target_lang != "ur" else "en")
+        if src_pair != target_lang:
+            q_enc = urllib.parse.quote(clean.encode('utf-8'))
+            pair = f"{src_pair}|{target_lang}"
+            url_mm = f"https://api.mymemory.translated.net/get?q={q_enc}&langpair={pair}"
+            req_mm = urllib.request.Request(url_mm, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req_mm, timeout=4) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                if res_data and "responseData" in res_data and res_data["responseData"]["translatedText"]:
+                    out_text = res_data["responseData"]["translatedText"].strip()
+                    # Filter warnings & nonsense slang
+                    if out_text and not out_text.startswith("PLEASE SELECT") and not out_text.startswith("MYMEMORY WARNING") and out_text.lower() != "bruh":
+                        return out_text
+    except Exception as e:
+        print(f"[Tier 2 MyMemory Error]: {e}")
+
+    # 3. Tier 3: Lingva Public Relay
     try:
         q_enc = urllib.parse.quote(clean.encode('utf-8'))
-        src = "ur" if source_lang == "auto" else source_lang
-        url_l = f"https://lingva.ml/api/v1/{src}/{target_lang}/{q_enc}"
-        req_l = urllib.request.Request(url_l, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req_l, timeout=4) as response:
-            res_json = json.loads(response.read().decode('utf-8'))
-            if "translation" in res_json and res_json["translation"]:
-                return res_json["translation"].strip()
+        src_lingva = "ur" if (is_script_urdu or target_lang == "en") else "auto"
+        if src_lingva != target_lang:
+            url_l = f"https://lingva.ml/api/v1/{src_lingva}/{target_lang}/{q_enc}"
+            req_l = urllib.request.Request(url_l, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req_l, timeout=4) as response:
+                res_json = json.loads(response.read().decode('utf-8'))
+                if "translation" in res_json and res_json["translation"]:
+                    out_l = res_json["translation"].strip()
+                    if out_l:
+                        return out_l
     except Exception as e:
-        print(f"[Tier 3 Lingva Fallback]: {e}")
+        print(f"[Tier 3 Lingva Error]: {e}")
 
     return clean
 
@@ -183,7 +191,6 @@ async def direct_login(req: DirectLoginRequest):
 
     return {"status": "ok", "phone": phone}
 
-# API: Save contact permanently in database
 @app.post("/api/contacts/add")
 async def add_permanent_contact(req: AddContactRequest):
     u = req.user_phone.strip()
@@ -193,7 +200,6 @@ async def add_permanent_contact(req: AddContactRequest):
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    # Save both ways so sender and receiver both have each other saved permanently
     cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (u, c))
     cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (c, u))
     cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (c, c))
@@ -245,25 +251,21 @@ async def translate_text(req: TranslationRequest):
         return {"translated_text": ""}
 
     target_lang = req.target_lang.strip().lower() if req.target_lang else "en"
-    source_param = "ur" if is_urdu_or_arabic(clean) else "auto"
-    translated = translate_robust(clean, source_param, target_lang)
+    translated = translate_robust(clean, target_lang)
     return {"translated_text": translated}
 
-# API: Chats endpoint ab Saved Contacts + Messages dono ko combine karta hai (Never empty on refresh)
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
     p = phone.strip()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # 1. Jo messages se aate hain
     cursor.execute("""
         SELECT DISTINCT CASE WHEN sender = ? THEN receiver ELSE sender END AS partner
         FROM messages WHERE sender = ? OR receiver = ?
     """, (p, p, p))
     msg_partners = [row[0] for row in cursor.fetchall() if row[0]]
 
-    # 2. Jo contacts table mein permanently saved hain
     cursor.execute("""
         SELECT contact_phone FROM user_contacts WHERE user_phone = ?
     """, (p,))
@@ -271,7 +273,6 @@ async def get_user_chats(phone: str):
 
     conn.close()
 
-    # Combine & deduplicate
     all_unique = []
     for item in (saved_contacts + msg_partners):
         if item and item != p and item not in all_unique:
@@ -361,7 +362,6 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
 
                 conn = sqlite3.connect(DB_PATH)
                 cursor = conn.cursor()
-                # Ensure permanent contacts save on first message
                 cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (phone, receiver))
                 cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (receiver, phone))
                 cursor.execute("""
