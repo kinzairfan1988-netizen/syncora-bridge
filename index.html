@@ -327,7 +327,6 @@
 </head>
 <body onclick="unlockMobileAudio()">
 
-    <!-- CRITICAL: playsinline prevents mobile auto-fullscreen / loudspeaker override -->
     <audio id="remote-audio-sink" autoplay playsinline></audio>
 
     <div class="auth-overlay" id="auth-overlay">
@@ -928,7 +927,6 @@
                             if (isTranslationCallMode) {
                                 document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${data.translated}`;
-                                // FIX: Do NOT synthesize own voice back via speech synthesis loop
                                 if (data.sender !== myPhone && data.translated && data.translated.trim()) {
                                     playSpokenVoice(data.translated, data.lang || currentSelectedTargetLang);
                                 }
@@ -1150,7 +1148,6 @@
         function triggerIncomingSetupModal() {
             if (!pendingCallOffer) return;
             if (isTranslationCallMode) {
-                // Show incoming language setup modal so receiver can also choose their preferred language
                 document.getElementById("incoming-caller-label").innerText = `${pendingCallOffer.sender} is calling with AI Translation.`;
                 document.getElementById("incoming-target-lang-select").value = currentSelectedTargetLang;
                 document.getElementById("incoming-setup-modal").style.display = "flex";
