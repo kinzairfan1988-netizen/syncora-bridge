@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Syncora Terminal</title>
+    <title>Syncora Terminal - Sponsor Demo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -336,24 +336,24 @@
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
             <div class="auth-badge">IA</div>
-            <h2 class="auth-title">Welcome to Syncora</h2>
-            <p class="auth-desc">Chat, Normal Call ya Live Translation ke liye apna number enter karein.</p>
+            <h2 class="auth-title">Syncora Sponsor Demo</h2>
+            <p class="auth-desc">Enter your mobile number to begin demo session.</p>
             <input type="tel" id="my-phone-input" class="auth-input" placeholder="Mobile Number (e.g. 03001234567)" onkeydown="if(event.key==='Enter'){ executeDirectLogin(); }">
-            <button class="btn-auth" onclick="executeDirectLogin()">Continue to Chat →</button>
+            <button class="btn-auth" onclick="executeDirectLogin()">Launch Terminal →</button>
         </div>
     </div>
 
     <div class="contacts-overlay" id="contacts-modal">
         <div class="contacts-card">
-            <h3 style="font-size: 17px; color: var(--accent-amber); font-family: 'Space Grotesk', sans-serif;">Start New Conversation</h3>
-            <p style="font-size: 12px; color: var(--text-muted);">Number enter karein, yeh lifetime ke liye list mein save ho jayega.</p>
+            <h3 style="font-size: 17px; color: var(--accent-amber); font-family: 'Space Grotesk', sans-serif;">Start New Demo Chat</h3>
+            <p style="font-size: 12px; color: var(--text-muted);">Enter partner's phone number.</p>
 
             <button class="btn-contact-opt" onclick="pickFromPhoneContacts()">
                 <span>📖</span> Select from Phone Contacts
             </button>
 
             <button class="btn-contact-opt wa-btn" onclick="shareInviteOnWhatsApp()">
-                <span>💬</span> Invite Friend on WhatsApp
+                <span>💬</span> Invite on WhatsApp
             </button>
 
             <div style="display: flex; align-items: center; gap: 8px; margin: 4px 0;">
@@ -362,7 +362,7 @@
                 <hr style="flex: 1; border: none; border-top: 1px solid var(--border-graphite);">
             </div>
 
-            <input type="tel" id="manual-contact-input" class="auth-input" placeholder="Enter Mobile Number (0301...)" style="margin-bottom: 6px;">
+            <input type="tel" id="manual-contact-input" class="auth-input" placeholder="Partner Number (0301...)" style="margin-bottom: 6px;">
             <button class="btn-auth" onclick="openManualChat()">Add & Open Chat</button>
 
             <button onclick="closeContactsModal()" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; margin-top: 4px;">
@@ -385,7 +385,7 @@
 
         <div class="call-subtitles-dock" id="call-subtitles-dock">
             <div style="font-size: 11px; font-weight: 700; color: var(--accent-amber); display:flex; justify-content:space-between;">
-                <span>🌐 Live AI Translation</span>
+                <span>🌐 Gemini AI Live Translation</span>
                 <span style="color:var(--online-green);">● Active</span>
             </div>
             <div style="font-size: 13px; font-weight: 600; color: #fff;" id="call-original-subtitle">Speaking...</div>
@@ -418,7 +418,7 @@
 
             <div class="settings-field">
                 <label>Bio / About</label>
-                <input type="text" id="settings-status-input" class="settings-input" placeholder="Hey there! I am using Syncora.">
+                <input type="text" id="settings-status-input" class="settings-input" placeholder="Syncora Demo User">
             </div>
 
             <button class="btn-save-settings" onclick="saveProfileChanges()">Save Changes</button>
@@ -426,29 +426,27 @@
         </div>
     </div>
 
-    <!-- SEND CONFIRMATION MODAL (Unified for Text & Voice) -->
+    <!-- SEND CONFIRMATION MODAL WITH 4 SPONSOR LANGUAGES -->
     <div class="send-modal-backdrop" id="send-modal">
         <div class="send-modal-card">
-            <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Confirm Dispatch</h3>
+            <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Confirm AI Translation</h3>
             <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Review message text</p>
 
             <div id="voice-edit-block" style="display:block; text-align:left;">
-                <label style="font-size: 11px; color: var(--text-muted);">Message / Content:</label>
+                <label style="font-size: 11px; color: var(--text-muted);">Message Content:</label>
                 <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Edit text if needed...">
             </div>
 
             <div class="lang-options-drawer" id="lang-drawer">
-                <label style="font-size: 11px; color: var(--text-muted);">Select Target Language:</label>
+                <label style="font-size: 11px; color: var(--text-muted);">Select Target Language (Sponsor Demo):</label>
                 <select class="lang-dropdown" id="modal-target-lang">
-                    <option value="en" selected>English (US)</option>
-                    <option value="ur">Urdu (اردو)</option>
-                    <option value="ar">Arabic (العربية)</option>
-                    <option value="de">German (Deutsch)</option>
-                    <option value="fr">French (Français)</option>
-                    <option value="es">Spanish (Español)</option>
+                    <option value="en" selected>English (en-US)</option>
+                    <option value="ur">Urdu (ur-PK)</option>
+                    <option value="ms">Malay (ms-MY)</option>
+                    <option value="zh">Simplified Chinese (zh-CN)</option>
                 </select>
                 <button class="modal-btn-choice btn-choice-trans" id="btn-modal-confirm-trans" onclick="confirmDispatchTranslation()">
-                    🌐 Translate & Send
+                    🌐 Translate via Gemini AI & Send
                 </button>
             </div>
 
@@ -499,7 +497,7 @@
                     <button class="icon-btn" onclick="backToSidebar()" id="mobile-back-btn" style="display:inline-block; font-size: 18px;">←</button>
                     <div class="chat-avatar" id="active-avatar">--</div>
                     <div style="overflow: hidden;">
-                        <div style="font-size: 13px; font-weight: 700;" id="active-partner-label">Select Chat</div>
+                        <div style="font-size: 13px; font-weight: 700;" id="active-partner-label">Select Demo Chat</div>
                         <div style="font-size: 10px; color: var(--text-muted);" id="active-partner-status">Offline</div>
                     </div>
                 </div>
@@ -514,7 +512,7 @@
                     <div class="call-buttons-group" id="call-buttons-dock" style="display: flex;">
                         <button class="btn-call-action" onclick="startCallSession('audio', false)" title="Normal Audio Call">📞</button>
                         <button class="btn-call-action" onclick="startCallSession('video', false)" title="Normal Video Call">📹</button>
-                        <button class="btn-call-action trans-call-btn" onclick="startCallSession('audio', true)" title="Call with Live AI Translation">🌐 Trans</button>
+                        <button class="btn-call-action trans-call-btn" onclick="startCallSession('audio', true)" title="Call with Gemini AI Translation">🌐 Trans</button>
                     </div>
                 </div>
             </header>
@@ -533,7 +531,7 @@
             <footer class="stage-input-bar">
                 <div class="input-shell" id="input-shell">
                     <button class="icon-btn" type="button" onclick="toggleAttachMenu()" title="Attach Link">📎</button>
-                    <input type="text" id="text-input" class="main-text-input" placeholder="Message..." onkeydown="if(event.key==='Enter'){ event.preventDefault(); stageMessageForDispatch(); }">
+                    <input type="text" id="text-input" class="main-text-input" placeholder="Type message for demo..." onkeydown="if(event.key==='Enter'){ event.preventDefault(); stageMessageForDispatch(); }">
                     <button class="btn-inside-mic" id="inside-mic-btn" type="button" onclick="toggleVoiceRecording()" title="Record Voice Note">🎙️</button>
                 </div>
 
@@ -685,18 +683,19 @@
             if (!clean) return;
 
             const utterance = new SpeechSynthesisUtterance(clean);
-            const hasUrdu = /[\u0600-\u06FF]/.test(clean);
-
             const voices = window.speechSynthesis.getVoices();
-            if (hasUrdu) {
-                const uv = voices.find(v => v.lang.toLowerCase().includes('ur') || v.lang.toLowerCase().includes('hi'));
-                if (uv) { utterance.voice = uv; utterance.lang = uv.lang; }
-                else { utterance.lang = 'ur-PK'; }
+            
+            let targetLocale = 'en-US';
+            if (lang === 'ur') targetLocale = 'ur-PK';
+            else if (lang === 'ms') targetLocale = 'ms-MY';
+            else if (lang === 'zh') targetLocale = 'zh-CN';
+
+            const mv = voices.find(v => v.lang.toLowerCase().includes(targetLocale.toLowerCase()) || v.lang.toLowerCase().startsWith(lang));
+            if (mv) {
+                utterance.voice = mv;
+                utterance.lang = mv.lang;
             } else {
-                const target = (lang || 'en').toLowerCase();
-                const mv = voices.find(v => v.lang.toLowerCase().startsWith(target));
-                if (mv) { utterance.voice = mv; utterance.lang = mv.lang; }
-                else { utterance.lang = 'en-US'; }
+                utterance.lang = targetLocale;
             }
 
             utterance.rate = 0.95;
@@ -794,7 +793,7 @@
         function shareInviteOnWhatsApp() {
             const origin = window.location.origin;
             const directLink = `${origin}/?chat=${encodeURIComponent(myPhone)}`;
-            const waMsg = encodeURIComponent(`Connect with me on Syncora Terminal for live text, audio call & voice translation:\n${directLink}`);
+            const waMsg = encodeURIComponent(`Join my Syncora AI Demo session here:\n${directLink}`);
             window.open(`https://api.whatsapp.com/send?text=${waMsg}`, '_blank');
         }
 
@@ -862,7 +861,7 @@
         }
 
         function executeLogout() {
-            if (confirm("Kiya aap waqai Syncora se Logout karna chahte hain?")) {
+            if (confirm("Log out from Syncora Demo?")) {
                 if (socket) { socket.close(); socket = null; }
                 localStorage.removeItem("syncora_user_phone");
                 localStorage.removeItem("syncora_active_partner");
@@ -971,7 +970,7 @@
                 <div class="chat-avatar">${partner.slice(-2)}</div>
                 <div class="chat-info">
                     <div class="chat-title">${partner}</div>
-                    <div class="chat-subtitle">Direct line active</div>
+                    <div class="chat-subtitle">Demo Line Ready</div>
                 </div>
             `;
             list.appendChild(item);
@@ -1053,12 +1052,12 @@
                 document.getElementById("call-modal").style.display = "flex";
 
                 if (isTranslateMode) {
-                    document.getElementById("call-status-text").innerText = "Outgoing AI Translation Call...";
+                    document.getElementById("call-status-text").innerText = "Gemini AI Translation Call Initiated...";
                     document.getElementById("call-subtitles-dock").style.display = "flex";
                     document.getElementById("call-original-subtitle").innerText = "Listening to your voice...";
                     document.getElementById("call-translated-subtitle").innerText = "Translation will stream here...";
                 } else {
-                    document.getElementById("call-status-text").innerText = `Outgoing Normal ${type.toUpperCase()} Call...`;
+                    document.getElementById("call-status-text").innerText = `Connecting ${type.toUpperCase()} Call...`;
                     document.getElementById("call-subtitles-dock").style.display = "none";
                 }
 
@@ -1133,7 +1132,7 @@
                 if (peerConnection) {
                     const state = peerConnection.iceConnectionState;
                     if (state === "connected" || state === "completed") {
-                        document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected (Live)";
+                        document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● Gemini AI Active" : "Call Connected (Live)";
                         const audioSink = document.getElementById("remote-audio-sink");
                         if (audioSink) { audioSink.play().catch(() => {}); }
                     } else if (state === "disconnected" || state === "failed") {
@@ -1157,18 +1156,18 @@
                 document.getElementById("call-modal").style.display = "flex";
 
                 if (isTranslationCallMode) {
-                    document.getElementById("call-status-text").innerText = "Incoming AI Translation Call...";
+                    document.getElementById("call-status-text").innerText = "Incoming Gemini AI Translation Call...";
                     document.getElementById("call-avatar-icon").innerText = "🌐";
                     document.getElementById("call-subtitles-dock").style.display = "flex";
                 } else {
-                    document.getElementById("call-status-text").innerText = `Incoming Normal ${currentCallType.toUpperCase()} Call...`;
+                    document.getElementById("call-status-text").innerText = `Incoming ${currentCallType.toUpperCase()} Call...`;
                     document.getElementById("call-avatar-icon").innerText = currentCallType === "video" ? "📹" : "📞";
                     document.getElementById("call-subtitles-dock").style.display = "none";
                 }
             } else if (data.signal_type === "answer") {
                 if (peerConnection) {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-                    document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected (Live)";
+                    document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● Gemini AI Active" : "Call Connected (Live)";
                 }
             } else if (data.signal_type === "end") {
                 closeCallUI();
@@ -1179,7 +1178,7 @@
             unlockMobileAudio();
             if (!pendingCallOffer) return;
             document.getElementById("btn-call-answer").style.display = "none";
-            document.getElementById("call-status-text").innerText = "Connecting live line...";
+            document.getElementById("call-status-text").innerText = "Establishing secure connection...";
 
             try {
                 localMediaStream = await obtainMediaStreamSafely(currentCallType);
@@ -1208,7 +1207,7 @@
                     }));
                 }
 
-                document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected (Live)";
+                document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● Gemini AI Active" : "Call Connected (Live)";
                 if (isTranslationCallMode) startLiveCallSpeechEngine();
             } catch (err) {
                 endCurrentCall();
@@ -1405,7 +1404,7 @@
                     };
 
                     document.getElementById("voice-hint-field").value = capturedLiveText.trim();
-                    document.getElementById("send-modal-preview").innerText = "Voice Note Captured";
+                    document.getElementById("send-modal-preview").innerText = "Voice Note Ready for Gemini AI";
                     document.getElementById("send-modal").style.display = "flex";
                 };
 
@@ -1472,7 +1471,7 @@
             }
         }
 
-        /* --- UNIFIED STAGING PIPELINE FOR TEXT & VOICE --- */
+        /* --- UNIFIED STAGING PIPELINE --- */
         function stageMessageForDispatch() {
             autoSelectFallbackPartner();
 
@@ -1494,7 +1493,7 @@
         function confirmDispatchOriginal() {
             if (!pendingPayload) return;
             const contentToSend = (pendingPayload.type === 'voice') ? pendingPayload.content : (document.getElementById("voice-hint-field").value.trim() || pendingPayload.content);
-            executeDispatch(contentToSend, "", pendingPayload.type);
+            executeDispatch(contentToSend, "", pendingPayload.type, "en");
             cancelDispatch();
         }
 
@@ -1506,7 +1505,7 @@
 
             const btn = document.getElementById("btn-modal-confirm-trans");
             const origText = btn.innerText;
-            btn.innerText = "Translating...";
+            btn.innerText = "Gemini Translating...";
             btn.disabled = true;
 
             let textToTranslate = document.getElementById("voice-hint-field").value.trim();
@@ -1529,7 +1528,6 @@
                     translatedText = textToTranslate;
                 }
             } else if (pendingPayload.type === 'voice') {
-                // For Voice Note: Translate hint/transcript if available
                 if (textToTranslate) {
                     try {
                         const res = await fetch("/translate", {
@@ -1605,8 +1603,8 @@
                         <div class="voice-card-private">
                             <button class="btn-play-voice-circle" onclick="playSpokenVoice('${safeTrans}', '${lang}')" title="Play Voice Note">▶</button>
                             <div class="voice-info-wrap">
-                                <span class="voice-title-label">🎙️ AI Voice Note (${lang.toUpperCase()})</span>
-                                <span class="voice-sub-label">Click ▶ to listen privately</span>
+                                <span class="voice-title-label">🎙️ Gemini AI Voice Note (${lang.toUpperCase()})</span>
+                                <span class="voice-sub-label">Click ▶ to listen</span>
                             </div>
                         </div>
                     `;
@@ -1627,7 +1625,7 @@
             }
 
             if (type === "text" && translated && translated.trim() !== "") {
-                body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
+                body += `<div class="bubble-translation">Gemini Translation: ${translated}</div>`;
             }
 
             let tickHtml = "";
