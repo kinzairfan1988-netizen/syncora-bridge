@@ -17,54 +17,48 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 DB_PATH = os.path.join(BASE_DIR, "syncora.db")
 
 def init_db():
-    conn = sqlite3.connect(DB_PATH, timeout=20)
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            phone TEXT PRIMARY KEY,
-            display_name TEXT,
-            about_status TEXT DEFAULT 'Hey there! I am using Syncora.',
-            avatar_url TEXT DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS user_contacts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_phone TEXT,
-            contact_phone TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(user_phone, contact_phone)
-        )
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            chat_id TEXT,
-            sender TEXT,
-            receiver TEXT,
-            msg_type TEXT,
-            content TEXT,
-            translated_content TEXT,
-            lang TEXT DEFAULT 'en',
-            status TEXT DEFAULT 'sent',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
     try:
-        cursor.execute("ALTER TABLE messages ADD COLUMN status TEXT DEFAULT 'sent'")
-    except Exception:
-        pass
-    try:
-        cursor.execute("ALTER TABLE messages ADD COLUMN lang TEXT DEFAULT 'en'")
-    except Exception:
-        pass
+        conn = sqlite3.connect(DB_PATH, timeout=20)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                phone TEXT PRIMARY KEY,
+                display_name TEXT,
+                about_status TEXT DEFAULT 'Hey there! I am using Syncora.',
+                avatar_url TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_contacts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_phone TEXT,
+                contact_phone TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_phone, contact_phone)
+            )
+        """)
 
-    conn.commit()
-    conn.close()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id TEXT,
+                sender TEXT,
+                receiver TEXT,
+                msg_type TEXT,
+                content TEXT,
+                translated_content TEXT,
+                lang TEXT DEFAULT 'en',
+                status TEXT DEFAULT 'sent',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[DB Init Error]: {e}")
 
 init_db()
 
@@ -154,6 +148,8 @@ class ConnectionManager:
     def disconnect(self, phone: str):
         if phone in self.active_sessions:
             del self.active_sessions[phone]
+
+    data_online = property(lambda self: list(self.active_sessions.keys()))
 
     def is_online(self, phone: str) -> bool:
         return phone.strip() in self.active_sessions
@@ -314,24 +310,6 @@ async def upload_media(file: UploadFile = File(...)):
 @app.websocket("/ws/{phone}")
 async def socket_endpoint(websocket: WebSocket, phone: str):
     await manager.connect(phone, websocket)
-    
-    try:
-        conn = sqlite3.connect(DB_PATH, timeout=20)
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT sender FROM messages WHERE receiver = ? AND status = 'sent'", (phone,))
-        senders = [row[0] for row in cursor.fetchall()]
-        cursor.execute("UPDATE messages SET status = 'delivered' WHERE receiver = ? AND status = 'sent'", (phone,))
-        conn.commit()
-        conn.close()
-
-        for s in senders:
-            await manager.send_to_user(s, {
-                "action": "messages_delivered",
-                "delivered_to": phone
-            })
-    except Exception as e:
-        print(f"[Delivered Error]: {e}")
-
     try:
         while True:
             raw_data = await websocket.receive_text()
@@ -406,7 +384,9 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
 @app.get("/")
 async def serve_index():
     index_file = os.path.join(BASE_DIR, "index.html")
-    return FileResponse(index_file)
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return JSONResponse(status_code=404, content={"error": "index.html not found in repository"})
 
 if __name__ == "__main__":
     import uvicorn
