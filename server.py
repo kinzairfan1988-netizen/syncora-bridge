@@ -388,6 +388,6 @@ async def serve_index():
         return FileResponse(index_file)
     return JSONResponse(status_code=404, content={"error": "index.html not found in repository"})
 
-    if __name__ == "__main__":
+   if __name__ == "__main__":
     import uvicorn
     uvicorn.run("server:app", host="0.0.0.0", port=8080, reload=False)
