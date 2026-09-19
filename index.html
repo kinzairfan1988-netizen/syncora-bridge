@@ -345,8 +345,8 @@
             <h3 style="font-size: 16px; color: var(--accent-amber);">🌐 Select Translation Language</h3>
             <p style="font-size: 12px; color: var(--text-muted);">Choose target language for live call translation:</p>
             <select class="lang-dropdown" id="call-target-lang-select" style="padding: 12px; border-radius: 10px; background: var(--surface-card); color: #fff; border: 1px solid var(--border-graphite); font-size: 14px; outline: none;">
-                <option value="en" selected>English (US)</option>
-                <option value="ur">Urdu (اردو)</option>
+                <option value="en">English (US)</option>
+                <option value="ur" selected>Urdu (اردو)</option>
                 <option value="ar">Arabic (العربية)</option>
                 <option value="de">German (Deutsch)</option>
                 <option value="fr">French (Français)</option>
@@ -669,7 +669,6 @@
         window.onload = async () => {
             renderChatListFromCache();
 
-            // Setup bulletproof event listeners for call buttons
             const acceptMainBtn = document.getElementById("btn-call-accept-main");
             if (acceptMainBtn) {
                 acceptMainBtn.addEventListener("click", () => { triggerIncomingSetupModal(); });
@@ -736,19 +735,12 @@
             if (!clean) return;
 
             const utterance = new SpeechSynthesisUtterance(clean);
-            const hasUrdu = /[\u0600-\u06FF]/.test(clean);
-
+            const target = (lang || 'en').toLowerCase();
             const voices = window.speechSynthesis.getVoices();
-            if (hasUrdu) {
-                const uv = voices.find(v => v.lang.toLowerCase().includes('ur') || v.lang.toLowerCase().includes('hi'));
-                if (uv) { utterance.voice = uv; utterance.lang = uv.lang; }
-                else { utterance.lang = 'ur-PK'; }
-            } else {
-                const target = (lang || 'en').toLowerCase();
-                const mv = voices.find(v => v.lang.toLowerCase().startsWith(target));
-                if (mv) { utterance.voice = mv; utterance.lang = mv.lang; }
-                else { utterance.lang = 'en-US'; }
-            }
+            
+            const mv = voices.find(v => v.lang.toLowerCase().startsWith(target));
+            if (mv) { utterance.voice = mv; utterance.lang = mv.lang; }
+            else { utterance.lang = target === 'ur' ? 'ur-PK' : 'en-US'; }
 
             utterance.rate = 0.95;
             utterance.pitch = 1.0;
@@ -946,8 +938,10 @@
                             if (isTranslationCallMode) {
                                 document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${data.translated}`;
+                                
+                                // Play translated speech using peer's intended target language
                                 if (data.sender !== myPhone && data.translated && data.translated.trim()) {
-                                    playSpokenVoice(data.translated, data.lang || currentSelectedTargetLang);
+                                    playSpokenVoice(data.translated, currentSelectedTargetLang);
                                 }
                             }
                         }
@@ -1058,13 +1052,14 @@
 
             try {
                 localMediaStream = await obtainMediaStreamSafely(type);
+                
                 document.getElementById("call-partner-name").innerText = activePartner;
                 document.getElementById("call-avatar-icon").innerText = type === "video" ? "📹" : (isTranslateMode ? "🌐" : "📞");
                 document.getElementById("btn-call-accept-main").style.display = "none";
                 document.getElementById("call-modal").style.display = "flex";
 
                 if (isTranslateMode) {
-                    document.getElementById("call-status-text").innerText = `Outgoing AI Translation Call (${currentSelectedTargetLang.toUpperCase()})...`;
+                    document.getElementById("call-status-text").innerText = `Connected ● AI Translation Active (${currentSelectedTargetLang.toUpperCase()})`;
                     document.getElementById("call-subtitles-dock").style.display = "flex";
                     document.getElementById("call-trans-header-label").innerText = `🌐 Live AI Translation (${currentSelectedTargetLang.toUpperCase()})`;
                 } else {
@@ -1121,12 +1116,13 @@
 
                 const audioSink = document.getElementById("remote-audio-sink");
                 if (audioSink) {
-                    audioSink.srcObject = remoteStream;
-                    audioSink.muted = false;
-                    audioSink.volume = 1.0;
-                    audioSink.play().catch(err => {
-                        console.log("Audio autoplay blocked:", err);
-                    });
+                    // In translation call mode, do not play raw remote audio stream directly to prevent echo/overlap
+                    audioSink.srcObject = isTranslationCallMode ? null : remoteStream;
+                    if (!isTranslationCallMode) {
+                        audioSink.muted = false;
+                        audioSink.volume = 1.0;
+                        audioSink.play().catch(() => {});
+                    }
                 }
             };
 
@@ -1159,6 +1155,7 @@
             } else if (data.signal_type === "answer") {
                 if (peerConnection) {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                    if (data.target_lang) currentSelectedTargetLang = data.target_lang;
                     document.getElementById("call-status-text").innerText = isTranslationCallMode ? `Connected ● AI Translation Active (${currentSelectedTargetLang.toUpperCase()})` : "Call Connected (Live)";
                 }
             } else if (data.signal_type === "end") { closeCallUI(); }
@@ -1234,7 +1231,8 @@
                 callSpeechRec = new SR();
                 callSpeechRec.continuous = true; 
                 callSpeechRec.interimResults = false; 
-                callSpeechRec.lang = 'ur-PK';
+                // Detect speech input language based on selected target or default to Urdu/English
+                callSpeechRec.lang = currentSelectedTargetLang === 'ur' ? 'ur-PK' : 'en-US';
 
                 callSpeechRec.onresult = async (event) => {
                     if (!isTranslationCallMode) return;
@@ -1255,6 +1253,7 @@
                                 
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${translated}`;
                                 
+                                // Broadcast caption to peer over websocket signaling channel
                                 if (socket && socket.readyState === WebSocket.OPEN && activePartner) {
                                     socket.send(JSON.stringify({ 
                                         action: "call_live_caption", 
