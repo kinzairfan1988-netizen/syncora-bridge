@@ -40,10 +40,10 @@
         .translate-bar select { background: #1f2937; color: #fff; border: 1px solid #374151; padding: 4px 8px; border-radius: 6px; font-size: 12px; outline: none; }
         .translate-bar span { color: #f59e0b; font-weight: bold; }
 
-        /* Contact Bar for switching partner */
+        /* Contact Bar */
         .contact-bar { padding: 8px 16px; background-color: #0f172a; border-bottom: 1px solid #222; display: flex; gap: 8px; }
-        .contact-bar input { margin: 0; padding: 6px 10px; font-size: 13px; background: #1e293b; border: 1px solid #334155; }
-        .contact-bar button { width: auto; padding: 6px 12px; font-size: 13px; background: #f59e0b; color: #000; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; }
+        .contact-bar input { margin: 0; padding: 6px 10px; font-size: 13px; background: #1e293b; border: 1px solid #334155; color: #fff; border-radius: 6px; outline: none; flex: 1; }
+        .contact-bar button { width: auto; padding: 6px 14px; font-size: 13px; background: #f59e0b; color: #000; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; }
 
         /* Chat Messages */
         .chat-messages { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background-color: #000; }
@@ -190,7 +190,7 @@
             };
         }
 
-        async function connectPartner() {
+            async function connectPartner() {
             const partner = document.getElementById("partnerInput").value.trim();
             if (!partner) return;
             currentPartner = partner;
