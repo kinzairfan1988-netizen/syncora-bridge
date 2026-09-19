@@ -1015,6 +1015,7 @@
                         call_type: type, is_translation_call: isTranslateMode, sdp: offer
                     }));
                 }
+                
                 if (isTranslateMode) startLiveCallSpeechEngine();
             } catch (err) { endCurrentCall(); }
         }
@@ -1121,6 +1122,7 @@
                     socket.send(JSON.stringify({ action: "call_signal", receiver: activePartner, signal_type: "answer", sdp: answer }));
                 }
                 document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected (Live)";
+                
                 if (isTranslationCallMode) startLiveCallSpeechEngine();
             } catch (err) { endCurrentCall(); }
         }
@@ -1129,31 +1131,53 @@
             const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SR) return;
             try {
+                if (callSpeechRec) { try { callSpeechRec.stop(); } catch(e){} }
+
                 callSpeechRec = new SR();
-                callSpeechRec.continuous = true; callSpeechRec.interimResults = false; callSpeechRec.lang = 'ur-PK';
+                callSpeechRec.continuous = true; 
+                callSpeechRec.interimResults = false; 
+                callSpeechRec.lang = 'ur-PK';
+
                 callSpeechRec.onresult = async (event) => {
                     if (!isTranslationCallMode) return;
                     for (let i = event.resultIndex; i < event.results.length; ++i) {
                         if (event.results[i].isFinal) {
                             const spokenText = event.results[i][0].transcript.trim();
                             if (!spokenText) continue;
+                            
                             document.getElementById("call-original-subtitle").innerText = `You: ${spokenText}`;
                             try {
                                 const res = await fetch("/translate", {
-                                    method: "POST", headers: { "Content-Type": "application/json" },
+                                    method: "POST", 
+                                    headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({ text: spokenText, target_lang: "en" })
                                 });
                                 const data = await res.json();
                                 const translated = data.translated_text || spokenText;
+                                
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${translated}`;
+                                
                                 if (socket && socket.readyState === WebSocket.OPEN && activePartner) {
-                                    socket.send(JSON.stringify({ action: "call_live_caption", receiver: activePartner, original: spokenText, translated: translated, lang: "en" }));
+                                    socket.send(JSON.stringify({ 
+                                        action: "call_live_caption", 
+                                        receiver: activePartner, 
+                                        original: spokenText, 
+                                        translated: translated, 
+                                        lang: "en" 
+                                    }));
                                 }
                             } catch(e){}
                         }
                     }
                 };
-                callSpeechRec.onend = () => { if (peerConnection && isTranslationCallMode) { try { callSpeechRec.start(); } catch(e){} } };
+
+                callSpeechRec.onerror = () => {};
+                callSpeechRec.onend = () => { 
+                    if (peerConnection && isTranslationCallMode) { 
+                        try { callSpeechRec.start(); } catch(e){} 
+                    } 
+                };
+
                 callSpeechRec.start();
             } catch(e){}
         }
