@@ -1,6 +1,7 @@
 fastapi
-uvicorn
 gunicorn
 pydantic
 python-multipart
 requests
+uvicorn[standard]
+websockets
