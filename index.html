@@ -231,12 +231,12 @@
             border-radius: 8px; color: var(--text-primary); cursor: pointer; font-size: 13px;
         }
 
-        .contacts-overlay, .settings-overlay, .send-modal-backdrop {
+        .contacts-overlay, .settings-overlay, .send-modal-backdrop, .call-setup-backdrop {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88);
             backdrop-filter: blur(10px); z-index: 998; display: none;
             align-items: center; justify-content: center; padding: 20px;
         }
-        .contacts-card, .settings-card, .send-modal-card {
+        .contacts-card, .settings-card, .send-modal-card, .call-setup-card {
             background: var(--surface-panel); border: 1px solid var(--border-graphite);
             border-radius: 20px; width: 100%; max-width: 380px; padding: 22px;
             display: flex; flex-direction: column; gap: 12px; text-align: center;
@@ -327,7 +327,6 @@
 </head>
 <body onclick="unlockMobileAudio()">
 
-    <!-- CRITICAL AUDIO FIX: Disabled autoplay on sink to prevent local audio loopback echo -->
     <audio id="remote-audio-sink" playsinline></audio>
 
     <div class="auth-overlay" id="auth-overlay">
@@ -337,6 +336,24 @@
             <p class="auth-desc">Chat, Call & Live AI Translation Terminal</p>
             <input type="tel" id="my-phone-input" class="auth-input" placeholder="Mobile Number (e.g. 03001234567)" onkeydown="if(event.key==='Enter'){ executeDirectLogin(); }">
             <button class="btn-auth" onclick="executeDirectLogin()">Enter Terminal →</button>
+        </div>
+    </div>
+
+    <!-- Call Setup Language Picker Modal -->
+    <div class="call-setup-backdrop" id="call-setup-modal">
+        <div class="call-setup-card">
+            <h3 style="font-size: 16px; color: var(--accent-amber);">🌐 Select Translation Language</h3>
+            <p style="font-size: 12px; color: var(--text-muted);">Choose target language for live call translation:</p>
+            <select class="lang-dropdown" id="call-target-lang-select" style="padding: 12px; border-radius: 10px; background: var(--surface-card); color: #fff; border: 1px solid var(--border-graphite); font-size: 14px; outline: none;">
+                <option value="en" selected>English (US)</option>
+                <option value="ur">Urdu (اردو)</option>
+                <option value="ar">Arabic (العربية)</option>
+                <option value="de">German (Deutsch)</option>
+                <option value="fr">French (Français)</option>
+                <option value="es">Spanish (Español)</option>
+            </select>
+            <button class="btn-auth" onclick="confirmAndStartTranslationCall()">Start Translated Call →</button>
+            <button onclick="document.getElementById('call-setup-modal').style.display='none'" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:12px;">Cancel</button>
         </div>
     </div>
 
@@ -382,7 +399,7 @@
 
         <div class="call-subtitles-dock" id="call-subtitles-dock">
             <div style="font-size: 11px; font-weight: 700; color: var(--accent-amber); display:flex; justify-content:space-between;">
-                <span>🌐 Live AI Translation</span>
+                <span id="call-trans-header-label">🌐 Live AI Translation</span>
                 <span style="color:var(--online-green);">● Active</span>
             </div>
             <div style="font-size: 13px; font-weight: 600; color: #fff;" id="call-original-subtitle">Speaking...</div>
@@ -510,7 +527,7 @@
                     <div class="call-buttons-group" id="call-buttons-dock" style="display: flex;">
                         <button class="btn-call-action" onclick="startCallSession('audio', false)" title="Normal Audio Call">📞</button>
                         <button class="btn-call-action" onclick="startCallSession('video', false)" title="Normal Video Call">📹</button>
-                        <button class="btn-call-action trans-call-btn" onclick="startCallSession('audio', true)" title="Call with Live AI Translation">🌐 Trans</button>
+                        <button class="btn-call-action trans-call-btn" onclick="promptTranslationCall()" title="Call with Live AI Translation">🌐 Trans</button>
                     </div>
                 </div>
             </header>
@@ -599,6 +616,7 @@
         let localMediaStream = null;
         let currentCallType = "audio";
         let isTranslationCallMode = false;
+        let currentSelectedTargetLang = "en";
         let isMicMuted = false;
         let callSpeechRec = null;
 
@@ -888,7 +906,7 @@
                             if (isTranslationCallMode) {
                                 document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${data.translated}`;
-                                if (data.translated && data.translated.trim()) playSpokenVoice(data.translated, data.lang || "en");
+                                if (data.translated && data.translated.trim()) playSpokenVoice(data.translated, data.lang || currentSelectedTargetLang);
                             }
                         }
                     } catch(e){}
@@ -973,15 +991,22 @@
         async function obtainMediaStreamSafely(type) {
             try {
                 return await navigator.mediaDevices.getUserMedia({
-                    audio: { 
-                        echoCancellation: true, 
-                        noiseSuppression: true, 
-                        autoGainControl: true,
-                        googEchoCancellation: true
-                    },
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, googEchoCancellation: true },
                     video: (type === "video")
                 });
             } catch (err) { alert("Microphone permission required."); throw err; }
+        }
+
+        function promptTranslationCall() {
+            if (!activePartner) { alert("Pehle contact select karein!"); return; }
+            document.getElementById("call-setup-modal").style.display = "flex";
+        }
+
+        function confirmAndStartTranslationCall() {
+            const selectEl = document.getElementById("call-target-lang-select");
+            currentSelectedTargetLang = selectEl ? selectEl.value : "en";
+            document.getElementById("call-setup-modal").style.display = "none";
+            startCallSession('audio', true);
         }
 
         async function startCallSession(type, isTranslateMode = false) {
@@ -997,8 +1022,9 @@
                 document.getElementById("call-modal").style.display = "flex";
 
                 if (isTranslateMode) {
-                    document.getElementById("call-status-text").innerText = "Outgoing AI Translation Call...";
+                    document.getElementById("call-status-text").innerText = `Outgoing AI Translation Call (${currentSelectedTargetLang.toUpperCase()})...`;
                     document.getElementById("call-subtitles-dock").style.display = "flex";
+                    document.getElementById("call-trans-header-label").innerText = `🌐 Live AI Translation (${currentSelectedTargetLang.toUpperCase()})`;
                 } else {
                     document.getElementById("call-status-text").innerText = `Outgoing Normal ${type.toUpperCase()} Call...`;
                     document.getElementById("call-subtitles-dock").style.display = "none";
@@ -1010,11 +1036,7 @@
                 } else { document.getElementById("call-video-container").style.display = "none"; }
 
                 initPeerConnection();
-                
-                // Add local tracks with transceiver to prevent loopback
-                localMediaStream.getTracks().forEach(track => { 
-                    peerConnection.addTrack(track, localMediaStream); 
-                });
+                localMediaStream.getTracks().forEach(track => { peerConnection.addTrack(track, localMediaStream); });
 
                 const offer = await peerConnection.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: (type === "video") });
                 await peerConnection.setLocalDescription(offer);
@@ -1022,7 +1044,7 @@
                 if (socket && socket.readyState === WebSocket.OPEN) {
                     socket.send(JSON.stringify({
                         action: "call_signal", receiver: activePartner, signal_type: "offer",
-                        call_type: type, is_translation_call: isTranslateMode, sdp: offer
+                        call_type: type, is_translation_call: isTranslateMode, target_lang: currentSelectedTargetLang, sdp: offer
                     }));
                 }
                 
@@ -1052,10 +1074,7 @@
                 
                 if (currentCallType === "video") {
                     const rv = document.getElementById("remote-video");
-                    if (rv) { 
-                        rv.srcObject = remoteStream; 
-                        rv.play().catch(() => {}); 
-                    }
+                    if (rv) { rv.srcObject = remoteStream; rv.play().catch(() => {}); }
                 }
 
                 const audioSink = document.getElementById("remote-audio-sink");
@@ -1063,9 +1082,8 @@
                     audioSink.srcObject = remoteStream;
                     audioSink.muted = false;
                     audioSink.volume = 1.0;
-                    // Safely play remote stream on distinct sink element
                     audioSink.play().catch(err => {
-                        console.log("Audio autoplay blocked, requires gesture:", err);
+                        console.log("Audio autoplay blocked:", err);
                     });
                 }
             };
@@ -1074,7 +1092,7 @@
                 if (peerConnection) {
                     const state = peerConnection.iceConnectionState;
                     if (state === "connected" || state === "completed") {
-                        document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected (Live)";
+                        document.getElementById("call-status-text").innerText = isTranslationCallMode ? `Connected ● AI Translation Active (${currentSelectedTargetLang.toUpperCase()})` : "Call Connected (Live)";
                     } else if (state === "disconnected" || state === "failed") {
                         document.getElementById("call-status-text").innerText = "Reconnecting...";
                     }
@@ -1087,17 +1105,22 @@
         async function handleIncomingCallSignal(data) {
             if (data.signal_type === "offer") {
                 pendingCallOffer = data; activePartner = data.sender;
-                currentCallType = data.call_type || "audio"; isTranslationCallMode = !!data.is_translation_call;
+                currentCallType = data.call_type || "audio"; 
+                isTranslationCallMode = !!data.is_translation_call;
+                currentSelectedTargetLang = data.target_lang || "en";
 
                 document.getElementById("call-partner-name").innerText = data.sender;
                 document.getElementById("btn-call-answer").style.display = "flex";
                 document.getElementById("call-modal").style.display = "flex";
-                document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Incoming AI Translation Call..." : `Incoming ${currentCallType.toUpperCase()} Call...`;
+                document.getElementById("call-status-text").innerText = isTranslationCallMode ? `Incoming AI Translation Call (${currentSelectedTargetLang.toUpperCase()})...` : `Incoming ${currentCallType.toUpperCase()} Call...`;
                 document.getElementById("call-subtitles-dock").style.display = isTranslationCallMode ? "flex" : "none";
+                if(isTranslationCallMode) {
+                    document.getElementById("call-trans-header-label").innerText = `🌐 Live AI Translation (${currentSelectedTargetLang.toUpperCase()})`;
+                }
             } else if (data.signal_type === "answer") {
                 if (peerConnection) {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-                    document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected (Live)";
+                    document.getElementById("call-status-text").innerText = isTranslationCallMode ? `Connected ● AI Translation Active (${currentSelectedTargetLang.toUpperCase()})` : "Call Connected (Live)";
                 }
             } else if (data.signal_type === "end") { closeCallUI(); }
         }
@@ -1125,7 +1148,7 @@
                 if (socket && socket.readyState === WebSocket.OPEN) {
                     socket.send(JSON.stringify({ action: "call_signal", receiver: activePartner, signal_type: "answer", sdp: answer }));
                 }
-                document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected (Live)";
+                document.getElementById("call-status-text").innerText = isTranslationCallMode ? `Connected ● AI Translation Active (${currentSelectedTargetLang.toUpperCase()})` : "Call Connected (Live)";
                 
                 if (isTranslationCallMode) startLiveCallSpeechEngine();
             } catch (err) { endCurrentCall(); }
@@ -1154,7 +1177,7 @@
                                 const res = await fetch("/translate", {
                                     method: "POST", 
                                     headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ text: spokenText, target_lang: "en" })
+                                    body: JSON.stringify({ text: spokenText, target_lang: currentSelectedTargetLang })
                                 });
                                 const data = await res.json();
                                 const translated = data.translated_text || spokenText;
@@ -1167,7 +1190,7 @@
                                         receiver: activePartner, 
                                         original: spokenText, 
                                         translated: translated, 
-                                        lang: "en" 
+                                        lang: currentSelectedTargetLang 
                                     }));
                                 }
                             } catch(e){}
@@ -1201,6 +1224,7 @@
             if (audioSink) audioSink.srcObject = null;
 
             document.getElementById("call-modal").style.display = "none";
+            document.getElementById("call-setup-modal").style.display = "none";
             document.getElementById("call-video-container").style.display = "none";
             document.getElementById("call-subtitles-dock").style.display = "none";
             isTranslationCallMode = false; pendingCallOffer = null;
