@@ -327,7 +327,7 @@
 </head>
 <body onclick="unlockMobileAudio()">
 
-    <audio id="remote-audio-sink" playsinline></audio>
+    <audio id="remote-audio-sink" autoplay playsinline></audio>
 
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
@@ -991,7 +991,7 @@
         async function obtainMediaStreamSafely(type) {
             try {
                 return await navigator.mediaDevices.getUserMedia({
-                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, googEchoCancellation: true },
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
                     video: (type === "video")
                 });
             } catch (err) { alert("Microphone permission required."); throw err; }
