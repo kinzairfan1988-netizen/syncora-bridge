@@ -68,7 +68,7 @@ def init_db():
 
 init_db()
 
-app = FastAPI(title="Syncora Terminal Demo Engine")
+app = FastAPI(title="Syncora Terminal Sponsor Demo Engine")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 class DirectLoginRequest(BaseModel):
@@ -92,71 +92,58 @@ def get_chat_id(u1: str, u2: str) -> str:
     cleaned = sorted([u1.strip(), u2.strip()])
     return f"chat_{cleaned[0]}_{cleaned[1]}"
 
-def has_urdu_arabic_script(text: str) -> bool:
-    return bool(re.search(r'[\u0600-\u06FF]', text))
-
-ROMAN_URDU_MARKERS = [
-    "karo", "karein", "kaho", "kya", "kiya", "kaisy", "kaise", "rahy", "rahe", 
-    "hain", "hai", "hon", "hoon", "nahi", "nhi", "chek", "ab", "pe", "per", 
-    "mai", "main", "ko", "se", "aur", "or", "bhi", "yeh", "ye", "woh", "wo",
-    "theek", "thik", "acha", "batao", "kaky", "bhai", "mera", "meri", "ap", "aap", "sun", "kya"
-]
-
-def is_probable_roman_urdu(text: str) -> bool:
-    tokens = re.findall(r'\b[a-zA-Z]+\b', text.lower())
-    match_count = sum(1 for t in tokens if t in ROMAN_URDU_MARKERS)
-    return match_count >= 1
-
-# Bulletproof Clean Translation Engine (No 'auto' param errors)
-def translate_robust(text: str, target_lang: str) -> str:
+# Gemini API Powered High-Accuracy Translation Engine for Demo
+def translate_via_gemini(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
         return ""
 
     target_lang = target_lang.strip().lower()
-    is_script_urdu = has_urdu_arabic_script(clean)
-    is_roman_urdu = is_probable_roman_urdu(clean)
+    
+    # Map target language codes to clear names for Gemini prompt
+    lang_map = {
+        "ur": "Urdu",
+        "en": "English",
+        "ms": "Bahasa Melayu (Malay)",
+        "zh": "Simplified Chinese"
+    }
+    target_name = lang_map.get(target_lang, "English")
 
-    # Determine source language strictly as 'ur' or 'en'
-    if is_script_urdu or is_roman_urdu:
-        source_lang = "ur"
-    else:
-        source_lang = "en"
-
-    # If source and target are same, return clean text directly
-    if source_lang == target_lang:
+    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not gemini_key:
         return clean
 
-    # Tier 1: Google GTX Single Endpoint
+    try:
+        prompt = f"Translate the following text accurately into {target_name}. If the input is in Roman Urdu, Urdu, English, Malay, or Chinese, translate its exact meaning naturally. Return ONLY the translated text without any quotation marks, introductory notes, or extra comments: {clean}"
+        payload = json.dumps({
+            "contents": [{"parts": [{"text": prompt}]}]
+        }).encode('utf-8')
+        
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+        req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+        
+        with urllib.request.urlopen(req, timeout=6) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            candidate = res_data.get("candidates", [])[0]
+            out_text = candidate.get("content", {}).get("parts", [])[0].get("text", "").strip()
+            if out_text:
+                return out_text
+    except Exception as e:
+        print(f"[Gemini API Error]: {e}")
+
+    # Fallback to Google GTX if Gemini rate-limits
     try:
         q_enc = urllib.parse.quote(clean.encode('utf-8'))
-        url_g = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source_lang}&tl={target_lang}&dt=t&q={q_enc}"
-        req_g = urllib.request.Request(url_g, headers={
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        })
+        url_g = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target_lang}&dt=t&q={q_enc}"
+        req_g = urllib.request.Request(url_g, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req_g, timeout=4) as response:
             res_json = json.loads(response.read().decode('utf-8'))
             if res_json and isinstance(res_json, list) and len(res_json) > 0 and res_json[0]:
                 out = "".join([part[0] for part in res_json[0] if part and part[0]]).strip()
-                if out and "INVALID SOURCE" not in out.upper():
+                if out:
                     return out
     except Exception as e:
-        print(f"[Google GTX Error]: {e}")
-
-    # Tier 2: MyMemory API Fallback (Strict 2-letter codes)
-    try:
-        q_enc = urllib.parse.quote(clean.encode('utf-8'))
-        pair = f"{source_lang}|{target_lang}"
-        url_mm = f"https://api.mymemory.translated.net/get?q={q_enc}&langpair={pair}"
-        req_mm = urllib.request.Request(url_mm, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req_mm, timeout=4) as response:
-            res_data = json.loads(response.read().decode('utf-8'))
-            if res_data and "responseData" in res_data and res_data["responseData"]["translatedText"]:
-                out_text = res_data["responseData"]["translatedText"].strip()
-                if out_text and "WARNING" not in out_text.upper() and "INVALID" not in out_text.upper():
-                    return out_text
-    except Exception as e:
-        print(f"[MyMemory Error]: {e}")
+        print(f"[GTX Fallback Error]: {e}")
 
     return clean
 
@@ -259,7 +246,7 @@ async def translate_text(req: TranslationRequest):
         return {"translated_text": ""}
 
     target_lang = req.target_lang.strip().lower() if req.target_lang else "en"
-    translated = translate_robust(clean, target_lang)
+    translated = translate_via_gemini(clean, target_lang)
     return {"translated_text": translated}
 
 @app.get("/api/chats/{phone}")
