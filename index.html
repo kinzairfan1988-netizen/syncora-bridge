@@ -939,7 +939,6 @@
                                 document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${data.translated}`;
                                 
-                                // Play translated speech on remote peer side using selected target language
                                 if (data.sender !== myPhone && data.translated && data.translated.trim()) {
                                     playSpokenVoice(data.translated, currentSelectedTargetLang);
                                 }
@@ -1116,7 +1115,6 @@
 
                 const audioSink = document.getElementById("remote-audio-sink");
                 if (audioSink) {
-                    // For normal calls play stream, for translation calls rely on TTS translation bridge
                     audioSink.srcObject = isTranslationCallMode ? null : remoteStream;
                     if (!isTranslationCallMode) {
                         audioSink.muted = false;
@@ -1231,7 +1229,6 @@
                 callSpeechRec = new SR();
                 callSpeechRec.continuous = true; 
                 callSpeechRec.interimResults = false; 
-                // Listen in Urdu by default for speech recognition input, translating to chosen target lang
                 callSpeechRec.lang = 'ur-PK';
 
                 callSpeechRec.onresult = async (event) => {
@@ -1253,7 +1250,6 @@
                                 
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${translated}`;
                                 
-                                // Send caption to peer over websocket signaling channel
                                 if (socket && socket.readyState === WebSocket.OPEN && activePartner) {
                                     socket.send(JSON.stringify({ 
                                         action: "call_live_caption", 
