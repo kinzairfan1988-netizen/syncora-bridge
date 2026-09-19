@@ -426,7 +426,6 @@
         </div>
     </div>
 
-    <!-- SEND CONFIRMATION MODAL (Unified for Text & Voice) -->
     <div class="send-modal-backdrop" id="send-modal">
         <div class="send-modal-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Confirm Dispatch</h3>
@@ -612,21 +611,20 @@
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
                 { urls: "stun:stun1.l.google.com:19302" },
-                { urls: "stun:stun2.l.google.com:19302" },
                 {
-                    urls: "turn:openrelay.metered.ca:80",
-                    username: "openrelayproject",
-                    credential: "openrelayproject"
+                    urls: "turn:global.relay.metered.ca:80",
+                    username: "a9981881b835e5d3cd1e3ea7",
+                    credential: "f6/G0F0H0l0D0+0K"
                 },
                 {
-                    urls: "turn:openrelay.metered.ca:443",
-                    username: "openrelayproject",
-                    credential: "openrelayproject"
+                    urls: "turn:global.relay.metered.ca:443",
+                    username: "a9981881b835e5d3cd1e3ea7",
+                    credential: "f6/G0F0H0l0D0+0K"
                 },
                 {
-                    urls: "turn:openrelay.metered.ca:443?transport=tcp",
-                    username: "openrelayproject",
-                    credential: "openrelayproject"
+                    urls: "turn:global.relay.metered.ca:443?transport=tcp",
+                    username: "a9981881b835e5d3cd1e3ea7",
+                    credential: "f6/G0F0H0l0D0+0K"
                 }
             ],
             iceCandidatePoolSize: 10,
@@ -1037,7 +1035,6 @@
             }
         }
 
-        /* --- WEBRTC CALL ENGINE --- */
         async function startCallSession(type, isTranslateMode = false) {
             unlockMobileAudio();
             if (!activePartner) { alert("Pehle contact select karein!"); return; }
@@ -1472,7 +1469,6 @@
             }
         }
 
-        /* --- UNIFIED STAGING PIPELINE FOR TEXT & VOICE --- */
         function stageMessageForDispatch() {
             autoSelectFallbackPartner();
 
@@ -1529,7 +1525,6 @@
                     translatedText = textToTranslate;
                 }
             } else if (pendingPayload.type === 'voice') {
-                // For Voice Note: Translate hint/transcript if available
                 if (textToTranslate) {
                     try {
                         const res = await fetch("/translate", {
