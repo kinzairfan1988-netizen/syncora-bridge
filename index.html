@@ -233,7 +233,7 @@
 
         .contacts-overlay, .settings-overlay, .send-modal-backdrop, .call-setup-backdrop, .incoming-setup-backdrop {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88);
-            backdrop-filter: blur(10px); z-index: 998; display: none;
+            backdrop-filter: blur(10px); z-index: 9999; display: none;
             align-items: center; justify-content: center; padding: 20px;
         }
         .contacts-card, .settings-card, .send-modal-card, .call-setup-card, .incoming-setup-card {
@@ -277,7 +277,7 @@
 
         .call-modal-overlay {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95);
-            backdrop-filter: blur(14px); z-index: 1000; display: none;
+            backdrop-filter: blur(14px); z-index: 9998; display: none;
             flex-direction: column; align-items: center; justify-content: space-between;
             padding: 30px 20px;
         }
@@ -373,8 +373,8 @@
                     <option value="es">Spanish (Español)</option>
                 </select>
             </div>
-            <button class="btn-auth" style="background: var(--online-green); color: #fff; margin-top: 6px;" onclick="acceptCallWithLanguage()">Accept & Connect Call</button>
-            <button onclick="rejectIncomingCall()" style="background: var(--danger-red-dim); border: 1px solid rgba(239, 68, 68, 0.4); color: var(--danger-red); padding: 10px; border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: 700;">Decline Call</button>
+            <button class="btn-auth" id="btn-confirm-accept-call" style="background: var(--online-green); color: #fff; margin-top: 6px;">Accept & Connect Call</button>
+            <button id="btn-confirm-decline-call" style="background: var(--danger-red-dim); border: 1px solid rgba(239, 68, 68, 0.4); color: var(--danger-red); padding: 10px; border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: 700;">Decline Call</button>
         </div>
     </div>
 
@@ -429,7 +429,7 @@
 
         <div class="call-controls-row">
             <button class="btn-call-btn btn-call-mute" id="btn-toggle-mic" onclick="toggleCallMic()">🎤</button>
-            <button class="btn-call-btn btn-call-accept" id="btn-call-accept-main" style="display:none;" onclick="triggerIncomingSetupModal()">📞</button>
+            <button class="btn-call-btn btn-call-accept" id="btn-call-accept-main" style="display:none;">📞</button>
             <button class="btn-call-btn btn-call-end" onclick="endCurrentCall()">📵</button>
         </div>
     </div>
@@ -668,6 +668,25 @@
 
         window.onload = async () => {
             renderChatListFromCache();
+
+            // Setup bulletproof event listeners for call buttons
+            const acceptMainBtn = document.getElementById("btn-call-accept-main");
+            if (acceptMainBtn) {
+                acceptMainBtn.addEventListener("click", () => { triggerIncomingSetupModal(); });
+                acceptMainBtn.addEventListener("touchend", (e) => { e.preventDefault(); triggerIncomingSetupModal(); });
+            }
+
+            const confirmAcceptBtn = document.getElementById("btn-confirm-accept-call");
+            if (confirmAcceptBtn) {
+                confirmAcceptBtn.addEventListener("click", () => { acceptCallWithLanguage(); });
+                confirmAcceptBtn.addEventListener("touchend", (e) => { e.preventDefault(); acceptCallWithLanguage(); });
+            }
+
+            const confirmDeclineBtn = document.getElementById("btn-confirm-decline-call");
+            if (confirmDeclineBtn) {
+                confirmDeclineBtn.addEventListener("click", () => { rejectIncomingCall(); });
+                confirmDeclineBtn.addEventListener("touchend", (e) => { e.preventDefault(); rejectIncomingCall(); });
+            }
 
             if (myPhone) {
                 document.getElementById("auth-overlay").style.display = "none";
