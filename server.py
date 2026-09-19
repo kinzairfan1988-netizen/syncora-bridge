@@ -149,8 +149,6 @@ class ConnectionManager:
         if phone in self.active_sessions:
             del self.active_sessions[phone]
 
-    data_online = property(lambda self: list(self.active_sessions.keys()))
-
     def is_online(self, phone: str) -> bool:
         return phone.strip() in self.active_sessions
 
@@ -386,8 +384,8 @@ async def serve_index():
     index_file = os.path.join(BASE_DIR, "index.html")
     if os.path.exists(index_file):
         return FileResponse(index_file)
-    return JSONResponse(status_code=404, content={"error": "index.html not found in repository"})
+    return JSONResponse(status_code=404, content={"error": "index.html not found"})
 
-   if __name__ == "__main__":
+if __name__ == "__main__":
     import uvicorn
     uvicorn.run("server:app", host="0.0.0.0", port=8080, reload=False)
