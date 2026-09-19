@@ -345,8 +345,8 @@
             <h3 style="font-size: 16px; color: var(--accent-amber);">🌐 Select Translation Language</h3>
             <p style="font-size: 12px; color: var(--text-muted);">Choose target language for live call translation:</p>
             <select class="lang-dropdown" id="call-target-lang-select" style="padding: 12px; border-radius: 10px; background: var(--surface-card); color: #fff; border: 1px solid var(--border-graphite); font-size: 14px; outline: none;">
-                <option value="en">English (US)</option>
-                <option value="ur" selected>Urdu (اردو)</option>
+                <option value="en" selected>English (US)</option>
+                <option value="ur">Urdu (اردو)</option>
                 <option value="ar">Arabic (العربية)</option>
                 <option value="de">German (Deutsch)</option>
                 <option value="fr">French (Français)</option>
@@ -939,6 +939,7 @@
                                 document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${data.translated}`;
                                 
+                                // CRITICAL FIX: Only play speech on the RECEIVING end, never loop back to sender!
                                 if (data.sender !== myPhone && data.translated && data.translated.trim()) {
                                     playSpokenVoice(data.translated, currentSelectedTargetLang);
                                 }
@@ -1229,7 +1230,8 @@
                 callSpeechRec = new SR();
                 callSpeechRec.continuous = true; 
                 callSpeechRec.interimResults = false; 
-                callSpeechRec.lang = 'ur-PK';
+                // CRITICAL FIX: Set speech recognition language to English (US) so any spoken words are captured cleanly
+                callSpeechRec.lang = 'en-US';
 
                 callSpeechRec.onresult = async (event) => {
                     if (!isTranslationCallMode) return;
@@ -1339,7 +1341,7 @@
                 if (SR) {
                     try {
                         speechRecognitionEngine = new SR();
-                        speechRecognitionEngine.continuous = true; speechRecognitionEngine.interimResults = true; speechRecognitionEngine.lang = 'ur-PK';
+                        speechRecognitionEngine.continuous = true; speechRecognitionEngine.interimResults = true; speechRecognitionEngine.lang = 'en-US';
                         speechRecognitionEngine.onresult = (ev) => {
                             let textSoFar = "";
                             for (let i = 0; i < ev.results.length; ++i) textSoFar += ev.results[i][0].transcript + " ";
@@ -1371,7 +1373,7 @@
                 isRecording = true;
                 document.getElementById("input-shell").style.display = "none";
                 document.getElementById("recording-bar").style.display = "flex";
-                document.getElementById("rec-live-words").innerText = "Listening (Urdu)...";
+                document.getElementById("rec-live-words").innerText = "Listening...";
             } catch (err) { alert("Mic error: " + err.message); }
         }
 
