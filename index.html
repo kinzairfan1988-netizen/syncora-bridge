@@ -327,7 +327,8 @@
 </head>
 <body onclick="unlockMobileAudio()">
 
-    <audio id="remote-audio-sink" autoplay playsinline></audio>
+    <!-- CRITICAL AUDIO FIX: Disabled autoplay on sink to prevent local audio loopback echo -->
+    <audio id="remote-audio-sink" playsinline></audio>
 
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
@@ -972,7 +973,12 @@
         async function obtainMediaStreamSafely(type) {
             try {
                 return await navigator.mediaDevices.getUserMedia({
-                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+                    audio: { 
+                        echoCancellation: true, 
+                        noiseSuppression: true, 
+                        autoGainControl: true,
+                        googEchoCancellation: true
+                    },
                     video: (type === "video")
                 });
             } catch (err) { alert("Microphone permission required."); throw err; }
@@ -1004,7 +1010,11 @@
                 } else { document.getElementById("call-video-container").style.display = "none"; }
 
                 initPeerConnection();
-                localMediaStream.getTracks().forEach(track => { peerConnection.addTrack(track, localMediaStream); });
+                
+                // Add local tracks with transceiver to prevent loopback
+                localMediaStream.getTracks().forEach(track => { 
+                    peerConnection.addTrack(track, localMediaStream); 
+                });
 
                 const offer = await peerConnection.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: (type === "video") });
                 await peerConnection.setLocalDescription(offer);
@@ -1053,10 +1063,9 @@
                     audioSink.srcObject = remoteStream;
                     audioSink.muted = false;
                     audioSink.volume = 1.0;
-                    audioSink.play().then(() => {
-                        console.log("Remote audio playing successfully on system!");
-                    }).catch(err => {
-                        console.log("Audio autoplay blocked by browser policy:", err);
+                    // Safely play remote stream on distinct sink element
+                    audioSink.play().catch(err => {
+                        console.log("Audio autoplay blocked, requires gesture:", err);
                     });
                 }
             };
@@ -1066,11 +1075,6 @@
                     const state = peerConnection.iceConnectionState;
                     if (state === "connected" || state === "completed") {
                         document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected (Live)";
-                        const audioSink = document.getElementById("remote-audio-sink");
-                        if (audioSink) {
-                            audioSink.muted = false;
-                            audioSink.play().catch(() => {});
-                        }
                     } else if (state === "disconnected" || state === "failed") {
                         document.getElementById("call-status-text").innerText = "Reconnecting...";
                     }
