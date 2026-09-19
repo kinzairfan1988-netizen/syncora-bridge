@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Syncora Terminal</title>
+    <title>Syncora Terminal - Final Production</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -30,13 +30,9 @@
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
         html, body {
-            height: 100%;
-            height: 100dvh;
-            width: 100vw;
-            overflow: hidden;
+            height: 100%; height: 100dvh; width: 100vw; overflow: hidden;
             font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
-            background-color: var(--bg-obsidian);
-            color: var(--text-primary);
+            background-color: var(--bg-obsidian); color: var(--text-primary);
         }
 
         .auth-overlay {
@@ -337,16 +333,16 @@
         <div class="auth-card">
             <div class="auth-badge">IA</div>
             <h2 class="auth-title">Welcome to Syncora</h2>
-            <p class="auth-desc">Chat, Normal Call ya Live Translation ke liye apna number enter karein.</p>
+            <p class="auth-desc">Chat, Call & Live AI Translation Terminal</p>
             <input type="tel" id="my-phone-input" class="auth-input" placeholder="Mobile Number (e.g. 03001234567)" onkeydown="if(event.key==='Enter'){ executeDirectLogin(); }">
-            <button class="btn-auth" onclick="executeDirectLogin()">Continue to Chat →</button>
+            <button class="btn-auth" onclick="executeDirectLogin()">Enter Terminal →</button>
         </div>
     </div>
 
     <div class="contacts-overlay" id="contacts-modal">
         <div class="contacts-card">
             <h3 style="font-size: 17px; color: var(--accent-amber); font-family: 'Space Grotesk', sans-serif;">Start New Conversation</h3>
-            <p style="font-size: 12px; color: var(--text-muted);">Number enter karein, yeh lifetime ke liye list mein save ho jayega.</p>
+            <p style="font-size: 12px; color: var(--text-muted);">Number enter karein, chat list mein add ho jayega.</p>
 
             <button class="btn-contact-opt" onclick="pickFromPhoneContacts()">
                 <span>📖</span> Select from Phone Contacts
@@ -571,9 +567,7 @@
                     window.speechSynthesis.speak(silentUtterance);
                 }
                 const audioSink = document.getElementById("remote-audio-sink");
-                if (audioSink) {
-                    audioSink.play().catch(() => {});
-                }
+                if (audioSink) { audioSink.play().catch(() => {}); }
                 mobileAudioUnlocked = true;
             } catch(e) {}
         }
@@ -701,9 +695,7 @@
             utterance.pitch = 1.0;
             utterance.volume = 1.0;
 
-            setTimeout(() => {
-                window.speechSynthesis.speak(utterance);
-            }, 100);
+            setTimeout(() => { window.speechSynthesis.speak(utterance); }, 100);
         }
 
         async function registerPermanentContact(partnerPhone) {
@@ -770,8 +762,7 @@
         async function pickFromPhoneContacts() {
             if ('contacts' in navigator && 'ContactsManager' in window) {
                 try {
-                    const props = ['tel', 'name'];
-                    const contacts = await navigator.contacts.select(props, { multiple: false });
+                    const contacts = await navigator.contacts.select(['tel', 'name'], { multiple: false });
                     if (contacts && contacts.length > 0) {
                         let selectedNumber = (contacts[0].tel && contacts[0].tel.length > 0) ? contacts[0].tel[0] : "";
                         selectedNumber = selectedNumber.replace(/\s+/g, '').replace(/-/g, '');
@@ -784,7 +775,7 @@
                     }
                 } catch (err) {}
             } else {
-                alert("Phone contact picker is not available. Use manual entry below.");
+                alert("Phone contact picker not available. Use manual entry below.");
                 document.getElementById("manual-contact-input").focus();
             }
         }
@@ -798,10 +789,7 @@
 
         async function openManualChat() {
             const num = document.getElementById("manual-contact-input").value.trim();
-            if (!num || num === myPhone) {
-                alert("Valid mobile number enter karein.");
-                return;
-            }
+            if (!num || num === myPhone) { alert("Valid mobile number enter karein."); return; }
             closeContactsModal();
             await registerPermanentContact(num);
             await loadRecentChats();
@@ -812,13 +800,10 @@
             const cleanQ = query.toLowerCase().trim();
             const list = document.getElementById("chat-list");
             list.innerHTML = "";
-            const filtered = allChatsCache.filter(c => c.toLowerCase().includes(cleanQ));
-            filtered.forEach(partner => renderChatItem(partner));
+            allChatsCache.filter(c => c.toLowerCase().includes(cleanQ)).forEach(partner => renderChatItem(partner));
         }
 
-        function switchTab(tab) {
-            if (tab === 'chats') backToSidebar();
-        }
+        function switchTab(tab) { if (tab === 'chats') backToSidebar(); }
 
         async function loadUserProfileData() {
             if (!myPhone) return;
@@ -832,31 +817,17 @@
             } catch (e) {}
         }
 
-        function openSettingsModal() {
-            loadUserProfileData();
-            document.getElementById("settings-modal").style.display = "flex";
-        }
-
+        function openSettingsModal() { loadUserProfileData(); document.getElementById("settings-modal").style.display = "flex"; }
         function closeSettingsModal() { document.getElementById("settings-modal").style.display = "none"; }
 
         async function saveProfileChanges() {
             const name = document.getElementById("settings-name-input").value.trim();
             const status = document.getElementById("settings-status-input").value.trim();
-
             const res = await fetch("/api/user/profile/update", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    phone: myPhone,
-                    display_name: name,
-                    about_status: status,
-                    avatar_url: currentAvatarUrl
-                })
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: myPhone, display_name: name, about_status: status, avatar_url: currentAvatarUrl })
             });
-            if (res.ok) {
-                alert("Settings saved successfully!");
-                closeSettingsModal();
-            }
+            if (res.ok) { alert("Settings saved successfully!"); closeSettingsModal(); }
         }
 
         function executeLogout() {
@@ -865,10 +836,8 @@
                 localStorage.removeItem("syncora_user_phone");
                 localStorage.removeItem("syncora_active_partner");
                 localStorage.removeItem("syncora_cached_chats");
-                myPhone = "";
-                activePartner = "";
+                myPhone = ""; activePartner = "";
                 closeSettingsModal();
-                document.getElementById("my-phone-input").value = "";
                 document.getElementById("auth-overlay").style.display = "flex";
             }
         }
@@ -888,9 +857,7 @@
                     document.getElementById("my-status-label").innerText = `● ${myPhone}`;
                     if (heartbeatInterval) clearInterval(heartbeatInterval);
                     heartbeatInterval = setInterval(() => {
-                        if (socket && socket.readyState === WebSocket.OPEN) {
-                            socket.send(JSON.stringify({ action: "ping" }));
-                        }
+                        if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ action: "ping" }));
                     }, 15000);
                 };
 
@@ -906,17 +873,11 @@
                             }
                             loadRecentChats();
                         } 
-                        else if (data.action === "message_sent_ack") {
-                            updateBubbleStatus(data.id, data.status);
-                        }
+                        else if (data.action === "message_sent_ack") { updateBubbleStatus(data.id, data.status); }
                         else if (data.action === "messages_delivered") {
-                            if (data.delivered_to === activePartner) {
-                                markAllSentBubblesDelivered();
-                            }
+                            if (data.delivered_to === activePartner) markAllSentBubblesDelivered();
                         }
-                        else if (data.action === "call_signal") {
-                            handleIncomingCallSignal(data);
-                        } 
+                        else if (data.action === "call_signal") { handleIncomingCallSignal(data); } 
                         else if (data.action === "ice_candidate") {
                             if (peerConnection && data.candidate) {
                                 try { await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) {}
@@ -926,21 +887,16 @@
                             if (isTranslationCallMode) {
                                 document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${data.translated}`;
-                                
-                                if (data.translated && data.translated.trim()) {
-                                    playSpokenVoice(data.translated, data.lang || "en");
-                                }
+                                if (data.translated && data.translated.trim()) playSpokenVoice(data.translated, data.lang || "en");
                             }
                         }
                     } catch(e){}
                 };
 
                 socket.onclose = () => {
-                    isConnectingSocket = false;
-                    socket = null;
+                    isConnectingSocket = false; socket = null;
                     if (myPhone) setTimeout(initSocketSafe, 3000);
                 };
-
                 socket.onerror = () => { isConnectingSocket = false; };
             } catch(e) { isConnectingSocket = false; }
         }
@@ -950,11 +906,7 @@
             try {
                 const res = await fetch(`/api/chats/${myPhone}`);
                 const data = await res.json();
-                const fresh = data.chats || [];
-                
-                fresh.forEach(p => {
-                    if (!allChatsCache.includes(p)) allChatsCache.push(p);
-                });
+                (data.chats || []).forEach(p => { if (!allChatsCache.includes(p)) allChatsCache.push(p); });
                 localStorage.setItem("syncora_cached_chats", JSON.stringify(allChatsCache));
                 renderChatListFromCache();
             } catch(e){}
@@ -995,8 +947,7 @@
                 const box = document.getElementById("messages-container");
                 box.innerHTML = "";
                 data.messages.forEach(m => {
-                    const type = m.sender === myPhone ? "sent" : "received";
-                    appendBubble(m.content, type, m.translated_content, m.msg_type, m.time, m.id, m.status, m.lang || "en");
+                    appendBubble(m.content, m.sender === myPhone ? "sent" : "received", m.translated_content, m.msg_type, m.time, m.id, m.status, m.lang || "en");
                 });
                 loadRecentChats();
             } catch(e){}
@@ -1008,13 +959,8 @@
                 const res = await fetch(`/api/user/status/${activePartner}`);
                 const data = await res.json();
                 const statusEl = document.getElementById("active-partner-status");
-                if (data.online) {
-                    statusEl.innerText = "● Online";
-                    statusEl.style.color = "var(--online-green)";
-                } else {
-                    statusEl.innerText = "Offline";
-                    statusEl.style.color = "var(--text-muted)";
-                }
+                if (data.online) { statusEl.innerText = "● Online"; statusEl.style.color = "var(--online-green)"; }
+                else { statusEl.innerText = "Offline"; statusEl.style.color = "var(--text-muted)"; }
             } catch(e){}
         }
 
@@ -1029,21 +975,16 @@
                     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
                     video: (type === "video")
                 });
-            } catch (err) {
-                alert("Microphone permission required. Allow from address bar 🔒.");
-                throw err;
-            }
+            } catch (err) { alert("Microphone permission required."); throw err; }
         }
 
         async function startCallSession(type, isTranslateMode = false) {
             unlockMobileAudio();
             if (!activePartner) { alert("Pehle contact select karein!"); return; }
-            currentCallType = type;
-            isTranslationCallMode = isTranslateMode;
+            currentCallType = type; isTranslationCallMode = isTranslateMode;
 
             try {
                 localMediaStream = await obtainMediaStreamSafely(type);
-
                 document.getElementById("call-partner-name").innerText = activePartner;
                 document.getElementById("call-avatar-icon").innerText = type === "video" ? "📹" : (isTranslateMode ? "🌐" : "📞");
                 document.getElementById("btn-call-answer").style.display = "none";
@@ -1052,8 +993,6 @@
                 if (isTranslateMode) {
                     document.getElementById("call-status-text").innerText = "Outgoing AI Translation Call...";
                     document.getElementById("call-subtitles-dock").style.display = "flex";
-                    document.getElementById("call-original-subtitle").innerText = "Listening to your voice...";
-                    document.getElementById("call-translated-subtitle").innerText = "Translation will stream here...";
                 } else {
                     document.getElementById("call-status-text").innerText = `Outgoing Normal ${type.toUpperCase()} Call...`;
                     document.getElementById("call-subtitles-dock").style.display = "none";
@@ -1062,66 +1001,44 @@
                 if (type === "video") {
                     document.getElementById("call-video-container").style.display = "block";
                     document.getElementById("local-video").srcObject = localMediaStream;
-                } else {
-                    document.getElementById("call-video-container").style.display = "none";
-                }
+                } else { document.getElementById("call-video-container").style.display = "none"; }
 
                 initPeerConnection();
                 localMediaStream.getTracks().forEach(track => peerConnection.addTrack(track, localMediaStream));
 
-                const offer = await peerConnection.createOffer({
-                    offerToReceiveAudio: true,
-                    offerToReceiveVideo: (type === "video")
-                });
+                const offer = await peerConnection.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: (type === "video") });
                 await peerConnection.setLocalDescription(offer);
 
                 if (socket && socket.readyState === WebSocket.OPEN) {
                     socket.send(JSON.stringify({
-                        action: "call_signal",
-                        receiver: activePartner,
-                        signal_type: "offer",
-                        call_type: type,
-                        is_translation_call: isTranslateMode,
-                        sdp: offer
+                        action: "call_signal", receiver: activePartner, signal_type: "offer",
+                        call_type: type, is_translation_call: isTranslateMode, sdp: offer
                     }));
                 }
-
                 if (isTranslateMode) startLiveCallSpeechEngine();
-            } catch (err) {
-                endCurrentCall();
-            }
+            } catch (err) { endCurrentCall(); }
         }
 
         function initPeerConnection() {
-            if (peerConnection) { 
-                try { peerConnection.close(); } catch(e){} 
-                peerConnection = null; 
-            }
+            if (peerConnection) { try { peerConnection.close(); } catch(e){} peerConnection = null; }
             peerConnection = new RTCPeerConnection(rtcConfig);
 
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate && socket && socket.readyState === WebSocket.OPEN && activePartner) {
-                    socket.send(JSON.stringify({
-                        action: "ice_candidate",
-                        receiver: activePartner,
-                        candidate: event.candidate
-                    }));
+                    socket.send(JSON.stringify({ action: "ice_candidate", receiver: activePartner, candidate: event.candidate }));
                 }
             };
 
             peerConnection.ontrack = (event) => {
                 const remoteStream = event.streams[0] || new MediaStream([event.track]);
-                
                 if (currentCallType === "video") {
                     const rv = document.getElementById("remote-video");
                     if (rv) { rv.srcObject = remoteStream; rv.play().catch(() => {}); }
                 }
-                
                 const audioSink = document.getElementById("remote-audio-sink");
                 if (audioSink) {
                     audioSink.srcObject = remoteStream;
-                    audioSink.muted = false;
-                    audioSink.volume = 1.0;
+                    audioSink.muted = false; audioSink.volume = 1.0;
                     audioSink.play().catch(() => {});
                 }
             };
@@ -1132,7 +1049,7 @@
                     if (state === "connected" || state === "completed") {
                         document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected (Live)";
                         const audioSink = document.getElementById("remote-audio-sink");
-                        if (audioSink) { audioSink.play().catch(() => {}); }
+                        if (audioSink) audioSink.play().catch(() => {});
                     } else if (state === "disconnected" || state === "failed") {
                         document.getElementById("call-status-text").innerText = "Reconnecting...";
                     }
@@ -1144,32 +1061,20 @@
 
         async function handleIncomingCallSignal(data) {
             if (data.signal_type === "offer") {
-                pendingCallOffer = data;
-                activePartner = data.sender;
-                currentCallType = data.call_type || "audio";
-                isTranslationCallMode = !!data.is_translation_call;
+                pendingCallOffer = data; activePartner = data.sender;
+                currentCallType = data.call_type || "audio"; isTranslationCallMode = !!data.is_translation_call;
 
                 document.getElementById("call-partner-name").innerText = data.sender;
                 document.getElementById("btn-call-answer").style.display = "flex";
                 document.getElementById("call-modal").style.display = "flex";
-
-                if (isTranslationCallMode) {
-                    document.getElementById("call-status-text").innerText = "Incoming AI Translation Call...";
-                    document.getElementById("call-avatar-icon").innerText = "🌐";
-                    document.getElementById("call-subtitles-dock").style.display = "flex";
-                } else {
-                    document.getElementById("call-status-text").innerText = `Incoming Normal ${currentCallType.toUpperCase()} Call...`;
-                    document.getElementById("call-avatar-icon").innerText = currentCallType === "video" ? "📹" : "📞";
-                    document.getElementById("call-subtitles-dock").style.display = "none";
-                }
+                document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Incoming AI Translation Call..." : `Incoming ${currentCallType.toUpperCase()} Call...`;
+                document.getElementById("call-subtitles-dock").style.display = isTranslationCallMode ? "flex" : "none";
             } else if (data.signal_type === "answer") {
                 if (peerConnection) {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
                     document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected (Live)";
                 }
-            } else if (data.signal_type === "end") {
-                closeCallUI();
-            }
+            } else if (data.signal_type === "end") { closeCallUI(); }
         }
 
         async function acceptIncomingCall() {
@@ -1180,7 +1085,6 @@
 
             try {
                 localMediaStream = await obtainMediaStreamSafely(currentCallType);
-
                 if (currentCallType === "video") {
                     document.getElementById("call-video-container").style.display = "block";
                     document.getElementById("local-video").srcObject = localMediaStream;
@@ -1190,79 +1094,46 @@
                 localMediaStream.getTracks().forEach(track => peerConnection.addTrack(track, localMediaStream));
 
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(pendingCallOffer.sdp));
-                const answer = await peerConnection.createAnswer({
-                    offerToReceiveAudio: true,
-                    offerToReceiveVideo: (currentCallType === "video")
-                });
+                const answer = await peerConnection.createAnswer({ offerToReceiveAudio: true, offerToReceiveVideo: (currentCallType === "video") });
                 await peerConnection.setLocalDescription(answer);
 
                 if (socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({
-                        action: "call_signal",
-                        receiver: activePartner,
-                        signal_type: "answer",
-                        sdp: answer
-                    }));
+                    socket.send(JSON.stringify({ action: "call_signal", receiver: activePartner, signal_type: "answer", sdp: answer }));
                 }
-
                 document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Connected ● AI Translation Active" : "Call Connected (Live)";
                 if (isTranslationCallMode) startLiveCallSpeechEngine();
-            } catch (err) {
-                endCurrentCall();
-            }
+            } catch (err) { endCurrentCall(); }
         }
 
         function startLiveCallSpeechEngine() {
             const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SR) return;
-
             try {
                 callSpeechRec = new SR();
-                callSpeechRec.continuous = true;
-                callSpeechRec.interimResults = false;
-                callSpeechRec.lang = 'ur-PK';
-
+                callSpeechRec.continuous = true; callSpeechRec.interimResults = false; callSpeechRec.lang = 'ur-PK';
                 callSpeechRec.onresult = async (event) => {
                     if (!isTranslationCallMode) return;
                     for (let i = event.resultIndex; i < event.results.length; ++i) {
                         if (event.results[i].isFinal) {
                             const spokenText = event.results[i][0].transcript.trim();
                             if (!spokenText) continue;
-
                             document.getElementById("call-original-subtitle").innerText = `You: ${spokenText}`;
-
                             try {
                                 const res = await fetch("/translate", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
+                                    method: "POST", headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({ text: spokenText, target_lang: "en" })
                                 });
                                 const data = await res.json();
                                 const translated = data.translated_text || spokenText;
-
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${translated}`;
-
                                 if (socket && socket.readyState === WebSocket.OPEN && activePartner) {
-                                    socket.send(JSON.stringify({
-                                        action: "call_live_caption",
-                                        receiver: activePartner,
-                                        original: spokenText,
-                                        translated: translated,
-                                        lang: "en"
-                                    }));
+                                    socket.send(JSON.stringify({ action: "call_live_caption", receiver: activePartner, original: spokenText, translated: translated, lang: "en" }));
                                 }
                             } catch(e){}
                         }
                     }
                 };
-
-                callSpeechRec.onerror = () => {};
-                callSpeechRec.onend = () => {
-                    if (peerConnection && isTranslationCallMode) {
-                        try { callSpeechRec.start(); } catch(e){}
-                    }
-                };
-
+                callSpeechRec.onend = () => { if (peerConnection && isTranslationCallMode) { try { callSpeechRec.start(); } catch(e){} } };
                 callSpeechRec.start();
             } catch(e){}
         }
@@ -1275,28 +1146,16 @@
         }
 
         function closeCallUI() {
-            if (peerConnection) { 
-                try { peerConnection.close(); } catch(e){} 
-                peerConnection = null; 
-            }
-            if (localMediaStream) { 
-                localMediaStream.getTracks().forEach(t => t.stop()); 
-                localMediaStream = null; 
-            }
-            if (callSpeechRec) { 
-                try { callSpeechRec.stop(); } catch(e){} 
-                callSpeechRec = null; 
-            }
+            if (peerConnection) { try { peerConnection.close(); } catch(e){} peerConnection = null; }
+            if (localMediaStream) { localMediaStream.getTracks().forEach(t => t.stop()); localMediaStream = null; }
+            if (callSpeechRec) { try { callSpeechRec.stop(); } catch(e){} callSpeechRec = null; }
             const audioSink = document.getElementById("remote-audio-sink");
-            if (audioSink) { 
-                audioSink.srcObject = null; 
-            }
+            if (audioSink) audioSink.srcObject = null;
 
             document.getElementById("call-modal").style.display = "none";
             document.getElementById("call-video-container").style.display = "none";
             document.getElementById("call-subtitles-dock").style.display = "none";
-            isTranslationCallMode = false;
-            pendingCallOffer = null;
+            isTranslationCallMode = false; pendingCallOffer = null;
         }
 
         function toggleCallMic() {
@@ -1317,9 +1176,7 @@
         document.addEventListener('click', (e) => {
             const menu = document.getElementById("attach-menu");
             if (menu && menu.style.display === "flex") {
-                if (!e.target.closest('#attach-menu') && !e.target.closest('button[title="Attach Link"]')) {
-                    menu.style.display = "none";
-                }
+                if (!e.target.closest('#attach-menu') && !e.target.closest('button[title="Attach Link"]')) menu.style.display = "none";
             }
         });
 
@@ -1331,76 +1188,40 @@
 
         async function startVoiceRecording() {
             autoSelectFallbackPartner();
-
             try {
                 activeAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
-                let mimeOptions = ["audio/webm", "audio/mp4", "audio/ogg", ""];
-                let chosenMime = "";
-                for (let m of mimeOptions) {
-                    if (!m || MediaRecorder.isTypeSupported(m)) {
-                        chosenMime = m;
-                        break;
-                    }
-                }
+                let chosenMime = ["audio/webm", "audio/mp4", "audio/ogg", ""].find(m => !m || MediaRecorder.isTypeSupported(m)) || "";
 
                 mediaRecorder = chosenMime ? new MediaRecorder(activeAudioStream, { mimeType: chosenMime }) : new MediaRecorder(activeAudioStream);
-                recordedChunks = [];
-                capturedLiveText = "";
+                recordedChunks = []; capturedLiveText = "";
 
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
                         speechRecognitionEngine = new SR();
-                        speechRecognitionEngine.continuous = true;
-                        speechRecognitionEngine.interimResults = true;
-                        speechRecognitionEngine.lang = 'ur-PK';
-
-                        const liveDisplay = document.getElementById("rec-live-words");
-
+                        speechRecognitionEngine.continuous = true; speechRecognitionEngine.interimResults = true; speechRecognitionEngine.lang = 'ur-PK';
                         speechRecognitionEngine.onresult = (ev) => {
                             let textSoFar = "";
-                            for (let i = 0; i < ev.results.length; ++i) {
-                                textSoFar += ev.results[i][0].transcript + " ";
-                            }
+                            for (let i = 0; i < ev.results.length; ++i) textSoFar += ev.results[i][0].transcript + " ";
                             capturedLiveText = textSoFar.trim();
-                            if (liveDisplay && capturedLiveText) {
-                                liveDisplay.innerText = capturedLiveText;
-                            }
+                            const liveDisplay = document.getElementById("rec-live-words");
+                            if (liveDisplay && capturedLiveText) liveDisplay.innerText = capturedLiveText;
                         };
-
-                        speechRecognitionEngine.onend = () => {
-                            if (isRecording && speechRecognitionEngine) {
-                                try { speechRecognitionEngine.start(); } catch(e){}
-                            }
-                        };
-
+                        speechRecognitionEngine.onend = () => { if (isRecording && speechRecognitionEngine) { try { speechRecognitionEngine.start(); } catch(e){} } };
                         speechRecognitionEngine.start();
                     } catch(e){}
                 }
 
-                mediaRecorder.ondataavailable = (e) => {
-                    if (e.data && e.data.size > 0) {
-                        recordedChunks.push(e.data);
-                    }
-                };
-
+                mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
                 mediaRecorder.onstop = async () => {
                     if (recordedChunks.length === 0) return;
-                    const ext = (chosenMime && chosenMime.includes("mp4")) ? "m4a" : "webm";
                     const blob = new Blob(recordedChunks, { type: chosenMime || "audio/webm" });
-                    
                     const form = new FormData();
-                    form.append("file", blob, `voice.${ext}`);
+                    form.append("file", blob, `voice.${chosenMime.includes("mp4") ? "m4a" : "webm"}`);
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
 
-                    pendingPayload = {
-                        type: "voice",
-                        content: data.url,
-                        hint: capturedLiveText.trim()
-                    };
-
+                    pendingPayload = { type: "voice", content: data.url, hint: capturedLiveText.trim() };
                     document.getElementById("voice-hint-field").value = capturedLiveText.trim();
                     document.getElementById("send-modal-preview").innerText = "Voice Note Captured";
                     document.getElementById("send-modal").style.display = "flex";
@@ -1408,47 +1229,26 @@
 
                 mediaRecorder.start(100);
                 isRecording = true;
-
                 document.getElementById("input-shell").style.display = "none";
                 document.getElementById("recording-bar").style.display = "flex";
                 document.getElementById("rec-live-words").innerText = "Listening (Urdu)...";
-
-            } catch (err) {
-                alert("Microphone permission error: " + err.message);
-            }
+            } catch (err) { alert("Mic error: " + err.message); }
         }
 
         function stopAndFinishRecording() {
             setTimeout(() => {
-                if (speechRecognitionEngine) { 
-                    try { speechRecognitionEngine.stop(); } catch(e){} 
-                    speechRecognitionEngine = null;
-                }
-                if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                    mediaRecorder.stop();
-                }
-                if (activeAudioStream) {
-                    activeAudioStream.getTracks().forEach(t => t.stop());
-                    activeAudioStream = null;
-                }
+                if (speechRecognitionEngine) { try { speechRecognitionEngine.stop(); } catch(e){} speechRecognitionEngine = null; }
+                if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+                if (activeAudioStream) { activeAudioStream.getTracks().forEach(t => t.stop()); activeAudioStream = null; }
                 resetRecordingUI();
             }, 300);
         }
 
         function cancelRecording() {
-            capturedLiveText = "";
-            recordedChunks = [];
-            if (speechRecognitionEngine) { 
-                try { speechRecognitionEngine.stop(); } catch(e){} 
-                speechRecognitionEngine = null;
-            }
-            if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                mediaRecorder.stop();
-            }
-            if (activeAudioStream) {
-                activeAudioStream.getTracks().forEach(t => t.stop());
-                activeAudioStream = null;
-            }
+            capturedLiveText = ""; recordedChunks = [];
+            if (speechRecognitionEngine) { try { speechRecognitionEngine.stop(); } catch(e){} speechRecognitionEngine = null; }
+            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+            if (activeAudioStream) { activeAudioStream.getTracks().forEach(t => t.stop()); activeAudioStream = null; }
             resetRecordingUI();
         }
 
@@ -1460,32 +1260,21 @@
         }
 
         function autoSelectFallbackPartner() {
-            if (!activePartner || activePartner.startsWith("call-")) {
-                activePartner = localStorage.getItem("syncora_active_partner") || "";
-            }
-            if (!activePartner && allChatsCache.length > 0) {
-                activePartner = allChatsCache[0];
-                selectChat(activePartner);
-            }
+            if (!activePartner || activePartner.startsWith("call-")) activePartner = localStorage.getItem("syncora_active_partner") || "";
+            if (!activePartner && allChatsCache.length > 0) { activePartner = allChatsCache[0]; selectChat(activePartner); }
         }
 
         function stageMessageForDispatch() {
             autoSelectFallbackPartner();
-
-            const input = document.getElementById("text-input");
-            const text = input.value.trim();
+            const text = document.getElementById("text-input").value.trim();
             if (!text) return;
-
             pendingPayload = { type: "text", content: text };
             document.getElementById("voice-hint-field").value = text;
             document.getElementById("send-modal-preview").innerText = `"${text.substring(0, 30)}"`;
             document.getElementById("send-modal").style.display = "flex";
         }
 
-        function cancelDispatch() {
-            pendingPayload = null;
-            document.getElementById("send-modal").style.display = "none";
-        }
+        function cancelDispatch() { pendingPayload = null; document.getElementById("send-modal").style.display = "none"; }
 
         function confirmDispatchOriginal() {
             if (!pendingPayload) return;
@@ -1496,89 +1285,41 @@
 
         async function confirmDispatchTranslation() {
             if (!pendingPayload) return;
-
-            const langSelect = document.getElementById("modal-target-lang");
-            const targetLang = (langSelect && langSelect.value) ? langSelect.value : "en";
-
+            const targetLang = document.getElementById("modal-target-lang").value || "en";
             const btn = document.getElementById("btn-modal-confirm-trans");
-            const origText = btn.innerText;
-            btn.innerText = "Translating...";
-            btn.disabled = true;
+            btn.innerText = "Translating..."; btn.disabled = true;
 
-            let textToTranslate = document.getElementById("voice-hint-field").value.trim();
-            if (!textToTranslate) {
-                textToTranslate = pendingPayload.content;
-            }
-
+            let textToTranslate = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
             let translatedText = "";
 
-            if (textToTranslate && pendingPayload.type === 'text') {
+            if (textToTranslate) {
                 try {
                     const res = await fetch("/translate", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        method: "POST", headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
                     });
                     const data = await res.json();
-                    translatedText = (data && data.translated_text && data.translated_text.trim()) ? data.translated_text : textToTranslate;
-                } catch (e) {
-                    translatedText = textToTranslate;
-                }
-            } else if (pendingPayload.type === 'voice') {
-                if (textToTranslate) {
-                    try {
-                        const res = await fetch("/translate", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
-                        });
-                        const data = await res.json();
-                        translatedText = (data && data.translated_text && data.translated_text.trim()) ? data.translated_text : "";
-                    } catch (e) {}
-                }
+                    translatedText = (data && data.translated_text) ? data.translated_text : textToTranslate;
+                } catch (e) { translatedText = textToTranslate; }
             }
 
-            btn.innerText = origText;
-            btn.disabled = false;
-
-            let finalContent = (pendingPayload.type === "voice") ? pendingPayload.content : textToTranslate;
-            
-            executeDispatch(finalContent, translatedText, pendingPayload.type, targetLang);
+            btn.innerText = "🌐 Translate & Send"; btn.disabled = false;
+            executeDispatch((pendingPayload.type === "voice") ? pendingPayload.content : textToTranslate, translatedText, pendingPayload.type, targetLang);
             cancelDispatch();
         }
 
         function executeDispatch(content, translated, msgType, lang = "en") {
             autoSelectFallbackPartner();
-
-            if (!activePartner) {
-                alert("Target contact select nahi hai! Sidebar se contact chunein.");
-                return;
-            }
+            if (!activePartner) { alert("Target contact select nahi hai!"); return; }
 
             const tempId = "msg_temp_" + Date.now();
-            
-            try {
-                appendBubble(content, "sent", translated, msgType, "now", tempId, "sent", lang);
-            } catch(e) {}
-            
+            try { appendBubble(content, "sent", translated, msgType, "now", tempId, "sent", lang); } catch(e) {}
             document.getElementById("text-input").value = "";
 
-            if (!socket || socket.readyState !== WebSocket.OPEN) {
-                initSocketSafe();
-            }
-
+            if (!socket || socket.readyState !== WebSocket.OPEN) initSocketSafe();
             if (socket && socket.readyState === WebSocket.OPEN) {
-                const payload = {
-                    action: "chat_message",
-                    receiver: activePartner,
-                    msg_type: msgType,
-                    content: content,
-                    translated: translated,
-                    lang: lang
-                };
-                socket.send(JSON.stringify(payload));
+                socket.send(JSON.stringify({ action: "chat_message", receiver: activePartner, msg_type: msgType, content: content, translated: translated, lang: lang }));
             }
-
             loadRecentChats();
         }
 
@@ -1591,32 +1332,34 @@
             let body = `<div>${content}</div>`;
             if (type === "media") {
                 body = `<img src="${content}" style="max-width:100%; border-radius:8px; display:block;">`;
-            } 
-            else if (type === "voice") {
+            } else if (type === "voice") {
                 const safeTrans = (translated || "").replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                
                 if (translated && translated.trim() !== "") {
+                    const uniqueBtnId = "voice_btn_" + Math.random().toString(36).substring(2, 9);
                     body = `
                         <div class="voice-card-private">
-                            <button class="btn-play-voice-circle" onclick="playSpokenVoice('${safeTrans}', '${lang}')" title="Play Voice Note">▶</button>
+                            <button id="${uniqueBtnId}" class="btn-play-voice-circle" title="Play Voice Note">▶</button>
                             <div class="voice-info-wrap">
                                 <span class="voice-title-label">🎙️ AI Voice Note (${lang.toUpperCase()})</span>
                                 <span class="voice-sub-label">Click ▶ to listen privately</span>
                             </div>
                         </div>
                     `;
+                    setTimeout(() => {
+                        const btnEl = document.getElementById(uniqueBtnId);
+                        if (btnEl) btnEl.onclick = () => playSpokenVoice(safeTrans, lang);
+                    }, 50);
                 } else {
                     body = `
                         <div class="voice-card-private">
-                            <audio controls preload="metadata" data-extension-bypass="true" style="max-width:220px; height:36px; outline:none;">
+                            <audio controls preload="auto" style="max-width:220px; height:36px; outline:none;">
                                 <source src="${content}">
                             </audio>
                         </div>
                     `;
                 }
-            } 
-            else if (type === "location") {
-                body = `<a href="${content}" target="_blank" style="color:inherit; font-weight:700;">📍 Shared Location (Open Map)</a>`;
+            } else if (type === "location") {
+                body = `<a href="${content}" target="_blank" style="color:inherit; font-weight:700;">📍 Shared Location</a>`;
             } else if (type === "document") {
                 body = `<a href="${content}" target="_blank" style="color:inherit; text-decoration:underline;">📄 Document File</a>`;
             }
@@ -1625,18 +1368,8 @@
                 body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
             }
 
-            let tickHtml = "";
-            if (dir === "sent") {
-                const tickSymbol = (status === "delivered") ? "✓✓" : "✓";
-                tickHtml = `<span class="tick-icon" id="tick_${msgId}">${tickSymbol}</span>`;
-            }
-
-            body += `
-                <div class="bubble-meta-row">
-                    <span>${time}</span>
-                    ${tickHtml}
-                </div>
-            `;
+            let tickHtml = dir === "sent" ? `<span class="tick-icon" id="tick_${msgId}">${(status === "delivered") ? "✓✓" : "✓"}</span>` : "";
+            body += `<div class="bubble-meta-row"><span>${time}</span>${tickHtml}</div>`;
             bubble.innerHTML = body;
             box.appendChild(bubble);
             box.scrollTop = box.scrollHeight;
@@ -1644,29 +1377,18 @@
 
         function updateBubbleStatus(msgId, status) {
             const tick = document.getElementById(`tick_${msgId}`);
-            if (tick) {
-                tick.innerText = (status === "delivered") ? "✓✓" : "✓";
-            } else {
-                const sentTicks = document.querySelectorAll(".bubble.sent .tick-icon");
-                if (sentTicks.length > 0) {
-                    const lastTick = sentTicks[sentTicks.length - 1];
-                    lastTick.innerText = (status === "delivered") ? "✓✓" : "✓";
-                }
-            }
+            if (tick) tick.innerText = (status === "delivered") ? "✓✓" : "✓";
         }
 
         function markAllSentBubblesDelivered() {
-            document.querySelectorAll(".bubble.sent .tick-icon").forEach(tick => {
-                tick.innerText = "✓✓";
-            });
+            document.querySelectorAll(".bubble.sent .tick-icon").forEach(tick => { tick.innerText = "✓✓"; });
         }
 
         async function uploadAttachment(e, type) {
             document.getElementById("attach-menu").style.display = "none";
             const file = e.target.files[0];
             if (!file || !activePartner) return;
-            const form = new FormData();
-            form.append("file", file);
+            const form = new FormData(); form.append("file", file);
             const res = await fetch("/api/upload", { method: "POST", body: form });
             const data = await res.json();
             executeDispatch(data.url, "", type);
@@ -1676,8 +1398,7 @@
             document.getElementById("attach-menu").style.display = "none";
             if (!navigator.geolocation || !activePartner) return;
             navigator.geolocation.getCurrentPosition(pos => {
-                const mapLink = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
-                executeDispatch(mapLink, "", "location");
+                executeDispatch(`https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`, "", "location");
             });
         }
     </script>
