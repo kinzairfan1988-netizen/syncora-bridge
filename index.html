@@ -231,12 +231,12 @@
             border-radius: 8px; color: var(--text-primary); cursor: pointer; font-size: 13px;
         }
 
-        .contacts-overlay, .settings-overlay, .send-modal-backdrop, .call-setup-backdrop {
+        .contacts-overlay, .settings-overlay, .send-modal-backdrop, .call-setup-backdrop, .incoming-setup-backdrop {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88);
             backdrop-filter: blur(10px); z-index: 998; display: none;
             align-items: center; justify-content: center; padding: 20px;
         }
-        .contacts-card, .settings-card, .send-modal-card, .call-setup-card {
+        .contacts-card, .settings-card, .send-modal-card, .call-setup-card, .incoming-setup-card {
             background: var(--surface-panel); border: 1px solid var(--border-graphite);
             border-radius: 20px; width: 100%; max-width: 380px; padding: 22px;
             display: flex; flex-direction: column; gap: 12px; text-align: center;
@@ -327,6 +327,7 @@
 </head>
 <body onclick="unlockMobileAudio()">
 
+    <!-- CRITICAL: playsinline prevents mobile auto-fullscreen / loudspeaker override -->
     <audio id="remote-audio-sink" autoplay playsinline></audio>
 
     <div class="auth-overlay" id="auth-overlay">
@@ -339,7 +340,7 @@
         </div>
     </div>
 
-    <!-- Call Setup Language Picker Modal -->
+    <!-- Caller Language Setup Modal -->
     <div class="call-setup-backdrop" id="call-setup-modal">
         <div class="call-setup-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);">🌐 Select Translation Language</h3>
@@ -354,6 +355,27 @@
             </select>
             <button class="btn-auth" onclick="confirmAndStartTranslationCall()">Start Translated Call →</button>
             <button onclick="document.getElementById('call-setup-modal').style.display='none'" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:12px;">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Receiver Incoming Language Setup Modal -->
+    <div class="incoming-setup-backdrop" id="incoming-setup-modal">
+        <div class="incoming-setup-card">
+            <h3 style="font-size: 16px; color: var(--accent-amber);">📞 Incoming Translation Call</h3>
+            <p style="font-size: 12px; color: var(--text-muted);" id="incoming-caller-label">User is calling with AI Translation.</p>
+            <div style="text-align: left; margin-top: 4px;">
+                <label style="font-size: 11px; color: var(--text-muted);">Your Preferred Language:</label>
+                <select class="lang-dropdown" id="incoming-target-lang-select" style="padding: 12px; border-radius: 10px; background: var(--surface-card); color: #fff; border: 1px solid var(--border-graphite); font-size: 14px; outline: none; margin-top: 4px;">
+                    <option value="en" selected>English (US)</option>
+                    <option value="ur">Urdu (اردو)</option>
+                    <option value="ar">Arabic (العربية)</option>
+                    <option value="de">German (Deutsch)</option>
+                    <option value="fr">French (Français)</option>
+                    <option value="es">Spanish (Español)</option>
+                </select>
+            </div>
+            <button class="btn-auth" style="background: var(--online-green); color: #fff; margin-top: 6px;" onclick="acceptCallWithLanguage()">Accept & Connect Call</button>
+            <button onclick="rejectIncomingCall()" style="background: var(--danger-red-dim); border: 1px solid rgba(239, 68, 68, 0.4); color: var(--danger-red); padding: 10px; border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: 700;">Decline Call</button>
         </div>
     </div>
 
@@ -408,7 +430,7 @@
 
         <div class="call-controls-row">
             <button class="btn-call-btn btn-call-mute" id="btn-toggle-mic" onclick="toggleCallMic()">🎤</button>
-            <button class="btn-call-btn btn-call-accept" id="btn-call-answer" style="display:none;" onclick="acceptIncomingCall()">📞</button>
+            <button class="btn-call-btn btn-call-accept" id="btn-call-accept-main" style="display:none;" onclick="triggerIncomingSetupModal()">📞</button>
             <button class="btn-call-btn btn-call-end" onclick="endCurrentCall()">📵</button>
         </div>
     </div>
@@ -906,7 +928,10 @@
                             if (isTranslationCallMode) {
                                 document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${data.translated}`;
-                                if (data.translated && data.translated.trim()) playSpokenVoice(data.translated, data.lang || currentSelectedTargetLang);
+                                // FIX: Do NOT synthesize own voice back via speech synthesis loop
+                                if (data.sender !== myPhone && data.translated && data.translated.trim()) {
+                                    playSpokenVoice(data.translated, data.lang || currentSelectedTargetLang);
+                                }
                             }
                         }
                     } catch(e){}
@@ -1018,7 +1043,7 @@
                 localMediaStream = await obtainMediaStreamSafely(type);
                 document.getElementById("call-partner-name").innerText = activePartner;
                 document.getElementById("call-avatar-icon").innerText = type === "video" ? "📹" : (isTranslateMode ? "🌐" : "📞");
-                document.getElementById("btn-call-answer").style.display = "none";
+                document.getElementById("btn-call-accept-main").style.display = "none";
                 document.getElementById("call-modal").style.display = "flex";
 
                 if (isTranslateMode) {
@@ -1110,13 +1135,10 @@
                 currentSelectedTargetLang = data.target_lang || "en";
 
                 document.getElementById("call-partner-name").innerText = data.sender;
-                document.getElementById("btn-call-answer").style.display = "flex";
+                document.getElementById("btn-call-accept-main").style.display = "flex";
                 document.getElementById("call-modal").style.display = "flex";
                 document.getElementById("call-status-text").innerText = isTranslationCallMode ? `Incoming AI Translation Call (${currentSelectedTargetLang.toUpperCase()})...` : `Incoming ${currentCallType.toUpperCase()} Call...`;
                 document.getElementById("call-subtitles-dock").style.display = isTranslationCallMode ? "flex" : "none";
-                if(isTranslationCallMode) {
-                    document.getElementById("call-trans-header-label").innerText = `🌐 Live AI Translation (${currentSelectedTargetLang.toUpperCase()})`;
-                }
             } else if (data.signal_type === "answer") {
                 if (peerConnection) {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
@@ -1125,10 +1147,37 @@
             } else if (data.signal_type === "end") { closeCallUI(); }
         }
 
-        async function acceptIncomingCall() {
-            unlockMobileAudio();
+        function triggerIncomingSetupModal() {
             if (!pendingCallOffer) return;
-            document.getElementById("btn-call-answer").style.display = "none";
+            if (isTranslationCallMode) {
+                // Show incoming language setup modal so receiver can also choose their preferred language
+                document.getElementById("incoming-caller-label").innerText = `${pendingCallOffer.sender} is calling with AI Translation.`;
+                document.getElementById("incoming-target-lang-select").value = currentSelectedTargetLang;
+                document.getElementById("incoming-setup-modal").style.display = "flex";
+            } else {
+                acceptCallWithLanguage();
+            }
+        }
+
+        async function acceptCallWithLanguage() {
+            unlockMobileAudio();
+            document.getElementById("incoming-setup-modal").style.display = "none";
+            if (isTranslationCallMode) {
+                const selectEl = document.getElementById("incoming-target-lang-select");
+                if (selectEl) currentSelectedTargetLang = selectEl.value;
+                document.getElementById("call-trans-header-label").innerText = `🌐 Live AI Translation (${currentSelectedTargetLang.toUpperCase()})`;
+            }
+            await acceptIncomingCall();
+        }
+
+        function rejectIncomingCall() {
+            document.getElementById("incoming-setup-modal").style.display = "none";
+            endCurrentCall();
+        }
+
+        async function acceptIncomingCall() {
+            if (!pendingCallOffer) return;
+            document.getElementById("btn-call-accept-main").style.display = "none";
             document.getElementById("call-status-text").innerText = "Connecting live line...";
 
             try {
@@ -1146,7 +1195,13 @@
                 await peerConnection.setLocalDescription(answer);
 
                 if (socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({ action: "call_signal", receiver: activePartner, signal_type: "answer", sdp: answer }));
+                    socket.send(JSON.stringify({ 
+                        action: "call_signal", 
+                        receiver: activePartner, 
+                        signal_type: "answer", 
+                        target_lang: currentSelectedTargetLang,
+                        sdp: answer 
+                    }));
                 }
                 document.getElementById("call-status-text").innerText = isTranslationCallMode ? `Connected ● AI Translation Active (${currentSelectedTargetLang.toUpperCase()})` : "Call Connected (Live)";
                 
@@ -1188,6 +1243,7 @@
                                     socket.send(JSON.stringify({ 
                                         action: "call_live_caption", 
                                         receiver: activePartner, 
+                                        sender: myPhone,
                                         original: spokenText, 
                                         translated: translated, 
                                         lang: currentSelectedTargetLang 
@@ -1225,6 +1281,7 @@
 
             document.getElementById("call-modal").style.display = "none";
             document.getElementById("call-setup-modal").style.display = "none";
+            document.getElementById("incoming-setup-modal").style.display = "none";
             document.getElementById("call-video-container").style.display = "none";
             document.getElementById("call-subtitles-dock").style.display = "none";
             isTranslationCallMode = false; pendingCallOffer = null;
