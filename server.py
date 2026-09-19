@@ -92,15 +92,12 @@ def get_chat_id(u1: str, u2: str) -> str:
     cleaned = sorted([u1.strip(), u2.strip()])
     return f"chat_{cleaned[0]}_{cleaned[1]}"
 
-# Gemini API Powered High-Accuracy Translation Engine for Demo
 def translate_via_gemini(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
         return ""
 
     target_lang = target_lang.strip().lower()
-    
-    # Map target language codes to clear names for Gemini prompt
     lang_map = {
         "ur": "Urdu",
         "en": "English",
@@ -131,7 +128,6 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
     except Exception as e:
         print(f"[Gemini API Error]: {e}")
 
-    # Fallback to Google GTX if Gemini rate-limits
     try:
         q_enc = urllib.parse.quote(clean.encode('utf-8'))
         url_g = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target_lang}&dt=t&q={q_enc}"
