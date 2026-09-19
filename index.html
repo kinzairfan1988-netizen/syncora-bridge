@@ -5,21 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Syncora - Real-Time Chat</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        .container { width: 100%; max-width: 600px; background: #1e293b; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; height: 80vh; }
-        h2 { text-align: center; color: #38bdf8; margin-top: 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .container { width: 100%; max-width: 600px; background: #1e293b; padding: 24px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); display: flex; flex-direction: column; height: 85vh; border: 1px solid #334155; }
+        h2 { text-align: center; color: #38bdf8; margin-top: 0; margin-bottom: 20px; font-size: 24px; letter-spacing: 0.5px; }
         .auth-box, .chat-box { display: flex; flex-direction: column; height: 100%; }
         .hidden { display: none !important; }
-        input, button { padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #475569; background: #334155; color: white; font-size: 16px; }
+        input, button { padding: 12px 16px; margin: 8px 0; border-radius: 10px; border: 1px solid #475569; background: #334155; color: white; font-size: 16px; outline: none; transition: all 0.3s ease; }
+        input:focus { border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2); }
         button { background: #0ea5e9; border: none; cursor: pointer; font-weight: bold; }
         button:hover { background: #0284c7; }
-        .messages { flex: 1; overflow-y: auto; background: #0f172a; padding: 10px; border-radius: 8px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
-        .msg { padding: 10px; border-radius: 8px; max-width: 75%; word-break: break-word; }
-        .msg.sent { background: #0369a1; align-self: flex-end; }
-        .msg.received { background: #334155; align-self: flex-start; }
-        .status-bar { font-size: 14px; color: #94a3b8; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-        .online-dot { height: 10px; width: 10px; background-color: #22c55e; border-radius: 50%; display: inline-block; }
-        .offline-dot { height: 10px; width: 10px; background-color: #ef4444; border-radius: 50%; display: inline-block; }
+        .messages { flex: 1; overflow-y: auto; background: #0b0f19; padding: 15px; border-radius: 12px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; border: 1px solid #1e293b; }
+        .msg { padding: 10px 14px; border-radius: 12px; max-width: 75%; word-break: break-word; font-size: 15px; line-height: 1.4; }
+        .msg.sent { background: #0369a1; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .msg.received { background: #334155; align-self: flex-start; border-bottom-left-radius: 2px; }
+        .status-bar { font-size: 14px; color: #94a3b8; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 8px 12px; border-radius: 8px; }
+        .online-dot { height: 10px; width: 10px; background-color: #22c55e; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #22c55e; }
+        .offline-dot { height: 10px; width: 10px; background-color: #ef4444; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #ef4444; }
+        .top-row { display: flex; gap: 10px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -29,7 +31,7 @@
         
         <!-- Login Screen -->
         <div id="authScreen" class="auth-box">
-            <p>Apna Mobile Number Darj Karein:</p>
+            <p style="color: #cbd5e1; margin-bottom: 5px;">Apna Mobile Number Darj Karein:</p>
             <input type="text" id="phoneInput" placeholder="e.g. 03001234567">
             <button onclick="loginUser()">Login Karein</button>
         </div>
@@ -41,16 +43,16 @@
                 <span>Status: <span id="connStatus" class="offline-dot"></span> <span id="statusText">Connecting...</span></span>
             </div>
             
-            <div style="display: flex; gap: 8px;">
+            <div class="top-row">
                 <input type="text" id="partnerInput" placeholder="Partner Phone Number" style="flex: 1; margin:0;">
-                <button onclick="loadChat()" style="margin:0; padding: 8px 15px;">Connect</button>
+                <button onclick="loadChat()" style="margin:0; padding: 0 20px;">Connect</button>
             </div>
 
             <div id="msgContainer" class="messages"></div>
 
-            <div style="display: flex; gap: 8px;">
+            <div style="display: flex; gap: 10px;">
                 <input type="text" id="msgInput" placeholder="Yahan message likhein..." style="flex: 1; margin:0;" onkeypress="if(event.key === 'Enter') sendMsg()">
-                <button onclick="sendMsg()" style="margin:0; padding: 8px 20px;">Bhejein</button>
+                <button onclick="sendMsg()" style="margin:0; padding: 0 24px;">Bhejein</button>
             </div>
         </div>
     </div>
@@ -71,6 +73,17 @@
                 alert("Baraye meherbani sahi mobile number likhein.");
                 return;
             }
+            
+            try {
+                await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: phone })
+                });
+            } catch (e) {
+                console.error("Login API error:", e);
+            }
+
             localStorage.setItem("sync_phone", phone);
             myPhone = phone;
             startChatApp();
@@ -79,7 +92,7 @@
         function startChatApp() {
             document.getElementById("authScreen").classList.add("hidden");
             document.getElementById("chatScreen").classList.remove("hidden");
-            document.getElementById("userInfo").innerText = "Mera Number: " + myPhone;
+            document.getElementById("userInfo">innerText = "Mera Number: " + myPhone;
 
             initWebSocket();
         }
@@ -93,7 +106,7 @@
             socket.onopen = function() {
                 document.getElementById("connStatus").className = "online-dot";
                 document.getElementById("statusText").innerText = "Online";
-                console.log("WebSocket Connected");
+                console.log("WebSocket Connected Successfully");
             };
 
             socket.onmessage = function(event) {
@@ -126,6 +139,15 @@
             }
             currentPartner = partner;
             
+            // Server par contact register karlein taake dono taraf chat open hojaye
+            try {
+                await fetch('/api/contacts/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_phone: myPhone, contact_phone: currentPartner })
+                });
+            } catch(e) {}
+
             const res = await fetch(`/api/messages/${myPhone}/${currentPartner}`);
             const data = await res.json();
             
@@ -152,9 +174,13 @@
                 lang: "en"
             };
 
-            socket.send(JSON.stringify(payload));
-            appendMessage(text, 'sent');
-            input.value = "";
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify(payload));
+                appendMessage(text, 'sent');
+                input.value = "";
+            } else {
+                alert("Connection abhi قائم nahi hai, thori der wait karein.");
+            }
         }
 
         function appendMessage(text, type) {
