@@ -89,8 +89,13 @@ def _call_gemini_api(text: str, target_lang: str) -> str:
         "contents": [{"parts": [{"text": prompt}]}]
     }).encode('utf-8')
     
-    # Google ke active models (Agar pehla 404 de to doosra automatically chalega)
-    candidate_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-flash-latest"]
+    # Models jo high availability aur fast response dete hain
+    candidate_models = [
+        "gemini-2.0-flash",
+        "gemini-2.5-flash",
+        "gemini-flash-latest",
+        "gemini-1.5-flash-latest"
+    ]
     
     for model_name in candidate_models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
@@ -117,15 +122,15 @@ def _call_gemini_api(text: str, target_lang: str) -> str:
                             return out_text
         except urllib.error.HTTPError as he:
             err_msg = he.read().decode('utf-8', errors='ignore')
-            if he.code == 404:
-                # Model 404 hone par agla model try karega
+            print(f"[API Notice on {model_name} - HTTP {he.code}]: Agla available model try kar rahe hain...")
+            # 503 (Busy), 429 (Rate limit), ya 404 (Not found) par rukna nahi hai, agla model try karein
+            if he.code in [503, 429, 404, 500]:
                 continue
             else:
-                print(f"[Google API Error {he.code} on {model_name}]: {err_msg}")
                 break
         except Exception as e:
-            print(f"[Translation Error on {model_name}]: {e}")
-            break
+            print(f"[Translation Notice on {model_name}]: {e} - Agle model pe switch...")
+            continue
             
     return clean
 
@@ -237,7 +242,7 @@ async def get_conversation(phone: str, partner: str):
         messages = []
         for r in rows:
             messages.append({
-                "id": r[0], "sender": r, "receiver": r, "msg_type": r[3],
+                "id": r[0], "sender": r, "receiver": r, "msg_type": r,
                 "content": r[4], "translated_content": r[5], "lang": r[6], "status": r[7], "time": str(r[8])[-8:-3]
             })
         return {"messages": messages}
@@ -246,8 +251,10 @@ async def get_conversation(phone: str, partner: str):
 
 @app.post("/api/upload")
 async def upload_media(file: UploadFile = File(...)):
-    # Extension tuple ('voice', '.webm') na bane isliye lagaya gaya hai
-    ext = os.path.splitext(file.filename) or ".webm"
+    # Extension tuple na bane iske liye saaf tareeqa:
+    parts = file.filename.rsplit(".", 1)
+    ext = f".{parts}" if len(parts) > 1 else ".webm"
+    
     filename = f"{os.urandom(8).hex()}{ext}"
     filepath = os.path.join(UPLOAD_DIR, filename)
     with open(filepath, "wb") as f:
