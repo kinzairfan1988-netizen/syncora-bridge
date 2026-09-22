@@ -11,7 +11,6 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-# .env file load karne ke liye
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -61,39 +60,40 @@ def _call_gemini_api(text: str, target_lang: str) -> str:
         return ""
     
     target_lang = target_lang.strip().lower()
-    
-    # Environment variable check karein, agar na mile to MANUAL_GEMINI_KEY use karein
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip() or MANUAL_GEMINI_KEY.strip()
     
     if not gemini_key:
         print("\n[ERROR]: GEMINI_API_KEY nahi mili! Ya to terminal mein export karein ya code mein MANUAL_GEMINI_KEY ke andar paste karein.\n")
-        return f"[Key Missing] {clean}"
+        return clean
 
-    try:
-        lang_map = {
-            "ur": "Urdu (Nastaliq script)",
-            "en": "English",
-            "ar": "Arabic",
-            "de": "German",
-            "fr": "French",
-            "es": "Spanish",
-            "hi": "Hindi",
-            "roman_ur": "Roman Urdu"
-        }
-        target_name = lang_map.get(target_lang, "English")
-        
-        prompt = (
-            f"You are a real-time translator for an audio calling and messaging app. "
-            f"Translate the following message into {target_name}. "
-            f"The input might be in Roman Urdu (like 'kaisy hain' which means 'How are you?'), Urdu, Hindi, or English. "
-            f"Translate it naturally and return ONLY the translated sentence with no quotation marks or notes:\n{clean}"
-        )
-        
-        payload = json.dumps({
-            "contents": [{"parts": [{"text": prompt}]}]
-        }).encode('utf-8')
-        
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+    lang_map = {
+        "ur": "Urdu (Nastaliq script)",
+        "en": "English",
+        "ar": "Arabic",
+        "de": "German",
+        "fr": "French",
+        "es": "Spanish",
+        "hi": "Hindi",
+        "roman_ur": "Roman Urdu"
+    }
+    target_name = lang_map.get(target_lang, "English")
+    
+    prompt = (
+        f"You are a real-time translator for an audio calling and messaging app. "
+        f"Translate the following spoken message accurately into {target_name}. "
+        f"The input might be in Urdu script, Roman Urdu, Hindi, or English. "
+        f"Return ONLY the direct translated sentence with no extra explanation, no quotes, and no notes:\n{clean}"
+    )
+    
+    payload = json.dumps({
+        "contents": [{"parts": [{"text": prompt}]}]
+    }).encode('utf-8')
+    
+    # Google ke active models (Agar pehla 404 de to doosra automatically chalega)
+    candidate_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-flash-latest"]
+    
+    for model_name in candidate_models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
         req = urllib.request.Request(
             url, 
             data=payload, 
@@ -101,26 +101,32 @@ def _call_gemini_api(text: str, target_lang: str) -> str:
             method='POST'
         )
         
-        with urllib.request.urlopen(req, timeout=15) as response:
-            res_body = response.read().decode('utf-8')
-            res_data = json.loads(res_body)
+        try:
+            with urllib.request.urlopen(req, timeout=12) as response:
+                res_body = response.read().decode('utf-8')
+                res_data = json.loads(res_body)
+                
+                candidates = res_data.get("candidates", [])
+                if candidates:
+                    content_obj = candidates[0].get("content", {})
+                    parts = content_obj.get("parts", [])
+                    if parts:
+                        out_text = parts[0].get("text", "").strip()
+                        if out_text:
+                            print(f"[Gemini Translated via {model_name}]: '{clean}' -> '{out_text}'")
+                            return out_text
+        except urllib.error.HTTPError as he:
+            err_msg = he.read().decode('utf-8', errors='ignore')
+            if he.code == 404:
+                # Model 404 hone par agla model try karega
+                continue
+            else:
+                print(f"[Google API Error {he.code} on {model_name}]: {err_msg}")
+                break
+        except Exception as e:
+            print(f"[Translation Error on {model_name}]: {e}")
+            break
             
-            candidates = res_data.get("candidates", [])
-            if candidates:
-                content_obj = candidates[0].get("content", {})
-                parts = content_obj.get("parts", [])
-                if parts:
-                    out_text = parts[0].get("text", "").strip()
-                    if out_text:
-                        print(f"[Gemini Translated]: '{clean}' -> '{out_text}' (Target: {target_name})")
-                        return out_text
-                        
-    except urllib.error.HTTPError as he:
-        err_msg = he.read().decode('utf-8', errors='ignore')
-        print(f"\n[Google API Error {he.code}]: {err_msg}\n")
-    except Exception as e:
-        print(f"\n[Translation Error]: {e}\n")
-        
     return clean
 
 async def translate_via_gemini(text: str, target_lang: str) -> str:
@@ -171,7 +177,7 @@ async def get_user_profile(phone: str):
         row = cursor.fetchone()
         conn.close()
         if row:
-            return {"phone": phone, "display_name": row[0] or "", "about_status": row or "", "avatar_url": row[2] or ""}
+            return {"phone": phone, "display_name": row[0] or "", "about_status": row or "", "avatar_url": row or ""}
     except Exception:
         pass
     return {"phone": phone, "display_name": "", "about_status": "Hey there! I am using Syncora.", "avatar_url": ""}
@@ -231,7 +237,7 @@ async def get_conversation(phone: str, partner: str):
         messages = []
         for r in rows:
             messages.append({
-                "id": r[0], "sender": r, "receiver": r[2], "msg_type": r[3],
+                "id": r[0], "sender": r, "receiver": r, "msg_type": r[3],
                 "content": r[4], "translated_content": r[5], "lang": r[6], "status": r[7], "time": str(r[8])[-8:-3]
             })
         return {"messages": messages}
@@ -240,6 +246,7 @@ async def get_conversation(phone: str, partner: str):
 
 @app.post("/api/upload")
 async def upload_media(file: UploadFile = File(...)):
+    # Extension tuple ('voice', '.webm') na bane isliye lagaya gaya hai
     ext = os.path.splitext(file.filename) or ".webm"
     filename = f"{os.urandom(8).hex()}{ext}"
     filepath = os.path.join(UPLOAD_DIR, filename)
@@ -271,9 +278,8 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
 
                 print(f"[WS Incoming]: Sender={sender}, Content='{content}', FrontTranslated='{translated}', Lang='{lang}'")
 
-                # KHAAS FIX: Agar frontend ne translated khali bheja ho YA wahi same text ("kaisy hain") bheja ho
-                if content and (not translated or translated.lower() == content.lower()):
-                    print(f"[WS Processing]: Gemini translation shuru kar raha hai...")
+                # Agar frontend ne translate na kiya ho ya same text bheja ho
+                if content and (not translated or translated.lower() == content.lower()) and msg_type == "text":
                     translated = await translate_via_gemini(content, lang)
 
                 try:
@@ -306,7 +312,6 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                 spoken_text = payload.get("text", "").strip()
                 target_lang = payload.get("target_lang", "en")
                 
-                print(f"[Call Caption]: '{spoken_text}' ko '{target_lang}' mein translate kar raha hai")
                 translated_caption = ""
                 if spoken_text:
                     translated_caption = await translate_via_gemini(spoken_text, target_lang)
