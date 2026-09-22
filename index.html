@@ -588,6 +588,13 @@
             if (localMediaStream) localMediaStream.getTracks().forEach(t => t.stop());
         };
 
+        function renderChatListFromCache() {
+            const list = document.getElementById("chat-list");
+            if (!list) return;
+            list.innerHTML = "";
+            allChatsCache.forEach(partner => renderChatItem(partner));
+        }
+
         function playSpokenVoice(text, lang) {
             unlockMobileAudio();
             if (!('speechSynthesis' in window)) return;
