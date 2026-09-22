@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Syncora Terminal - PeerJS Cloud Engine</title>
+    <!-- Favicon 404 Error Fix -->
+    <link rel="icon" href="data:,">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -563,7 +565,6 @@
     </div>
 
     <script>
-        // PEERJS CLOUD ENGINE (Fixed WebSocket connection with host & secure parameters)
         let peer = null;
         let activePeerCall = null;
         let localMediaStream = null;
@@ -655,7 +656,6 @@
             if (!myPhone) return;
             const cleanId = "syncora_" + myPhone.replace(/[^0-9]/g, '');
             
-            // FIXED PEERJS INITIALIZATION WITH EXPLICIT HOST/SECURE CONFIG
             peer = new Peer(cleanId, {
                 host: '0.peerjs.com',
                 port: 443,
