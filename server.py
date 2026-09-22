@@ -51,7 +51,10 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
     target_lang = target_lang.strip().lower()
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
     
+    print(f"[DEBUG] API Key present: {bool(gemini_key)}, Text: {clean}, Target: {target_lang}")
+    
     if not gemini_key:
+        print("[DEBUG ERROR] GEMINI_API_KEY environment variable is missing or empty!")
         return clean
 
     try:
@@ -70,7 +73,6 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
             res_body = response.read().decode('utf-8')
             res_data = json.loads(res_body)
             
-            # Safe extraction from Gemini response structure
             candidates = res_data.get("candidates", [])
             if candidates:
                 content_obj = candidates[0].get("content", {})
@@ -78,9 +80,10 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
                 if parts:
                     out_text = parts[0].get("text", "").strip()
                     if out_text:
+                        print(f"[DEBUG SUCCESS] Translated: {out_text}")
                         return out_text
     except Exception as e:
-        print(f"[Translation Engine Error]: {e}")
+        print(f"[DEBUG EXCEPTION] Translation API Failed: {e}")
         
     return clean
 
@@ -215,7 +218,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
             elif action == "chat_message":
                 sender = phone
                 chat_id = get_chat_id(sender, receiver)
-                cmd_type = payload.get("msg_type", "text")
+                msg_type = payload.get("msg_type", "text")
                 content = payload.get("content", "")
                 translated = payload.get("translated", "")
                 lang = payload.get("lang", "en")
@@ -224,7 +227,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                     conn = sqlite3.connect(DB_PATH)
                     cursor = conn.cursor()
                     cursor.execute("INSERT INTO messages (chat_id, sender, receiver, msg_type, content, translated_content, lang, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                   (chat_id, sender, receiver, cmd_type, content, translated, lang, "delivered" if manager.is_online(receiver) else "sent"))
+                                   (chat_id, sender, receiver, msg_type, content, translated, lang, "delivered" if manager.is_online(receiver) else "sent"))
                     msg_id = cursor.lastrowid
                     conn.commit()
                     conn.close()
@@ -233,7 +236,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
 
                 await manager.send_to_user(receiver, {
                     "action": "new_message", "id": msg_id, "sender": sender,
-                    "content": content, "translated": translated, "msg_type": cmd_type,
+                    "content": content, "translated": translated, "msg_type": msg_type,
                     "lang": lang, "time": "now", "status": "delivered"
                 })
             elif action in ["call_signal", "call_live_caption"]:
