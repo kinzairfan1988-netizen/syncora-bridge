@@ -51,10 +51,7 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
     target_lang = target_lang.strip().lower()
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
     
-    print(f"[DEBUG] API Key present: {bool(gemini_key)}, Text: {clean}, Target: {target_lang}")
-    
     if not gemini_key:
-        print("[DEBUG ERROR] GEMINI_API_KEY environment variable is missing or empty!")
         return clean
 
     try:
@@ -66,7 +63,8 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
             "contents": [{"parts": [{"text": prompt}]}]
         }).encode('utf-8')
         
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+        # Updated URL endpoint using standard v1 generateContent format
+        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={gemini_key}"
         req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
         
         with urllib.request.urlopen(req, timeout=15) as response:
@@ -80,10 +78,9 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
                 if parts:
                     out_text = parts[0].get("text", "").strip()
                     if out_text:
-                        print(f"[DEBUG SUCCESS] Translated: {out_text}")
                         return out_text
     except Exception as e:
-        print(f"[DEBUG EXCEPTION] Translation API Failed: {e}")
+        print(f"[Translation API Error]: {e}")
         
     return clean
 
