@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Syncora Terminal - Agora Cloud Engine</title>
+    <title>Syncora Terminal - PeerJS Cloud Engine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-    <!-- Agora RTC NG SDK -->
-    <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.22.0.js"></script>
+    <!-- PeerJS Cloud SDK -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root {
             --bg-obsidian: #0b0e14;
@@ -329,6 +329,8 @@
 </head>
 <body onclick="unlockMobileAudio()">
 
+    <audio id="remote-audio-sink" autoplay playsinline></audio>
+
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
             <div class="auth-badge">IA</div>
@@ -352,7 +354,7 @@
                 <option value="fr">French (Français)</option>
                 <option value="es">Spanish (Español)</option>
             </select>
-            <button class="btn-auth" onclick="confirmAndStartTranslationCall()">Start Agora Cloud Call →</button>
+            <button class="btn-auth" onclick="confirmAndStartTranslationCall()">Start Translated Call →</button>
             <button onclick="document.getElementById('call-setup-modal').style.display='none'" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:12px;">Cancel</button>
         </div>
     </div>
@@ -360,7 +362,7 @@
     <!-- Receiver Incoming Language Setup Modal -->
     <div class="incoming-setup-backdrop" id="incoming-setup-modal">
         <div class="incoming-setup-card">
-            <h3 style="font-size: 16px; color: var(--accent-amber);">📞 Incoming Agora Translation Call</h3>
+            <h3 style="font-size: 16px; color: var(--accent-amber);">📞 Incoming Translation Call</h3>
             <p style="font-size: 12px; color: var(--text-muted);" id="incoming-caller-label">User is calling with AI Translation.</p>
             <div style="text-align: left; margin-top: 4px;">
                 <label style="font-size: 11px; color: var(--text-muted);">Your Preferred Language:</label>
@@ -413,9 +415,14 @@
             <div style="font-size: 13px; color: var(--online-green);" id="call-status-text">Calling...</div>
         </div>
 
+        <div style="width:100%; max-width:540px; height:260px; display:none; position:relative; background:#000; border-radius:16px; overflow:hidden;" id="call-video-container">
+            <video id="remote-video" style="width:100%; height:100%; object-fit:cover;" autoplay playsinline></video>
+            <video id="local-video" style="width:100px; height:75px; position:absolute; bottom:8px; right:8px; border-radius:8px; border:2px solid var(--accent-amber); object-fit:cover;" autoplay muted playsinline></video>
+        </div>
+
         <div class="call-subtitles-dock" id="call-subtitles-dock">
             <div style="font-size: 11px; font-weight: 700; color: var(--accent-amber); display:flex; justify-content:space-between;">
-                <span id="call-trans-header-label">🌐 Live AI Translation (Agora Cloud)</span>
+                <span id="call-trans-header-label">🌐 Live AI Translation</span>
                 <span style="color:var(--online-green);">● Active</span>
             </div>
             <div style="font-size: 13px; font-weight: 600; color: #fff;" id="call-original-subtitle">Speaking...</div>
@@ -541,7 +548,8 @@
                     </div>
 
                     <div class="call-buttons-group" id="call-buttons-dock" style="display: flex;">
-                        <button class="btn-call-action" onclick="startAgoraCall(false)" title="Normal Audio Call">📞</button>
+                        <button class="btn-call-action" onclick="startPeerCall('audio')" title="Normal Audio Call">📞</button>
+                        <button class="btn-call-action" onclick="startPeerCall('video')" title="Normal Video Call">📹</button>
                         <button class="btn-call-action trans-call-btn" onclick="promptTranslationCall()" title="Call with Live AI Translation">🌐 Trans</button>
                     </div>
                 </div>
@@ -556,7 +564,7 @@
             </div>
 
             <input type="file" id="file-picker-media" accept="image/*,video/*" style="display:none;" onchange="uploadAttachment(event, 'media')">
-            <input type="file" id="file-picker-doc" accept="*/*" style="display:none;" onchange="uploadAttachment(event, 'document')">
+            <input type="file" id="file-picker-doc"accept="*/*" style="display:none;" onchange="uploadAttachment(event, 'document')">
 
             <footer class="stage-input-bar">
                 <div class="input-shell" id="input-shell">
@@ -582,11 +590,10 @@
     </div>
 
     <script>
-        // AGORA CONFIGURATION
-        const AGORA_APP_ID = "21fa09ead64a44688bd462c00ea417ef";
-        let agoraClient = null;
-        let localAudioTrack = null;
-        let isAgoraCallActive = false;
+        // PEERJS CLOUD ENGINE (Bina kisi Token ya Certificate ke 100% Free & Fast Calling)
+        let peer = null;
+        let activePeerCall = null;
+        let localMediaStream = null;
 
         window.addEventListener('error', function (e) {
             if (e.filename && (e.filename.includes('200.js') || e.filename.includes('extension'))) {
@@ -605,6 +612,8 @@
                     silentUtterance.volume = 0.01;
                     window.speechSynthesis.speak(silentUtterance);
                 }
+                const audioSink = document.getElementById("remote-audio-sink");
+                if (audioSink) { audioSink.play().catch(() => {}); }
                 mobileAudioUnlocked = true;
             } catch(e) {}
         }
@@ -631,37 +640,20 @@
         let pendingPayload = null;
         let currentAvatarUrl = "";
 
+        let currentCallType = "audio";
         let isTranslationCallMode = false;
         let currentSelectedTargetLang = "en";
         let isMicMuted = false;
         let callSpeechRec = null;
-        let pendingCallOffer = null;
 
         window.onload = async () => {
             renderChatListFromCache();
-
-            const acceptMainBtn = document.getElementById("btn-call-accept-main");
-            if (acceptMainBtn) {
-                acceptMainBtn.addEventListener("click", () => { triggerIncomingSetupModal(); });
-                acceptMainBtn.addEventListener("touchend", (e) => { e.preventDefault(); triggerIncomingSetupModal(); });
-            }
-
-            const confirmAcceptBtn = document.getElementById("btn-confirm-accept-call");
-            if (confirmAcceptBtn) {
-                confirmAcceptBtn.addEventListener("click", () => { acceptCallWithLanguage(); });
-                confirmAcceptBtn.addEventListener("touchend", (e) => { e.preventDefault(); acceptCallWithLanguage(); });
-            }
-
-            const confirmDeclineBtn = document.getElementById("btn-confirm-decline-call");
-            if (confirmDeclineBtn) {
-                confirmDeclineBtn.addEventListener("click", () => { rejectIncomingCall(); });
-                confirmDeclineBtn.addEventListener("touchend", (e) => { e.preventDefault(); rejectIncomingCall(); });
-            }
 
             if (myPhone) {
                 document.getElementById("auth-overlay").style.display = "none";
                 document.getElementById("my-status-label").innerText = `● ${myPhone}`;
                 initSocketSafe();
+                initPeerJSServer();
                 loadUserProfileData();
 
                 if (directChatParam && directChatParam !== myPhone && !directChatParam.startsWith("call-")) {
@@ -682,10 +674,31 @@
 
         window.onbeforeunload = () => {
             if (socket) { socket.close(); }
+            if (peer) { peer.destroy(); }
             if (heartbeatInterval) clearInterval(heartbeatInterval);
             if (statusPollInterval) clearInterval(statusPollInterval);
-            leaveAgoraChannel();
+            if (localMediaStream) { localMediaStream.getTracks().forEach(t => t.stop()); }
         };
+
+        function initPeerJSServer() {
+            if (!myPhone) return;
+            // Clean phone number for peer id
+            const cleanId = "syncora_" + myPhone.replace(/[^0-9]/g, '');
+            peer = new Peer(cleanId);
+
+            peer.on('call', async (call) => {
+                activePeerCall = call;
+                currentCallType = call.metadata && call.metadata.type ? call.metadata.type : "audio";
+                isTranslationCallMode = call.metadata && call.metadata.translate ? call.metadata.translate : false;
+                currentSelectedTargetLang = call.metadata && call.metadata.lang ? call.metadata.lang : "en";
+
+                document.getElementById("call-partner-name").innerText = call.peer.replace("syncora_", "");
+                document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Incoming AI Translation Call..." : `Incoming ${currentCallType.toUpperCase()} Call...`;
+                document.getElementById("call-subtitles-dock").style.display = isTranslationCallMode ? "flex" : "none";
+                document.getElementById("btn-call-accept-main").style.display = "flex";
+                document.getElementById("call-modal").style.display = "flex";
+            });
+        }
 
         function renderChatListFromCache() {
             const list = document.getElementById("chat-list");
@@ -747,6 +760,7 @@
                     document.getElementById("auth-overlay").style.display = "none";
                     document.getElementById("my-status-label").innerText = `● ${myPhone}`;
                     initSocketSafe();
+                    initPeerJSServer();
                     loadUserProfileData();
                     if (directChatParam && directChatParam !== myPhone) await registerPermanentContact(directChatParam);
                     await loadRecentChats();
@@ -832,6 +846,7 @@
         function executeLogout() {
             if (confirm("Kiya aap waqai Syncora se Logout karna chahte hain?")) {
                 if (socket) { socket.close(); socket = null; }
+                if (peer) { peer.destroy(); peer = null; }
                 localStorage.removeItem("syncora_user_phone");
                 localStorage.removeItem("syncora_active_partner");
                 localStorage.removeItem("syncora_cached_chats");
@@ -876,7 +891,6 @@
                         else if (data.action === "messages_delivered") {
                             if (data.delivered_to === activePartner) markAllSentBubblesDelivered();
                         }
-                        else if (data.action === "call_signal") { handleIncomingCallSignal(data); } 
                         else if (data.action === "call_live_caption") {
                             if (isTranslationCallMode) {
                                 document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
@@ -963,7 +977,7 @@
             if (statusPollInterval) clearInterval(statusPollInterval);
         }
 
-        // --- AGORA CLOUD CALL INTEGRATION ---
+        // --- PEERJS CALL INTEGRATION ---
         function promptTranslationCall() {
             if (!activePartner) { alert("Pehle contact select karein!"); return; }
             document.getElementById("call-setup-modal").style.display = "flex";
@@ -973,131 +987,107 @@
             const selectEl = document.getElementById("call-target-lang-select");
             currentSelectedTargetLang = selectEl ? selectEl.value : "en";
             document.getElementById("call-setup-modal").style.display = "none";
-            startAgoraCall(true);
+            startPeerCall('audio', true);
         }
 
-        async function startAgoraCall(isTranslateMode = false) {
+        async function startPeerCall(type, isTranslateMode = false) {
             unlockMobileAudio();
             if (!activePartner) { alert("Pehle contact select karein!"); return; }
+            currentCallType = type;
             isTranslationCallMode = isTranslateMode;
 
             try {
-                agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-                const channelName = [myPhone, activePartner].sort().join("_");
+                localMediaStream = await navigator.mediaDevices.getUserMedia({
+                    audio: { echoCancellation: true, noiseSuppression: true },
+                    video: (type === "video")
+                });
+
+                const targetPeerId = "syncora_" + activePartner.replace(/[^0-9]/g, '');
                 
                 document.getElementById("call-partner-name").innerText = activePartner;
-                document.getElementById("call-avatar-icon").innerText = isTranslateMode ? "🌐" : "📞";
+                document.getElementById("call-avatar-icon").innerText = type === "video" ? "📹" : (isTranslateMode ? "🌐" : "📞");
                 document.getElementById("btn-call-accept-main").style.display = "none";
                 document.getElementById("call-modal").style.display = "flex";
 
-                if (isTranslateMode) {
-                    document.getElementById("call-status-text").innerText = `Connected ● Agora AI Translation Active (${currentSelectedTargetLang.toUpperCase()})`;
-                    document.getElementById("call-subtitles-dock").style.display = "flex";
-                    document.getElementById("call-trans-header-label").innerText = `🌐 Agora AI Translation (${currentSelectedTargetLang.toUpperCase()})`;
+                if (type === "video") {
+                    document.getElementById("call-video-container").style.display = "block";
+                    document.getElementById("local-video").srcObject = localMediaStream;
                 } else {
-                    document.getElementById("call-status-text").innerText = "Connected via Agora Cloud (Live)";
+                    document.getElementById("call-video-container").style.display = "none";
+                }
+
+                if (isTranslateMode) {
+                    document.getElementById("call-status-text").innerText = `Connected ● AI Translation Active (${currentSelectedTargetLang.toUpperCase()})`;
+                    document.getElementById("call-subtitles-dock").style.display = "flex";
+                    document.getElementById("call-trans-header-label").innerText = `🌐 AI Translation (${currentSelectedTargetLang.toUpperCase()})`;
+                } else {
+                    document.getElementById("call-status-text").innerText = `Calling via PeerJS (${type.toUpperCase()})...`;
                     document.getElementById("call-subtitles-dock").style.display = "none";
                 }
 
-                await agoraClient.join(AGORA_APP_ID, channelName, null, null);
-                
-                // If translation mode, mute raw microphone stream to prevent echo, else publish normal audio
-                if (!isTranslateMode) {
-                    localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-                    await agoraClient.publish([localAudioTrack]);
-                }
+                const call = peer.call(targetPeerId, localMediaStream, {
+                    metadata: { type: type, translate: isTranslateMode, lang: currentSelectedTargetLang }
+                });
 
-                agoraClient.on("user-published", async (user, mediaType) => {
-                    await agoraClient.subscribe(user, mediaType);
-                    if (mediaType === "audio" && !isTranslateMode) {
-                        user.audioTrack.play();
+                activePeerCall = call;
+
+                call.on('stream', (remoteStream) => {
+                    document.getElementById("call-status-text").innerText = "Call Connected (Live)";
+                    if (type === "video") {
+                        const rv = document.getElementById("remote-video");
+                        if (rv) { rv.srcObject = remoteStream; rv.play().catch(() => {}); }
+                    }
+                    const audioSink = document.getElementById("remote-audio-sink");
+                    if (audioSink && !isTranslateMode) {
+                        audioSink.srcObject = remoteStream;
+                        audioSink.play().catch(() => {});
                     }
                 });
+
+                call.on('close', () => { closeCallUI(); });
 
                 if (isTranslateMode) {
                     startLiveCallSpeechEngine();
                 }
-
-                // Notify receiver via WebSocket signaling
-                if (socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({
-                        action: "call_signal", receiver: activePartner, signal_type: "offer",
-                        is_translation_call: isTranslateMode, target_lang: currentSelectedTargetLang
-                    }));
-                }
-
-                isAgoraCallActive = true;
             } catch (err) {
-                alert("Agora Connection Error: " + err.message);
+                alert("Media/Call Error: " + err.message);
                 endCurrentCall();
             }
         }
 
-        async function handleIncomingCallSignal(data) {
-            if (data.signal_type === "offer") {
-                pendingCallOffer = data; activePartner = data.sender;
-                isTranslationCallMode = !!data.is_translation_call;
-                currentSelectedTargetLang = data.target_lang || "en";
+        const acceptMainBtn = document.getElementById("btn-accept-call") || document.getElementById("btn-call-accept-main");
+        if (acceptMainBtn) {
+            acceptMainBtn.onclick = async () => {
+                document.getElementById("btn-call-accept-main").style.display = "none";
+                document.getElementById("call-status-text").innerText = "Connecting Call...";
+                try {
+                    localMediaStream = await navigator.mediaDevices.getUserMedia({
+                        audio: { echoCancellation: true, noiseSuppression: true },
+                        video: (currentCallType === "video")
+                    });
+                    if (currentCallType === "video") {
+                        document.getElementById("call-video-container").style.display = "block";
+                        document.getElementById("local-video").srcObject = localMediaStream;
+                    }
 
-                document.getElementById("call-partner-name").innerText = data.sender;
-                document.getElementById("btn-call-accept-main").style.display = "flex";
-                document.getElementById("call-modal").style.display = "flex";
-                document.getElementById("call-status-text").innerText = isTranslationCallMode ? `Incoming Agora Translation Call...` : `Incoming Audio Call...`;
-                document.getElementById("call-subtitles-dock").style.display = isTranslationCallMode ? "flex" : "none";
-            } else if (data.signal_type === "end") {
-                endCurrentCall();
-            }
-        }
+                    activePeerCall.answer(localMediaStream);
 
-        function triggerIncomingSetupModal() {
-            if (!pendingCallOffer) return;
-            if (isTranslationCallMode) {
-                document.getElementById("incoming-caller-label").innerText = `${pendingCallOffer.sender} is calling with Agora AI Translation.`;
-                document.getElementById("incoming-target-lang-select").value = currentSelectedTargetLang;
-                document.getElementById("incoming-setup-modal").style.display = "flex";
-            } else {
-                acceptCallWithLanguage();
-            }
-        }
+                    activePeerCall.on('stream', (remoteStream) => {
+                        document.getElementById("call-status-text").innerText = "Call Connected (Live)";
+                        if (currentCallType === "video") {
+                            const rv = document.getElementById("remote-video");
+                            if (rv) { rv.srcObject = remoteStream; rv.play().catch(() => {}); }
+                        }
+                        const audioSink = document.getElementById("remote-audio-sink");
+                        if (audioSink && !isTranslationCallMode) {
+                            audioSink.srcObject = remoteStream;
+                            audioSink.play().catch(() => {});
+                        }
+                    });
 
-        async function acceptCallWithLanguage() {
-            unlockMobileAudio();
-            document.getElementById("incoming-setup-modal").style.display = "none";
-            if (isTranslationCallMode) {
-                const selectEl = document.getElementById("incoming-target-lang-select");
-                if (selectEl) currentSelectedTargetLang = selectEl.value;
-            }
-            await acceptAgoraCall();
-        }
-
-        function rejectIncomingCall() {
-            document.getElementById("incoming-setup-modal").style.display = "none";
-            endCurrentCall();
-        }
-
-        async function acceptAgoraCall() {
-            if (!pendingCallOffer) return;
-            document.getElementById("btn-call-accept-main").style.display = "none";
-            
-            try {
-                agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-                const channelName = [myPhone, activePartner].sort().join("_");
-
-                await agoraClient.join(AGORA_APP_ID, channelName, null, null);
-                if (!isTranslationCallMode) {
-                    localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-                    await agoraClient.publish([localAudioTrack]);
-                }
-
-                agoraClient.on("user-published", async (user, mediaType) => {
-                    await agoraClient.subscribe(user, mediaType);
-                    if (mediaType === "audio" && !isTranslationCallMode) user.audioTrack.play();
-                });
-
-                if (isTranslationCallMode) startLiveCallSpeechEngine();
-                isAgoraCallActive = true;
-                document.getElementById("call-status-text").innerText = "Connected via Agora Cloud (Live)";
-            } catch (err) { endCurrentCall(); }
+                    if (isTranslationCallMode) startLiveCallSpeechEngine();
+                } catch(err) { endCurrentCall(); }
+            };
         }
 
         function startLiveCallSpeechEngine() {
@@ -1143,34 +1133,36 @@
             } catch(e){}
         }
 
-        async function leaveAgoraChannel() {
-            if (localAudioTrack) { localAudioTrack.close(); localAudioTrack = null; }
-            if (agoraClient) { await agoraClient.leave(); agoraClient = null; }
-            if (callSpeechRec) { try { callSpeechRec.stop(); } catch(e){} callSpeechRec = null; }
-            isAgoraCallActive = false;
+        function endCurrentCall() {
+            if (activePeerCall) { try { activePeerCall.close(); } catch(e){} activePeerCall = null; }
+            closeCallUI();
         }
 
-        function endCurrentCall() {
-            if (activePartner && socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ action: "call_signal", receiver: activePartner, signal_type: "end" }));
-            }
-            leaveAgoraChannel();
+        function closeCallUI() {
+            if (localMediaStream) { localMediaStream.getTracks().forEach(t => t.stop()); localMediaStream = null; }
+            if (callSpeechRec) { try { callSpeechRec.stop(); } catch(e){} callSpeechRec = null; }
+            const audioSink = document.getElementById("remote-audio-sink");
+            if (audioSink) audioSink.srcObject = null;
+
             document.getElementById("call-modal").style.display = "none";
             document.getElementById("call-setup-modal").style.display = "none";
             document.getElementById("incoming-setup-modal").style.display = "none";
+            document.getElementById("call-video-container").style.display = "none";
             document.getElementById("call-subtitles-dock").style.display = "none";
-            isTranslationCallMode = false; pendingCallOffer = null;
+            isTranslationCallMode = false;
         }
 
         function toggleCallMic() {
-            if (localAudioTrack) {
+            if (!localMediaStream) return;
+            const audioTrack = localMediaStream.getAudioTracks()[0];
+            if (audioTrack) {
                 isMicMuted = !isMicMuted;
-                localAudioTrack.setEnabled(!isMicMuted);
+                audioTrack.enabled = !isMicMuted;
                 document.getElementById("btn-toggle-mic").innerText = isMicMuted ? "🔇" : "🎤";
             }
         }
 
-        // Chat & Voice Notes functions below...
+        // Chat & Voice Notes functions
         function toggleAttachMenu() {
             const menu = document.getElementById("attach-menu");
             menu.style.display = menu.style.display === "flex" ? "none" : "flex";
@@ -1193,7 +1185,7 @@
             try {
                 activeAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(activeAudioStream);
-                recordedChunks = []; capturedLiveText = "";
+                recordedChunks = [];
                 mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
                 mediaRecorder.onstop = async () => {
                     if (recordedChunks.length === 0) return;
@@ -1201,8 +1193,9 @@
                     const form = new FormData(); form.append("file", blob, "voice.webm");
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
+                    
                     pendingPayload = { type: "voice", content: data.url };
-                    document.getElementById("voice-hint-field").value = "";
+                    document.getElementById("voice-hint-field").value = "Voice Message Note";
                     document.getElementById("send-modal-preview").innerText = "Voice Note Captured";
                     document.getElementById("send-modal").style.display = "flex";
                 };
@@ -1300,10 +1293,10 @@
                     if (btnEl) btnEl.onclick = () => playSpokenVoice(safeTrans, lang);
                 }, 50);
             }
-            if (type === "text" && translated && translated.trim() !== "") {
+            if (translated && translated.trim() !== "") {
                 body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
             }
-            bubble.innerHTML = body + `<div class="bubble-meta-row"><span>${time}</span></div>`;
+            bubble.innerHTML = body + `<div class="call-modal-overlay"><span>${time}</span></div>`;
             box.appendChild(bubble);
             box.scrollTop = box.scrollHeight;
         }
