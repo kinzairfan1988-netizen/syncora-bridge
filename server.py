@@ -1,13 +1,22 @@
 import os
 import json
 import sqlite3
+import asyncio
 import urllib.request
 import urllib.parse
+import urllib.error
 from typing import Dict
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+# .env file se environment variables load karne ke liye
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
@@ -43,7 +52,7 @@ def get_chat_id(u1: str, u2: str) -> str:
     cleaned = sorted([u1.strip(), u2.strip()])
     return f"chat_{cleaned[0]}_{cleaned[1]}"
 
-def translate_via_gemini(text: str, target_lang: str) -> str:
+def _call_gemini_api(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
         return ""
@@ -52,19 +61,38 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
     
     if not gemini_key:
+        print("[Translation Warning]: GEMINI_API_KEY environment variable set nahi hai!")
         return clean
 
     try:
-        lang_map = {"ur": "Urdu", "en": "English", "ar": "Arabic", "de": "German", "fr": "French", "es": "Spanish"}
-        target_name = lang_map.get(target_lang, "English")
+        lang_map = {
+            "ur": "Urdu",
+            "en": "English",
+            "ar": "Arabic",
+            "de": "German",
+            "fr": "French",
+            "es": "Spanish",
+            "hi": "Hindi",
+            "roman_ur": "Roman Urdu (Hindi/Urdu in English alphabet)"
+        }
+        target_name = lang_map.get(target_lang, target_lang)
         
-        prompt = f"Translate this text accurately into {target_name}. Return ONLY the translated text without quotation marks or extra explanation: {clean}"
+        prompt = (
+            f"You are a professional real-time speech and chat translator. "
+            f"Translate the following text accurately into {target_name}. "
+            f"Return ONLY the translated sentence with no markdown, no quotes, and no extra explanation:\n{clean}"
+        )
         payload = json.dumps({
             "contents": [{"parts": [{"text": prompt}]}]
         }).encode('utf-8')
         
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
-        req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+        req = urllib.request.Request(
+            url, 
+            data=payload, 
+            headers={'Content-Type': 'application/json'}, 
+            method='POST'
+        )
         
         with urllib.request.urlopen(req, timeout=15) as response:
             res_body = response.read().decode('utf-8')
@@ -78,10 +106,17 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
                     out_text = parts[0].get("text", "").strip()
                     if out_text:
                         return out_text
+    except urllib.error.HTTPError as he:
+        error_details = he.read().decode('utf-8', errors='ignore')
+        print(f"[Translation HTTP Error {he.code}]: {error_details}")
     except Exception as e:
         print(f"[Translation API Error]: {e}")
         
     return clean
+
+async def translate_via_gemini(text: str, target_lang: str) -> str:
+    # Event loop ko block hone se bachane ke liye threadpool mein chalayein
+    return await asyncio.to_thread(_call_gemini_api, text, target_lang)
 
 class ConnectionManager:
     def __init__(self):
@@ -155,7 +190,7 @@ async def translate_text(req: TranslationRequest):
     clean = req.text.strip()
     if not clean:
         return {"translated_text": ""}
-    translated = translate_via_gemini(clean, req.target_lang)
+    translated = await translate_via_gemini(clean, req.target_lang)
     return {"translated_text": translated}
 
 @app.get("/api/chats/{phone}")
@@ -211,35 +246,64 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
             if action == "ping":
                 await websocket.send_text(json.dumps({"action": "pong"}))
                 continue
+
             elif action == "chat_message":
                 sender = phone
                 chat_id = get_chat_id(sender, receiver)
                 msg_type = payload.get("msg_type", "text")
                 content = payload.get("content", "")
-                translated = payload.get("translated", "")
                 lang = payload.get("lang", "en")
-                
+                translated = payload.get("translated", "")
+
+                # Agar frontend ne pehle se translate nahi bheja, to backend translate karega
+                if not translated and content and msg_type == "text":
+                    translated = await translate_via_gemini(content, lang)
+
                 try:
                     conn = sqlite3.connect(DB_PATH)
                     cursor = conn.cursor()
-                    cursor.execute("INSERT INTO messages (chat_id, sender, receiver, msg_type, content, translated_content, lang, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                   (chat_id, sender, receiver, msg_type, content, translated, lang, "delivered" if manager.is_online(receiver) else "sent"))
+                    cursor.execute(
+                        "INSERT INTO messages (chat_id, sender, receiver, msg_type, content, translated_content, lang, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (chat_id, sender, receiver, msg_type, content, translated, lang, "delivered" if manager.is_online(receiver) else "sent")
+                    )
                     msg_id = cursor.lastrowid
                     conn.commit()
                     conn.close()
-                except Exception:
+                except Exception as e:
+                    print(f"[DB Insert Message Error]: {e}")
                     msg_id = 9999
 
                 await manager.send_to_user(receiver, {
-                    "action": "new_message", "id": msg_id, "sender": sender,
-                    "content": content, "translated": translated, "msg_type": msg_type,
-                    "lang": lang, "time": "now", "status": "delivered"
+                    "action": "new_message", 
+                    "id": msg_id, 
+                    "sender": sender,
+                    "content": content, 
+                    "translated": translated, 
+                    "msg_type": msg_type,
+                    "lang": lang, 
+                    "time": "now", 
+                    "status": "delivered"
                 })
-            elif action in ["call_signal", "call_live_caption"]:
+
+            elif action == "call_live_caption":
+                # Calling ke doran real-time subtitle translation
+                spoken_text = payload.get("text", "")
+                target_lang = payload.get("target_lang", "en")
+                
+                translated_caption = ""
+                if spoken_text:
+                    translated_caption = await translate_via_gemini(spoken_text, target_lang)
+
+                payload["translated_text"] = translated_caption
                 await manager.send_to_user(receiver, payload)
+
+            elif action == "call_signal":
+                await manager.send_to_user(receiver, payload)
+
     except WebSocketDisconnect:
         manager.disconnect(phone)
-    except Exception:
+    except Exception as e:
+        print(f"[WS Error]: {e}")
         manager.disconnect(phone)
 
 @app.get("/")
@@ -251,4 +315,5 @@ async def serve_index():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("server:app", host="0.0.0.0", port=8080, reload=False)
+    # File chahe server.py ho ya main.py, app object directly pass karne se chal jayegi
+    uvicorn.run(app, host="0.0.0.0", port=8080)
