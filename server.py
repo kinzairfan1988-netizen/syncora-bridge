@@ -18,6 +18,9 @@ try:
 except ImportError:
     pass
 
+# AGAR ENVIRONMENT VARIABLE KA MASLA HO TO APNI KEY YAHAN DIRECT PASTE KAREIN:
+MANUAL_GEMINI_KEY = ""  # Maslan: "AIzaSy..."
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -58,16 +61,17 @@ def _call_gemini_api(text: str, target_lang: str) -> str:
         return ""
     
     target_lang = target_lang.strip().lower()
-    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
     
-    # Agar environment variable nahi mila
+    # Environment variable check karein, agar na mile to MANUAL_GEMINI_KEY use karein
+    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip() or MANUAL_GEMINI_KEY.strip()
+    
     if not gemini_key:
-        print("\n[TRANSLATION ERROR]: GEMINI_API_KEY set nahi hai! Terminal mein 'export GEMINI_API_KEY=...' ya .env file check karein.\n")
-        return f"[Translation Failed: Key Missing] {clean}"
+        print("\n[ERROR]: GEMINI_API_KEY nahi mili! Ya to terminal mein export karein ya code mein MANUAL_GEMINI_KEY ke andar paste karein.\n")
+        return f"[Key Missing] {clean}"
 
     try:
         lang_map = {
-            "ur": "Urdu (in Urdu Nastaliq script)",
+            "ur": "Urdu (Nastaliq script)",
             "en": "English",
             "ar": "Arabic",
             "de": "German",
@@ -78,16 +82,11 @@ def _call_gemini_api(text: str, target_lang: str) -> str:
         }
         target_name = lang_map.get(target_lang, "English")
         
-        # Roman Urdu ko khaas tor par handle karne ke liye mazboot prompt
         prompt = (
-            f"You are a real-time translator for an audio calling and chat app. "
-            f"The input text may be in Roman Urdu (Urdu written in English alphabets like 'kaisy hain', 'kya haal hai'), Urdu script, Hindi, or English. "
-            f"Understand the meaning accurately and translate it into: {target_name}. "
-            f"IMPORTANT: "
-            f"1. If input is 'kaisy hain' and target is English, output 'How are you?'. "
-            f"2. Return ONLY the translated sentence. "
-            f"3. Do NOT add explanations, notes, quotes, or repeating words.\n\n"
-            f"Input: {clean}"
+            f"You are a real-time translator for an audio calling and messaging app. "
+            f"Translate the following message into {target_name}. "
+            f"The input might be in Roman Urdu (like 'kaisy hain' which means 'How are you?'), Urdu, Hindi, or English. "
+            f"Translate it naturally and return ONLY the translated sentence with no quotation marks or notes:\n{clean}"
         )
         
         payload = json.dumps({
@@ -113,14 +112,14 @@ def _call_gemini_api(text: str, target_lang: str) -> str:
                 if parts:
                     out_text = parts[0].get("text", "").strip()
                     if out_text:
-                        print(f"[Translation Success]: '{clean}' -> '{out_text}' (Target: {target_name})")
+                        print(f"[Gemini Translated]: '{clean}' -> '{out_text}' (Target: {target_name})")
                         return out_text
                         
     except urllib.error.HTTPError as he:
         err_msg = he.read().decode('utf-8', errors='ignore')
-        print(f"\n[Google API HTTP Error {he.code}]: {err_msg}\n")
+        print(f"\n[Google API Error {he.code}]: {err_msg}\n")
     except Exception as e:
-        print(f"\n[Translation System Error]: {e}\n")
+        print(f"\n[Translation Error]: {e}\n")
         
     return clean
 
@@ -201,6 +200,7 @@ async def translate_text(req: TranslationRequest):
     clean = req.text.strip()
     if not clean:
         return {"translated_text": ""}
+    print(f"[/translate API Hit]: Text='{clean}', Target='{req.target_lang}'")
     translated = await translate_via_gemini(clean, req.target_lang)
     return {"translated_text": translated}
 
@@ -265,12 +265,15 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                 sender = phone
                 chat_id = get_chat_id(sender, receiver)
                 msg_type = payload.get("msg_type", "text")
-                content = payload.get("content", "")
+                content = payload.get("content", "").strip()
                 lang = payload.get("lang", "en")
-                translated = payload.get("translated", "")
+                translated = payload.get("translated", "").strip()
 
-                # Agar frontend se translation nahi aayi to server Gemini se translate karega
-                if not translated and content:
+                print(f"[WS Incoming]: Sender={sender}, Content='{content}', FrontTranslated='{translated}', Lang='{lang}'")
+
+                # KHAAS FIX: Agar frontend ne translated khali bheja ho YA wahi same text ("kaisy hain") bheja ho
+                if content and (not translated or translated.lower() == content.lower()):
+                    print(f"[WS Processing]: Gemini translation shuru kar raha hai...")
                     translated = await translate_via_gemini(content, lang)
 
                 try:
@@ -284,7 +287,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                     conn.commit()
                     conn.close()
                 except Exception as e:
-                    print(f"[DB Insert Message Error]: {e}")
+                    print(f"[DB Error]: {e}")
                     msg_id = 9999
 
                 await manager.send_to_user(receiver, {
@@ -300,10 +303,10 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                 })
 
             elif action == "call_live_caption":
-                # Real-time calling subtitle translation
-                spoken_text = payload.get("text", "")
+                spoken_text = payload.get("text", "").strip()
                 target_lang = payload.get("target_lang", "en")
                 
+                print(f"[Call Caption]: '{spoken_text}' ko '{target_lang}' mein translate kar raha hai")
                 translated_caption = ""
                 if spoken_text:
                     translated_caption = await translate_via_gemini(spoken_text, target_lang)
@@ -317,7 +320,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
     except WebSocketDisconnect:
         manager.disconnect(phone)
     except Exception as e:
-        print(f"[WS Error]: {e}")
+        print(f"[WS Disconnect/Error]: {e}")
         manager.disconnect(phone)
 
 @app.get("/")
