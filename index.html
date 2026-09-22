@@ -4,12 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Syncora Terminal - PeerJS Cloud Engine</title>
-    <!-- Favicon 404 Error Fix -->
     <link rel="icon" href="data:,">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-    <!-- PeerJS Cloud SDK -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root {
@@ -1168,8 +1166,8 @@
                     const data = await res.json();
                     
                     pendingPayload = { type: "voice", content: data.url };
-                    document.getElementById("voice-hint-field").value = "Voice Message Note";
-                    document.getElementById("send-modal-preview").innerText = "Voice Note Captured";
+                    document.getElementById("voice-hint-field").value = "Voice Note Message";
+                    document.getElementById("send-modal-preview").innerText = "Voice Note Recorded Successfully";
                     document.getElementById("send-modal").style.display = "flex";
                 };
                 mediaRecorder.start();
@@ -1210,7 +1208,11 @@
 
         function confirmDispatchOriginal() {
             if (!pendingPayload) return;
-            executeDispatch(pendingPayload.content, "", pendingPayload.type);
+            let finalContent = pendingPayload.content;
+            if (pendingPayload.type === "text") {
+                finalContent = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
+            }
+            executeDispatch(finalContent, "", pendingPayload.type);
             cancelDispatch();
         }
 
@@ -1218,6 +1220,11 @@
             if (!pendingPayload) return;
             const targetLang = document.getElementById("modal-target-lang").value || "en";
             let textToTranslate = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
+            
+            if (pendingPayload.type === "voice") {
+                textToTranslate = "Voice Note Audio Message";
+            }
+
             let translatedText = textToTranslate;
             try {
                 const res = await fetch("/translate", {
@@ -1227,7 +1234,8 @@
                 const data = await res.json();
                 translatedText = data.translated_text || textToTranslate;
             } catch (e) {}
-            executeDispatch(textToTranslate, translatedText, pendingPayload.type, targetLang);
+
+            executeDispatch(pendingPayload.content, translatedText, pendingPayload.type, targetLang);
             cancelDispatch();
         }
 
@@ -1266,8 +1274,10 @@
                     if (btnEl) btnEl.onclick = () => playSpokenVoice(safeTrans, lang);
                 }, 50);
             }
-            if (translated && translated.trim() !== "") {
+            if (translated && translated.trim() !== "" && type !== "voice") {
                 body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
+            } else if (translated && translated.trim() !== "" && type === "voice") {
+                body += `<div class="bubble-translation">Transcript/Translation: ${translated}</div>`;
             }
             bubble.innerHTML = body + `<div class="call-modal-overlay"><span>${time}</span></div>`;
             box.appendChild(bubble);
