@@ -164,22 +164,6 @@
             border-top: 1px dashed var(--border-graphite); color: var(--online-green);
         }
 
-        .voice-card-private {
-            display: flex; align-items: center; gap: 12px; padding: 4px 2px;
-        }
-        .btn-play-voice-circle {
-            width: 44px; height: 44px; border-radius: 50%; background: #000; color: var(--accent-amber);
-            border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            font-size: 18px; flex-shrink: 0; transition: transform 0.1s;
-        }
-        .btn-play-voice-circle:active { transform: scale(0.92); }
-        .bubble.received .btn-play-voice-circle {
-            background: var(--accent-amber); color: #000;
-        }
-        .voice-info-wrap { display: flex; flex-direction: column; }
-        .voice-title-label { font-size: 13px; font-weight: 700; }
-        .voice-sub-label { font-size: 11px; opacity: 0.8; }
-
         .stage-input-bar {
             padding: 8px 12px; background: var(--surface-panel);
             border-top: 1px solid var(--border-graphite); display: flex; align-items: center;
@@ -418,8 +402,8 @@
             <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Confirm Dispatch</h3>
             <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Review message text</p>
             <div id="voice-edit-block" style="display:block; text-align:left;">
-                <label style="font-size: 11px; color: var(--text-muted);">Message / Content:</label>
-                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Edit text if needed...">
+                <label style="font-size: 11px; color: var(--text-muted);">Spoken Message / Text:</label>
+                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Edit or type text...">
             </div>
             <div class="lang-options-drawer" id="lang-drawer">
                 <label style="font-size: 11px; color: var(--text-muted);">Select Target Language:</label>
@@ -548,6 +532,8 @@
         let recordedChunks = [];
         let isRecording = false;
         let activeAudioStream = null;
+        let voiceSpeechRec = null;
+        let currentRecordedTranscript = "";
 
         let pendingPayload = null;
         let currentAvatarUrl = "";
@@ -772,7 +758,7 @@
                         } 
                         else if (data.action === "call_live_caption") {
                             if (isTranslationCallMode) {
-                                document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
+                                document.getElementById("call-original-subtitle").innerText = `${data.sender}:${data.original}`;
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${data.translated}`;
                                 if (data.sender !== myPhone && data.translated && data.translated.trim()) {
                                     playSpokenVoice(data.translated, currentSelectedTargetLang);
@@ -1031,7 +1017,8 @@
                 callSpeechRec = new SR();
                 callSpeechRec.continuous = true; 
                 callSpeechRec.interimResults = false; 
-                callSpeechRec.lang = 'en-US';
+                // ur-PK or en-US dono ko pick karta hai
+                callSpeechRec.lang = 'ur-PK';
 
                 callSpeechRec.onresult = async (event) => {
                     if (!isTranslationCallMode) return;
@@ -1113,10 +1100,12 @@
 
         async function startVoiceRecording() {
             try {
+                currentRecordedTranscript = "";
                 activeAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(activeAudioStream);
                 recordedChunks = [];
                 mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
+                
                 mediaRecorder.onstop = async () => {
                     if (recordedChunks.length === 0) return;
                     const blob = new Blob(recordedChunks, { type: "audio/webm" });
@@ -1125,10 +1114,39 @@
                     const data = await res.json();
                     
                     pendingPayload = { type: "voice", content: data.url };
-                    document.getElementById("voice-hint-field").value = "Voice Note Message";
-                    document.getElementById("send-modal-preview").innerText = "Voice Note Recorded Successfully";
+                    
+                    // User ne jo aawaz mein bola wo text yahan aayega, hardcoded nahi
+                    const finalRecordedText = currentRecordedTranscript.trim() || "";
+                    document.getElementById("voice-hint-field").value = finalRecordedText;
+                    document.getElementById("send-modal-preview").innerText = finalRecordedText ? `"${finalRecordedText}"` : "Voice Note Audio Recorded";
                     document.getElementById("send-modal").style.display = "flex";
                 };
+
+                // Aawaz ko sath sath alfaaz (speech to text) mein convert karein
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (SR) {
+                    try {
+                        voiceSpeechRec = new SR();
+                        voiceSpeechRec.continuous = true;
+                        voiceSpeechRec.interimResults = true;
+                        voiceSpeechRec.lang = 'ur-PK'; // Urdu / Pakistani accent
+                        voiceSpeechRec.onresult = (e) => {
+                            let textSoFar = "";
+                            for (let i = 0; i < e.results.length; ++i) {
+                                textSoFar += e.results[i][0].transcript + " ";
+                            }
+                            currentRecordedTranscript = textSoFar.trim();
+                            const liveWords = document.getElementById("rec-live-words");
+                            if (liveWords && currentRecordedTranscript) {
+                                liveWords.innerText = currentRecordedTranscript;
+                            }
+                        };
+                        voiceSpeechRec.start();
+                    } catch(err) {
+                        console.log("SpeechRec error:", err);
+                    }
+                }
+
                 mediaRecorder.start();
                 isRecording = true;
                 document.getElementById("input-shell").style.display = "none";
@@ -1137,12 +1155,15 @@
         }
 
         function stopAndFinishRecording() {
+            if (voiceSpeechRec) { try { voiceSpeechRec.stop(); } catch(e){} voiceSpeechRec = null; }
             if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
             if (activeAudioStream) { activeAudioStream.getTracks().forEach(t => t.stop()); activeAudioStream = null; }
             resetRecordingUI();
         }
 
         function cancelRecording() {
+            if (voiceSpeechRec) { try { voiceSpeechRec.stop(); } catch(e){} voiceSpeechRec = null; }
+            currentRecordedTranscript = "";
             if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
             if (activeAudioStream) { activeAudioStream.getTracks().forEach(t => t.stop()); activeAudioStream = null; }
             resetRecordingUI();
@@ -1152,6 +1173,7 @@
             isRecording = false;
             document.getElementById("recording-bar").style.display = "none";
             document.getElementById("input-shell").style.display = "flex";
+            document.getElementById("rec-live-words").innerText = "Listening...";
         }
 
         function stageMessageForDispatch() {
@@ -1178,20 +1200,26 @@
         async function confirmDispatchTranslation() {
             if (!pendingPayload) return;
             const targetLang = document.getElementById("modal-target-lang").value || "en";
-            let textToTranslate = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
-            if (pendingPayload.type === "voice") {
-                textToTranslate = "Voice Note Audio Message";
+            
+            // Hardcoded "Voice Note Audio Message" khatam kar diya gaya hai
+            let textToTranslate = document.getElementById("voice-hint-field").value.trim();
+            if (!textToTranslate && pendingPayload.type === "text") {
+                textToTranslate = pendingPayload.content;
             }
 
-            let translatedText = textToTranslate;
-            try {
-                const res = await fetch("/translate", {
-                    method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
-                });
-                const data = await res.json();
-                translatedText = data.translated_text || textToTranslate;
-            } catch (e) {}
+            let translatedText = "";
+            if (textToTranslate) {
+                try {
+                    const res = await fetch("/translate", {
+                        method: "POST", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
+                    });
+                    const data = await res.json();
+                    translatedText = data.translated_text || textToTranslate;
+                } catch (e) {
+                    translatedText = textToTranslate;
+                }
+            }
 
             executeDispatch(pendingPayload.content, translatedText, pendingPayload.type, targetLang);
             cancelDispatch();
@@ -1214,30 +1242,26 @@
             bubble.className = `bubble ${dir}`;
             if (msgId) bubble.id = `bubble_${msgId}`;
 
-            let body = `<div>${content}</div>`;
+            let body = "";
+            
             if (type === "voice") {
-                const safeTrans = (translated || "").replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                const uniqueBtnId = "voice_btn_" + Math.random().toString(36).substring(2, 9);
+                // Asal audio player
                 body = `
-                    <div class="voice-card-private">
-                        <button id="${uniqueBtnId}" class="btn-play-voice-circle" title="Play Voice Note">▶</button>
-                        <div class="voice-info-wrap">
-                            <span class="voice-title-label">🎙️ AI Voice Note (${lang.toUpperCase()})</span>
-                            <span class="voice-sub-label">Click ▶ to listen</span>
-                        </div>
+                    <div style="margin-bottom: 6px;">
+                        <audio controls src="${content}" style="width: 100%; max-width: 250px; height: 38px; outline: none;"></audio>
                     </div>
                 `;
-                setTimeout(() => {
-                    const btnEl = document.getElementById(uniqueBtnId);
-                    if (btnEl) btnEl.onclick = () => playSpokenVoice(safeTrans, lang);
-                }, 50);
+                if (translated && translated.trim() !== "") {
+                    body += `<div class="bubble-translation">🌐 AI Translation: ${translated}</div>`;
+                }
+            } else {
+                body = `<div>${content}</div>`;
+                if (translated && translated.trim() !== "") {
+                    body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
+                }
             }
-            if (translated && translated.trim() !== "" && type !== "voice") {
-                body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
-            } else if (translated && translated.trim() !== "" && type === "voice") {
-                body += `<div class="bubble-translation">Transcript/Translation: ${translated}</div>`;
-            }
-            bubble.innerHTML = body + `<div class="call-modal-overlay"><span>${time}</span></div>`;
+
+            bubble.innerHTML = body;
             box.appendChild(bubble);
             box.scrollTop = box.scrollHeight;
         }
