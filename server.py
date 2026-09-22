@@ -51,7 +51,6 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
 
     target_lang = target_lang.strip().lower()
     
-    # 1. Quick local phrase fallback for testing/demo reliability
     common_phrases = {
         "hello": {"ur": "ہیلو", "ar": "مرحبا", "es": "hola"},
         "how are you": {"ur": "آپ کیسے ہیں", "ar": "كيف حالك", "es": "cómo estás"}
@@ -59,7 +58,6 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
     if clean.lower() in common_phrases and target_lang in common_phrases[clean.lower()]:
         return common_phrases[clean.lower()][target_lang]
 
-    # 2. Gemini API v1beta Endpoint Call
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if gemini_key:
         try:
