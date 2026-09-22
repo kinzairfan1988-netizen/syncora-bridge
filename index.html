@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Syncora Terminal - PeerJS Cloud Engine</title>
+    <title>Syncora Terminal - Native WebSocket Engine</title>
     <link rel="icon" href="data:,">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root {
             --bg-obsidian: #0b0e14;
@@ -227,12 +226,12 @@
             border-radius: 8px; color: var(--text-primary); cursor: pointer; font-size: 13px;
         }
 
-        .contacts-overlay, .settings-overlay, .send-modal-backdrop, .call-setup-backdrop, .incoming-setup-backdrop {
+        .contacts-overlay, .settings-overlay, .send-modal-backdrop, .call-setup-backdrop {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88);
             backdrop-filter: blur(10px); z-index: 9999; display: none;
             align-items: center; justify-content: center; padding: 20px;
         }
-        .contacts-card, .settings-card, .send-modal-card, .call-setup-card, .incoming-setup-card {
+        .contacts-card, .settings-card, .send-modal-card, .call-setup-card {
             background: var(--surface-panel); border: 1px solid var(--border-graphite);
             border-radius: 20px; width: 100%; max-width: 380px; padding: 22px;
             display: flex; flex-direction: column; gap: 12px; text-align: center;
@@ -300,24 +299,17 @@
         @media (max-width: 768px) {
             .sidebar-panel { width: 100%; height: 100dvh; display: flex; }
             .stage-panel { display: none; width: 100%; height: 100dvh; }
-            
             body.in-chat .sidebar-panel { display: none !important; }
             body.in-chat .stage-panel { display: flex !important; flex-direction: column; height: 100dvh; }
-
             .stage-header { padding: 8px 10px; gap: 4px; }
             .chat-avatar { width: 34px; height: 34px; font-size: 11px; }
             #active-partner-label { font-size: 13px !important; max-width: 95px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-            
             .btn-call-action { height: 30px; padding: 0 8px; font-size: 11px; gap: 3px; }
-            .btn-call-action.trans-call-btn { padding: 0 8px; font-size: 11px; }
-
             .stage-input-bar { padding: 6px 10px; }
             .main-text-input { font-size: 14px; padding: 6px 2px; }
             .btn-send-permanent { width: 38px; height: 38px; font-size: 15px; }
-            
             .mobile-header-actions { display: flex !important; align-items: center; gap: 4px; }
         }
-
         .mobile-header-actions { display: none; }
     </style>
 </head>
@@ -357,27 +349,16 @@
         <div class="contacts-card">
             <h3 style="font-size: 17px; color: var(--accent-amber); font-family: 'Space Grotesk', sans-serif;">Start New Conversation</h3>
             <p style="font-size: 12px; color: var(--text-muted);">Number enter karein, chat list mein add ho jayega.</p>
-
-            <button class="btn-contact-opt" onclick="pickFromPhoneContacts()">
-                <span>📖</span> Select from Phone Contacts
-            </button>
-
-            <button class="btn-contact-opt wa-btn" onclick="shareInviteOnWhatsApp()">
-                <span>💬</span> Invite Friend on WhatsApp
-            </button>
-
+            <button class="btn-contact-opt" onclick="pickFromPhoneContacts()"><span>📖</span> Select from Phone Contacts</button>
+            <button class="btn-contact-opt wa-btn" onclick="shareInviteOnWhatsApp()"><span>💬</span> Invite Friend on WhatsApp</button>
             <div style="display: flex; align-items: center; gap: 8px; margin: 4px 0;">
                 <hr style="flex: 1; border: none; border-top: 1px solid var(--border-graphite);">
                 <span style="font-size: 11px; color: var(--text-muted);">OR MANUAL</span>
                 <hr style="flex: 1; border: none; border-top: 1px solid var(--border-graphite);">
             </div>
-
             <input type="tel" id="manual-contact-input" class="auth-input" placeholder="Enter Mobile Number (0301...)" style="margin-bottom: 6px;">
             <button class="btn-auth" onclick="openManualChat()">Add & Open Chat</button>
-
-            <button onclick="closeContactsModal()" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; margin-top: 4px;">
-                Close
-            </button>
+            <button onclick="closeContactsModal()" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; margin-top: 4px;">Close</button>
         </div>
     </div>
 
@@ -415,22 +396,18 @@
                 <h3 style="color: var(--accent-amber); font-family: 'Space Grotesk';">Profile Settings</h3>
                 <button class="icon-btn" onclick="closeSettingsModal()">✕</button>
             </div>
-
             <div class="settings-field">
                 <label>Your Name</label>
                 <input type="text" id="settings-name-input" class="settings-input" placeholder="Display name">
             </div>
-
             <div class="settings-field">
                 <label>Phone Number</label>
                 <input type="text" id="settings-phone-display" class="settings-input" disabled>
             </div>
-
             <div class="settings-field">
                 <label>Bio / About</label>
                 <input type="text" id="settings-status-input" class="settings-input" placeholder="Hey there! I am using Syncora.">
             </div>
-
             <button class="btn-save-settings" onclick="saveProfileChanges()">Save Changes</button>
             <button class="btn-logout" onclick="executeLogout()">🚪 Log Out</button>
         </div>
@@ -440,12 +417,10 @@
         <div class="send-modal-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Confirm Dispatch</h3>
             <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Review message text</p>
-
             <div id="voice-edit-block" style="display:block; text-align:left;">
                 <label style="font-size: 11px; color: var(--text-muted);">Message / Content:</label>
                 <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Edit text if needed...">
             </div>
-
             <div class="lang-options-drawer" id="lang-drawer">
                 <label style="font-size: 11px; color: var(--text-muted);">Select Target Language:</label>
                 <select class="lang-dropdown" id="modal-target-lang">
@@ -456,18 +431,10 @@
                     <option value="fr">French (Français)</option>
                     <option value="es">Spanish (Español)</option>
                 </select>
-                <button class="modal-btn-choice btn-choice-trans" id="btn-modal-confirm-trans" onclick="confirmDispatchTranslation()">
-                    🌐 Translate & Send
-                </button>
+                <button class="modal-btn-choice btn-choice-trans" id="btn-modal-confirm-trans" onclick="confirmDispatchTranslation()">🌐 Translate & Send</button>
             </div>
-
-            <button class="modal-btn-choice" onclick="confirmDispatchOriginal()" style="margin-top: 4px;">
-                ✉️ Send Without Translation
-            </button>
-
-            <button onclick="cancelDispatch()" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer;">
-                Cancel
-            </button>
+            <button class="modal-btn-choice" onclick="confirmDispatchOriginal()" style="margin-top: 4px;">✉️ Send Without Translation</button>
+            <button onclick="cancelDispatch()" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer;">Cancel</button>
         </div>
     </div>
 
@@ -477,28 +444,15 @@
                 <span class="app-brand">SYNCORA</span>
                 <span style="font-size: 12px; color: var(--online-green);" id="my-status-label">● Online</span>
             </div>
-
             <div class="sidebar-search">
                 <input type="text" id="chat-search-input" class="search-input" placeholder="Search chats..." oninput="filterChatList(this.value)">
             </div>
-
             <div class="chat-list" id="chat-list"></div>
-
             <button class="fab-btn" onclick="openContactsModal()" title="Start New Chat">💬</button>
-
             <nav class="bottom-nav-bar">
-                <button class="nav-tab-btn active" onclick="switchTab('chats')">
-                    <span class="tab-icon">💬</span>
-                    <span>Chats</span>
-                </button>
-                <button class="nav-tab-btn" onclick="openContactsModal()">
-                    <span class="tab-icon">👥</span>
-                    <span>Contacts</span>
-                </button>
-                <button class="nav-tab-btn" onclick="openSettingsModal()">
-                    <span class="tab-icon">⚙️</span>
-                    <span>Settings</span>
-                </button>
+                <button class="nav-tab-btn active" onclick="switchTab('chats')"><span class="tab-icon">💬</span><span>Chats</span></button>
+                <button class="nav-tab-btn" onclick="openContactsModal()"><span class="tab-icon">👥</span><span>Contacts</span></button>
+                <button class="nav-tab-btn" onclick="openSettingsModal()"><span class="tab-icon">⚙️</span><span>Settings</span></button>
             </nav>
         </aside>
 
@@ -512,17 +466,15 @@
                         <div style="font-size: 10px; color: var(--text-muted);" id="active-partner-status">Offline</div>
                     </div>
                 </div>
-
                 <div style="display:flex; align-items:center; gap: 4px;">
                     <div class="mobile-header-actions">
                         <button class="icon-btn" onclick="openContactsModal()" title="Contacts">👥</button>
                         <button class="icon-btn" onclick="shareInviteOnWhatsApp()" title="Invite on WhatsApp">🔗</button>
                         <button class="icon-btn" onclick="openSettingsModal()" title="Settings">⚙️</button>
                     </div>
-
                     <div class="call-buttons-group" id="call-buttons-dock" style="display: flex;">
-                        <button class="btn-call-action" onclick="startPeerCall('audio')" title="Normal Audio Call">📞</button>
-                        <button class="btn-call-action" onclick="startPeerCall('video')" title="Normal Video Call">📹</button>
+                        <button class="btn-call-action" onclick="startNativeCall('audio')" title="Normal Audio Call">📞</button>
+                        <button class="btn-call-action" onclick="startNativeCall('video')" title="Normal Video Call">📹</button>
                         <button class="btn-call-action trans-call-btn" onclick="promptTranslationCall()" title="Call with Live AI Translation">🌐 Trans</button>
                     </div>
                 </div>
@@ -537,7 +489,7 @@
             </div>
 
             <input type="file" id="file-picker-media" accept="image/*,video/*" style="display:none;" onchange="uploadAttachment(event, 'media')">
-            <input type="file" id="file-picker-doc"accept="*/*" style="display:none;" onchange="uploadAttachment(event, 'document')">
+            <input type="file" id="file-picker-doc" accept="*/*" style="display:none;" onchange="uploadAttachment(event, 'document')">
 
             <footer class="stage-input-bar">
                 <div class="input-shell" id="input-shell">
@@ -545,7 +497,6 @@
                     <input type="text" id="text-input" class="main-text-input" placeholder="Message..." onkeydown="if(event.key==='Enter'){ event.preventDefault(); stageMessageForDispatch(); }">
                     <button class="btn-inside-mic" id="inside-mic-btn" type="button" onclick="toggleVoiceRecording()" title="Record Voice Note">🎙️</button>
                 </div>
-
                 <div class="recording-bar" id="recording-bar">
                     <div class="rec-indicator">
                         <div class="rec-dot"></div>
@@ -556,24 +507,15 @@
                         <button class="icon-btn" type="button" onclick="stopAndFinishRecording()" style="color: var(--online-green);">✓</button>
                     </div>
                 </div>
-
                 <button class="btn-send-permanent" id="send-arrow-btn" type="button" onclick="stageMessageForDispatch()" title="Send">➤</button>
             </footer>
         </main>
     </div>
 
     <script>
-        let peer = null;
-        let activePeerCall = null;
         let localMediaStream = null;
-
-        window.addEventListener('error', function (e) {
-            if (e.filename && (e.filename.includes('200.js') || e.filename.includes('extension'))) {
-                e.stopImmediatePropagation();
-                e.preventDefault();
-                return true;
-            }
-        }, true);
+        let peerConnection = null;
+        const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
         let mobileAudioUnlocked = false;
         function unlockMobileAudio() {
@@ -618,18 +560,15 @@
 
         window.onload = async () => {
             renderChatListFromCache();
-
             if (myPhone) {
                 document.getElementById("auth-overlay").style.display = "none";
                 document.getElementById("my-status-label").innerText = `● ${myPhone}`;
                 initSocketSafe();
-                initPeerJSServer();
                 loadUserProfileData();
 
                 if (directChatParam && directChatParam !== myPhone && !directChatParam.startsWith("call-")) {
                     await registerPermanentContact(directChatParam);
                 }
-
                 await loadRecentChats();
 
                 if (directChatParam && directChatParam !== myPhone && !directChatParam.startsWith("call-")) {
@@ -643,43 +582,11 @@
         };
 
         window.onbeforeunload = () => {
-            if (socket) { socket.close(); }
-            if (peer) { peer.destroy(); }
+            if (socket) socket.close();
             if (heartbeatInterval) clearInterval(heartbeatInterval);
             if (statusPollInterval) clearInterval(statusPollInterval);
-            if (localMediaStream) { localMediaStream.getTracks().forEach(t => t.stop()); }
+            if (localMediaStream) localMediaStream.getTracks().forEach(t => t.stop());
         };
-
-        function initPeerJSServer() {
-            if (!myPhone) return;
-            const cleanId = "syncora_" + myPhone.replace(/[^0-9]/g, '');
-            
-            peer = new Peer(cleanId, {
-                host: '0.peerjs.com',
-                port: 443,
-                secure: true
-            });
-
-            peer.on('call', async (call) => {
-                activePeerCall = call;
-                currentCallType = call.metadata && call.metadata.type ? call.metadata.type : "audio";
-                isTranslationCallMode = call.metadata && call.metadata.translate ? call.metadata.translate : false;
-                currentSelectedTargetLang = call.metadata && call.metadata.lang ? call.metadata.lang : "en";
-
-                document.getElementById("call-partner-name").innerText = call.peer.replace("syncora_", "");
-                document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Incoming AI Translation Call..." : `Incoming ${currentCallType.toUpperCase()} Call...`;
-                document.getElementById("call-subtitles-dock").style.display = isTranslationCallMode ? "flex" : "none";
-                document.getElementById("btn-call-accept-main").style.display = "flex";
-                document.getElementById("call-modal").style.display = "flex";
-            });
-        }
-
-        function renderChatListFromCache() {
-            const list = document.getElementById("chat-list");
-            if (!list) return;
-            list.innerHTML = "";
-            allChatsCache.forEach(partner => renderChatItem(partner));
-        }
 
         function playSpokenVoice(text, lang) {
             unlockMobileAudio();
@@ -691,15 +598,12 @@
             const utterance = new SpeechSynthesisUtterance(clean);
             const target = (lang || 'en').toLowerCase();
             const voices = window.speechSynthesis.getVoices();
-            
             const mv = voices.find(v => v.lang.toLowerCase().startsWith(target));
             if (mv) { utterance.voice = mv; utterance.lang = mv.lang; }
             else { utterance.lang = target === 'ur' ? 'ur-PK' : 'en-US'; }
-
             utterance.rate = 0.95;
             utterance.pitch = 1.0;
             utterance.volume = 1.0;
-
             setTimeout(() => { window.speechSynthesis.speak(utterance); }, 100);
         }
 
@@ -734,7 +638,6 @@
                     document.getElementById("auth-overlay").style.display = "none";
                     document.getElementById("my-status-label").innerText = `● ${myPhone}`;
                     initSocketSafe();
-                    initPeerJSServer();
                     loadUserProfileData();
                     if (directChatParam && directChatParam !== myPhone) await registerPermanentContact(directChatParam);
                     await loadRecentChats();
@@ -820,7 +723,6 @@
         function executeLogout() {
             if (confirm("Kiya aap waqai Syncora se Logout karna chahte hain?")) {
                 if (socket) { socket.close(); socket = null; }
-                if (peer) { peer.destroy(); peer = null; }
                 localStorage.removeItem("syncora_user_phone");
                 localStorage.removeItem("syncora_active_partner");
                 localStorage.removeItem("syncora_cached_chats");
@@ -861,19 +763,17 @@
                             }
                             loadRecentChats();
                         } 
-                        else if (data.action === "message_sent_ack") { updateBubbleStatus(data.id, data.status); }
-                        else if (data.action === "messages_delivered") {
-                            if (data.delivered_to === activePartner) markAllSentBubblesDelivered();
-                        }
                         else if (data.action === "call_live_caption") {
                             if (isTranslationCallMode) {
                                 document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${data.translated}`;
-                                
                                 if (data.sender !== myPhone && data.translated && data.translated.trim()) {
                                     playSpokenVoice(data.translated, currentSelectedTargetLang);
                                 }
                             }
+                        }
+                        else if (data.action === "call_signal") {
+                            await handleSignalingData(data);
                         }
                     } catch(e){}
                 };
@@ -960,10 +860,11 @@
             const selectEl = document.getElementById("call-target-lang-select");
             currentSelectedTargetLang = selectEl ? selectEl.value : "en";
             document.getElementById("call-setup-modal").style.display = "none";
-            startPeerCall('audio', true);
+            startNativeCall('audio', true);
         }
 
-        async function startPeerCall(type, isTranslateMode = false) {
+        // NATIVE WEBRTC SIGNALING (NO EXTERNAL CLOUD DEPENDENCY)
+        async function startNativeCall(type, isTranslateMode = false) {
             unlockMobileAudio();
             if (!activePartner) { alert("Pehle contact select karein!"); return; }
             currentCallType = type;
@@ -975,8 +876,6 @@
                     video: (type === "video")
                 });
 
-                const targetPeerId = "syncora_" + activePartner.replace(/[^0-9]/g, '');
-                
                 document.getElementById("call-partner-name").innerText = activePartner;
                 document.getElementById("call-avatar-icon").innerText = type === "video" ? "📹" : (isTranslateMode ? "🌐" : "📞");
                 document.getElementById("btn-call-accept-main").style.display = "none";
@@ -994,37 +893,92 @@
                     document.getElementById("call-subtitles-dock").style.display = "flex";
                     document.getElementById("call-trans-header-label").innerText = `🌐 AI Translation (${currentSelectedTargetLang.toUpperCase()})`;
                 } else {
-                    document.getElementById("call-status-text").innerText = `Calling via PeerJS (${type.toUpperCase()})...`;
+                    document.getElementById("call-status-text").innerText = `Calling (${type.toUpperCase()})...`;
                     document.getElementById("call-subtitles-dock").style.display = "none";
                 }
 
-                const call = peer.call(targetPeerId, localMediaStream, {
-                    metadata: { type: type, translate: isTranslateMode, lang: currentSelectedTargetLang }
-                });
+                createPeerConnection();
+                localMediaStream.getTracks().forEach(track => peerConnection.addTrack(track, localMediaStream));
 
-                activePeerCall = call;
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
 
-                call.on('stream', (remoteStream) => {
-                    document.getElementById("call-status-text").innerText = "Call Connected (Live)";
-                    if (type === "video") {
-                        const rv = document.getElementById("remote-video");
-                        if (rv) { rv.srcObject = remoteStream; rv.play().catch(() => {}); }
-                    }
-                    const audioSink = document.getElementById("remote-audio-sink");
-                    if (audioSink && !isTranslateMode) {
-                        audioSink.srcObject = remoteStream;
-                        audioSink.play().catch(() => {});
-                    }
-                });
+                socket.send(JSON.stringify({
+                    action: "call_signal",
+                    receiver: activePartner,
+                    sender: myPhone,
+                    signal_type: "offer",
+                    sdp: offer,
+                    call_type: type,
+                    translate: isTranslateMode,
+                    lang: currentSelectedTargetLang
+                }));
 
-                call.on('close', () => { closeCallUI(); });
-
-                if (isTranslateMode) {
-                    startLiveCallSpeechEngine();
-                }
+                if (isTranslateMode) startLiveCallSpeechEngine();
             } catch (err) {
                 alert("Media/Call Error: " + err.message);
                 endCurrentCall();
+            }
+        }
+
+        function createPeerConnection() {
+            if (peerConnection) { peerConnection.close(); }
+            peerConnection = new RTCPeerConnection(rtcConfig);
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate && socket && socket.readyState === WebSocket.OPEN && activePartner) {
+                    socket.send(JSON.stringify({
+                        action: "call_signal",
+                        receiver: activePartner,
+                        sender: myPhone,
+                        signal_type: "candidate",
+                        candidate: event.candidate
+                    }));
+                }
+            };
+
+            peerConnection.ontrack = (event) => {
+                document.getElementById("call-status-text").innerText = "Call Connected (Live)";
+                if (currentCallType === "video") {
+                    const rv = document.getElementById("remote-video");
+                    if (rv) { rv.srcObject = event.streams[0]; rv.play().catch(() => {}); }
+                }
+                const audioSink = document.getElementById("remote-audio-sink");
+                if (audioSink && !isTranslationCallMode) {
+                    audioSink.srcObject = event.streams[0];
+                    audioSink.play().catch(() => {});
+                }
+            };
+        }
+
+        async function handleSignalingData(data) {
+            const sender = data.sender;
+            activePartner = sender;
+            localStorage.setItem("syncora_active_partner", activePartner);
+
+            if (data.signal_type === "offer") {
+                currentCallType = data.call_type || "audio";
+                isTranslationCallMode = data.translate || false;
+                currentSelectedTargetLang = data.lang || "en";
+
+                document.getElementById("call-partner-name").innerText = sender;
+                document.getElementById("call-avatar-icon").innerText = currentCallType === "video" ? "📹" : (isTranslationCallMode ? "🌐" : "📞");
+                document.getElementById("call-status-text").innerText = isTranslationCallMode ? "Incoming AI Translation Call..." : `Incoming ${currentCallType.toUpperCase()} Call...`;
+                document.getElementById("call-subtitles-dock").style.display = isTranslationCallMode ? "flex" : "none";
+                document.getElementById("btn-call-accept-main").style.display = "flex";
+                document.getElementById("call-modal").style.display = "flex";
+
+                window.incomingOfferSDP = data.sdp;
+            } 
+            else if (data.signal_type === "answer") {
+                if (peerConnection) {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                }
+            } 
+            else if (data.signal_type === "candidate") {
+                if (peerConnection && data.candidate) {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                }
             }
         }
 
@@ -1043,20 +997,20 @@
                         document.getElementById("local-video").srcObject = localMediaStream;
                     }
 
-                    activePeerCall.answer(localMediaStream);
+                    createPeerConnection();
+                    localMediaStream.getTracks().forEach(track => peerConnection.addTrack(track, localMediaStream));
 
-                    activePeerCall.on('stream', (remoteStream) => {
-                        document.getElementById("call-status-text").innerText = "Call Connected (Live)";
-                        if (currentCallType === "video") {
-                            const rv = document.getElementById("remote-video");
-                            if (rv) { rv.srcObject = remoteStream; rv.play().catch(() => {}); }
-                        }
-                        const audioSink = document.getElementById("remote-audio-sink");
-                        if (audioSink && !isTranslationCallMode) {
-                            audioSink.srcObject = remoteStream;
-                            audioSink.play().catch(() => {});
-                        }
-                    });
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(window.incomingOfferSDP));
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+
+                    socket.send(JSON.stringify({
+                        action: "call_signal",
+                        receiver: activePartner,
+                        sender: myPhone,
+                        signal_type: "answer",
+                        sdp: answer
+                    }));
 
                     if (isTranslationCallMode) startLiveCallSpeechEngine();
                 } catch(err) { endCurrentCall(); }
@@ -1068,7 +1022,6 @@
             if (!SR) return;
             try {
                 if (callSpeechRec) { try { callSpeechRec.stop(); } catch(e){} }
-
                 callSpeechRec = new SR();
                 callSpeechRec.continuous = true; 
                 callSpeechRec.interimResults = false; 
@@ -1107,7 +1060,7 @@
         }
 
         function endCurrentCall() {
-            if (activePeerCall) { try { activePeerCall.close(); } catch(e){} activePeerCall = null; }
+            if (peerConnection) { peerConnection.close(); peerConnection = null; }
             closeCallUI();
         }
 
@@ -1220,7 +1173,6 @@
             if (!pendingPayload) return;
             const targetLang = document.getElementById("modal-target-lang").value || "en";
             let textToTranslate = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
-            
             if (pendingPayload.type === "voice") {
                 textToTranslate = "Voice Note Audio Message";
             }
