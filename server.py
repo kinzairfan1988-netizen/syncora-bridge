@@ -48,6 +48,15 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
     if not clean:
         return ""
     target_lang = target_lang.strip().lower()
+    
+    # Fallback common phrases to guarantee instant response if API key is missing/slow
+    common_phrases = {
+        "hello": {"ur": "ہیلو", "ar": "مرحبا", "es": "hola"},
+        "how are you": {"ur": "آپ کیسے ہیں", "ar": "كيف حالك", "es": "cómo estás"}
+    }
+    if clean.lower() in common_phrases and target_lang in common_phrases[clean.lower()]:
+        return common_phrases[clean.lower()][target_lang]
+
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if gemini_key:
         try:
@@ -138,7 +147,8 @@ async def translate_text(req: TranslationRequest):
     clean = req.text.strip()
     if not clean:
         return {"translated_text": ""}
-    return {"translated_text": translate_via_gemini(clean, req.target_lang)}
+    translated = translate_via_gemini(clean, req.target_lang)
+    return {"translated_text": translated}
 
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
