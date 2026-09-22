@@ -63,8 +63,8 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
             "contents": [{"parts": [{"text": prompt}]}]
         }).encode('utf-8')
         
-        # Updated URL endpoint using standard v1 generateContent format
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+        # Using gemini-pro to ensure stable endpoint response without 404 errors
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={gemini_key}"
         req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
         
         with urllib.request.urlopen(req, timeout=15) as response:
