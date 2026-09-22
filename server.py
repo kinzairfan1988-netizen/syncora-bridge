@@ -47,37 +47,37 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
         return ""
-    target_lang = target_lang.strip().lower()
     
-    # Common fallback phrases
-    common_phrases = {
-        "hello": {"ur": "ہیلو", "ar": "مرحبا", "es": "hola"},
-        "how are you": {"ur": "آپ کیسے ہیں", "ar": "كيف حالك", "es": "cómo estás"}
-    }
-    if clean.lower() in common_phrases and target_lang in common_phrases[clean.lower()]:
-        return common_phrases[clean.lower()][target_lang]
-
+    target_lang = target_lang.strip().lower()
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if gemini_key:
-        try:
-            lang_map = {"ur": "Urdu", "en": "English", "ar": "Arabic", "de": "German", "fr": "French", "es": "Spanish"}
-            target_name = lang_map.get(target_lang, "English")
-            prompt = f"Translate this text accurately into {target_name}. Return ONLY the translated text without quotation marks: {clean}"
-            payload = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode('utf-8')
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
-            req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
-            with urllib.request.urlopen(req, timeout=5) as response:
-                res_data = json.loads(response.read().decode('utf-8'))
-                candidates = res_data.get("candidates", [])
-                if candidates:
-                    parts = candidates[0].get("content", {}).get("parts", [])
-                    if parts:
-                        out_text = parts[0].get("text", "").strip()
-                        if out_text:
-                            return out_text
-        except Exception as e:
-            print(f"Translation Error: {e}")
-            pass
+    
+    if not gemini_key:
+        return clean
+
+    try:
+        lang_map = {"ur": "Urdu", "en": "English", "ar": "Arabic", "de": "German", "fr": "French", "es": "Spanish"}
+        target_name = lang_map.get(target_lang, "English")
+        
+        prompt = f"Translate this text accurately into {target_name}. Return ONLY the translated text without quotation marks: {clean}"
+        payload = json.dumps({
+            "contents": [{"parts": [{"text": prompt}]}]
+        }).encode('utf-8')
+        
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+        req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+        
+        with urllib.request.urlopen(req, timeout=10) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            candidates = res_data.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if parts:
+                    out_text = parts[0].get("text", "").strip()
+                    if out_text:
+                        return out_text
+    except Exception as e:
+        print(f"Translation Error: {e}")
+        
     return clean
 
 class ConnectionManager:
@@ -92,9 +92,8 @@ class ConnectionManager:
         if phone in self.active_sessions:
             del self.active_sessions[phone]
 
-    _is_online = lambda self, phone: phone.strip() in self.active_sessions
     def is_online(self, phone: str) -> bool:
-        return self._is_online(phone)
+        return phone.strip() in self.active_sessions
 
     async def send_to_user(self, phone: str, payload: dict):
         if phone in self.active_sessions:
