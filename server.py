@@ -58,7 +58,7 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
         lang_map = {"ur": "Urdu", "en": "English", "ar": "Arabic", "de": "German", "fr": "French", "es": "Spanish"}
         target_name = lang_map.get(target_lang, "English")
         
-        prompt = f"Translate this text accurately into {target_name}. Return ONLY the translated text without quotation marks: {clean}"
+        prompt = f"Translate this text accurately into {target_name}. Return ONLY the translated text without quotation marks or extra explanation: {clean}"
         payload = json.dumps({
             "contents": [{"parts": [{"text": prompt}]}]
         }).encode('utf-8')
@@ -66,17 +66,21 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
         req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
         
-        with urllib.request.urlopen(req, timeout=10) as response:
-            res_data = json.loads(response.read().decode('utf-8'))
+        with urllib.request.urlopen(req, timeout=15) as response:
+            res_body = response.read().decode('utf-8')
+            res_data = json.loads(res_body)
+            
+            # Safe extraction from Gemini response structure
             candidates = res_data.get("candidates", [])
             if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
+                content_obj = candidates[0].get("content", {})
+                parts = content_obj.get("parts", [])
                 if parts:
                     out_text = parts[0].get("text", "").strip()
                     if out_text:
                         return out_text
     except Exception as e:
-        print(f"Translation Error: {e}")
+        print(f"[Translation Engine Error]: {e}")
         
     return clean
 
@@ -211,7 +215,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
             elif action == "chat_message":
                 sender = phone
                 chat_id = get_chat_id(sender, receiver)
-                msg_type = payload.get("msg_type", "text")
+                cmd_type = payload.get("msg_type", "text")
                 content = payload.get("content", "")
                 translated = payload.get("translated", "")
                 lang = payload.get("lang", "en")
@@ -220,7 +224,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                     conn = sqlite3.connect(DB_PATH)
                     cursor = conn.cursor()
                     cursor.execute("INSERT INTO messages (chat_id, sender, receiver, msg_type, content, translated_content, lang, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                   (chat_id, sender, receiver, msg_type, content, translated, lang, "delivered" if manager.is_online(receiver) else "sent"))
+                                   (chat_id, sender, receiver, cmd_type, content, translated, lang, "delivered" if manager.is_online(receiver) else "sent"))
                     msg_id = cursor.lastrowid
                     conn.commit()
                     conn.close()
@@ -229,7 +233,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
 
                 await manager.send_to_user(receiver, {
                     "action": "new_message", "id": msg_id, "sender": sender,
-                    "content": content, "translated": translated, "msg_type": msg_type,
+                    "content": content, "translated": translated, "msg_type": cmd_type,
                     "lang": lang, "time": "now", "status": "delivered"
                 })
             elif action in ["call_signal", "call_live_caption"]:
