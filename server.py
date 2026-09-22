@@ -1,12 +1,13 @@
 import os
 import json
 import sqlite3
+import urllib.request
+import urllib.parse
 from typing import Dict
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import google.generativeai as genai
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
@@ -54,21 +55,31 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
         return clean
 
     try:
-        genai.configure(api_key=gemini_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
         lang_map = {"ur": "Urdu", "en": "English", "ar": "Arabic", "de": "German", "fr": "French", "es": "Spanish"}
         target_name = lang_map.get(target_lang, "English")
         
         prompt = f"Translate this text accurately into {target_name}. Return ONLY the translated text without quotation marks or extra explanation: {clean}"
+        payload = json.dumps({
+            "contents": [{"parts": [{"text": prompt}]}]
+        }).encode('utf-8')
         
-        response = model.generate_content(prompt)
-        if response and response.text:
-            out_text = response.text.strip()
-            if out_text:
-                return out_text
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+        req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+        
+        with urllib.request.urlopen(req, timeout=15) as response:
+            res_body = response.read().decode('utf-8')
+            res_data = json.loads(res_body)
+            
+            candidates = res_data.get("candidates", [])
+            if candidates:
+                content_obj = candidates[0].get("content", {})
+                parts = content_obj.get("parts", [])
+                if parts:
+                    out_text = parts[0].get("text", "").strip()
+                    if out_text:
+                        return out_text
     except Exception as e:
-        print(f"[Gemini SDK Translation Error]: {e}")
+        print(f"[Translation API Error]: {e}")
         
     return clean
 
