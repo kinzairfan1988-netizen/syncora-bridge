@@ -1,5 +1,4 @@
 import os
-import re
 import json
 import sqlite3
 import urllib.request
@@ -48,16 +47,7 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
         return ""
-
     target_lang = target_lang.strip().lower()
-    
-    common_phrases = {
-        "hello": {"ur": "ہیلو", "ar": "مرحبا", "es": "hola"},
-        "how are you": {"ur": "آپ کیسے ہیں", "ar": "كيف حالك", "es": "cómo estás"}
-    }
-    if clean.lower() in common_phrases and target_lang in common_phrases[clean.lower()]:
-        return common_phrases[clean.lower()][target_lang]
-
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if gemini_key:
         try:
@@ -74,7 +64,6 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
                     return out_text
         except Exception:
             pass
-
     return clean
 
 class ConnectionManager:
@@ -103,8 +92,7 @@ manager = ConnectionManager()
 
 @app.post("/api/auth/login")
 async def direct_login(req: DirectLoginRequest):
-    phone = req.phone.strip()
-    return {"status": "ok", "phone": phone}
+    return {"status": "ok", "phone": req.phone.strip()}
 
 @app.post("/api/contacts/add")
 async def add_permanent_contact(req: dict):
@@ -150,9 +138,7 @@ async def translate_text(req: TranslationRequest):
     clean = req.text.strip()
     if not clean:
         return {"translated_text": ""}
-    target_lang = req.target_lang.strip().lower() if req.target_lang else "en"
-    translated = translate_via_gemini(clean, target_lang)
-    return {"translated_text": translated}
+    return {"translated_text": translate_via_gemini(clean, req.target_lang)}
 
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
@@ -162,8 +148,7 @@ async def get_user_chats(phone: str):
         cursor.execute("SELECT contact_phone FROM user_contacts WHERE user_phone = ?", (phone,))
         rows = cursor.fetchall()
         conn.close()
-        chats = [r[0] for r in rows]
-        return {"chats": chats}
+        return {"chats": [r[0] for r in rows]}
     except Exception:
         return {"chats": []}
 
@@ -232,7 +217,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                     "content": content, "translated": translated, "msg_type": msg_type,
                     "lang": lang, "time": "now", "status": "delivered"
                 })
-            elif action == "call_live_caption":
+            elif action in ["call_signal", "call_live_caption"]:
                 await manager.send_to_user(receiver, payload)
     except WebSocketDisconnect:
         manager.disconnect(phone)
