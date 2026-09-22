@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-# .env file se environment variables load karne ke liye
+# .env file load karne ke liye
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -50,7 +50,7 @@ class TranslationRequest(BaseModel):
 
 def get_chat_id(u1: str, u2: str) -> str:
     cleaned = sorted([u1.strip(), u2.strip()])
-    return f"chat_{cleaned[0]}_{cleaned[1]}"
+    return f"chat_{cleaned[0]}_{cleaned}"
 
 def _call_gemini_api(text: str, target_lang: str) -> str:
     clean = text.strip()
@@ -60,28 +60,36 @@ def _call_gemini_api(text: str, target_lang: str) -> str:
     target_lang = target_lang.strip().lower()
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
     
+    # Agar environment variable nahi mila
     if not gemini_key:
-        print("[Translation Warning]: GEMINI_API_KEY environment variable set nahi hai!")
-        return clean
+        print("\n[TRANSLATION ERROR]: GEMINI_API_KEY set nahi hai! Terminal mein 'export GEMINI_API_KEY=...' ya .env file check karein.\n")
+        return f"[Translation Failed: Key Missing] {clean}"
 
     try:
         lang_map = {
-            "ur": "Urdu",
+            "ur": "Urdu (in Urdu Nastaliq script)",
             "en": "English",
             "ar": "Arabic",
             "de": "German",
             "fr": "French",
             "es": "Spanish",
             "hi": "Hindi",
-            "roman_ur": "Roman Urdu (Hindi/Urdu in English alphabet)"
+            "roman_ur": "Roman Urdu"
         }
-        target_name = lang_map.get(target_lang, target_lang)
+        target_name = lang_map.get(target_lang, "English")
         
+        # Roman Urdu ko khaas tor par handle karne ke liye mazboot prompt
         prompt = (
-            f"You are a professional real-time speech and chat translator. "
-            f"Translate the following text accurately into {target_name}. "
-            f"Return ONLY the translated sentence with no markdown, no quotes, and no extra explanation:\n{clean}"
+            f"You are a real-time translator for an audio calling and chat app. "
+            f"The input text may be in Roman Urdu (Urdu written in English alphabets like 'kaisy hain', 'kya haal hai'), Urdu script, Hindi, or English. "
+            f"Understand the meaning accurately and translate it into: {target_name}. "
+            f"IMPORTANT: "
+            f"1. If input is 'kaisy hain' and target is English, output 'How are you?'. "
+            f"2. Return ONLY the translated sentence. "
+            f"3. Do NOT add explanations, notes, quotes, or repeating words.\n\n"
+            f"Input: {clean}"
         )
+        
         payload = json.dumps({
             "contents": [{"parts": [{"text": prompt}]}]
         }).encode('utf-8')
@@ -105,17 +113,18 @@ def _call_gemini_api(text: str, target_lang: str) -> str:
                 if parts:
                     out_text = parts[0].get("text", "").strip()
                     if out_text:
+                        print(f"[Translation Success]: '{clean}' -> '{out_text}' (Target: {target_name})")
                         return out_text
+                        
     except urllib.error.HTTPError as he:
-        error_details = he.read().decode('utf-8', errors='ignore')
-        print(f"[Translation HTTP Error {he.code}]: {error_details}")
+        err_msg = he.read().decode('utf-8', errors='ignore')
+        print(f"\n[Google API HTTP Error {he.code}]: {err_msg}\n")
     except Exception as e:
-        print(f"[Translation API Error]: {e}")
+        print(f"\n[Translation System Error]: {e}\n")
         
     return clean
 
 async def translate_via_gemini(text: str, target_lang: str) -> str:
-    # Event loop ko block hone se bachane ke liye threadpool mein chalayein
     return await asyncio.to_thread(_call_gemini_api, text, target_lang)
 
 class ConnectionManager:
@@ -163,7 +172,7 @@ async def get_user_profile(phone: str):
         row = cursor.fetchone()
         conn.close()
         if row:
-            return {"phone": phone, "display_name": row[0] or "", "about_status": row[1] or "", "avatar_url": row[2] or ""}
+            return {"phone": phone, "display_name": row[0] or "", "about_status": row or "", "avatar_url": row[2] or ""}
     except Exception:
         pass
     return {"phone": phone, "display_name": "", "about_status": "Hey there! I am using Syncora.", "avatar_url": ""}
@@ -177,8 +186,10 @@ async def update_user_profile(req: dict):
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO users (phone, display_name, about_status, avatar_url) VALUES (?, ?, ?, ?) ON CONFLICT(phone) DO UPDATE SET display_name=?, about_status=?, avatar_url=?", 
-                       (phone, display_name, about_status, avatar_url, display_name, about_status, avatar_url))
+        cursor.execute(
+            "INSERT INTO users (phone, display_name, about_status, avatar_url) VALUES (?, ?, ?, ?) ON CONFLICT(phone) DO UPDATE SET display_name=?, about_status=?, avatar_url=?", 
+            (phone, display_name, about_status, avatar_url, display_name, about_status, avatar_url)
+        )
         conn.commit()
         conn.close()
         return {"status": "ok"}
@@ -211,13 +222,16 @@ async def get_conversation(phone: str, partner: str):
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("SELECT id, sender, receiver, msg_type, content, translated_content, lang, status, created_at FROM messages WHERE chat_id = ? ORDER BY id ASC", (chat_id,))
+        cursor.execute(
+            "SELECT id, sender, receiver, msg_type, content, translated_content, lang, status, created_at FROM messages WHERE chat_id = ? ORDER BY id ASC", 
+            (chat_id,)
+        )
         rows = cursor.fetchall()
         conn.close()
         messages = []
         for r in rows:
             messages.append({
-                "id": r[0], "sender": r[1], "receiver": r[2], "msg_type": r[3],
+                "id": r[0], "sender": r, "receiver": r[2], "msg_type": r[3],
                 "content": r[4], "translated_content": r[5], "lang": r[6], "status": r[7], "time": str(r[8])[-8:-3]
             })
         return {"messages": messages}
@@ -226,7 +240,7 @@ async def get_conversation(phone: str, partner: str):
 
 @app.post("/api/upload")
 async def upload_media(file: UploadFile = File(...)):
-    ext = os.path.splitext(file.filename)[1] or ".webm"
+    ext = os.path.splitext(file.filename) or ".webm"
     filename = f"{os.urandom(8).hex()}{ext}"
     filepath = os.path.join(UPLOAD_DIR, filename)
     with open(filepath, "wb") as f:
@@ -255,8 +269,8 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                 lang = payload.get("lang", "en")
                 translated = payload.get("translated", "")
 
-                # Agar frontend ne pehle se translate nahi bheja, to backend translate karega
-                if not translated and content and msg_type == "text":
+                # Agar frontend se translation nahi aayi to server Gemini se translate karega
+                if not translated and content:
                     translated = await translate_via_gemini(content, lang)
 
                 try:
@@ -286,7 +300,7 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                 })
 
             elif action == "call_live_caption":
-                # Calling ke doran real-time subtitle translation
+                # Real-time calling subtitle translation
                 spoken_text = payload.get("text", "")
                 target_lang = payload.get("target_lang", "en")
                 
@@ -315,5 +329,4 @@ async def serve_index():
 
 if __name__ == "__main__":
     import uvicorn
-    # File chahe server.py ho ya main.py, app object directly pass karne se chal jayegi
     uvicorn.run(app, host="0.0.0.0", port=8080)
