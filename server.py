@@ -49,7 +49,7 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
         return ""
     target_lang = target_lang.strip().lower()
     
-    # Fallback common phrases to guarantee instant response if API key is missing/slow
+    # Common fallback phrases
     common_phrases = {
         "hello": {"ur": "ہیلو", "ar": "مرحبا", "es": "hola"},
         "how are you": {"ur": "آپ کیسے ہیں", "ar": "كيف حالك", "es": "cómo estás"}
@@ -68,10 +68,15 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
             req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
             with urllib.request.urlopen(req, timeout=5) as response:
                 res_data = json.loads(response.read().decode('utf-8'))
-                out_text = res_data.get("candidates", [])[0].get("content", {}).get("parts", [])[0].get("text", "").strip()
-                if out_text:
-                    return out_text
-        except Exception:
+                candidates = res_data.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts:
+                        out_text = parts[0].get("text", "").strip()
+                        if out_text:
+                            return out_text
+        except Exception as e:
+            print(f"Translation Error: {e}")
             pass
     return clean
 
@@ -87,8 +92,9 @@ class ConnectionManager:
         if phone in self.active_sessions:
             del self.active_sessions[phone]
 
+    _is_online = lambda self, phone: phone.strip() in self.active_sessions
     def is_online(self, phone: str) -> bool:
-        return phone.strip() in self.active_sessions
+        return self._is_online(phone)
 
     async def send_to_user(self, phone: str, payload: dict):
         if phone in self.active_sessions:
