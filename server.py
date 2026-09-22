@@ -51,7 +51,6 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
 
     target_lang = target_lang.strip().lower()
     
-    # Safe local fallback dictionary for instant testing without external dependency failures
     common_phrases = {
         "hello": {"ur": "ہیلو", "ar": "مرحبا", "es": "hola"},
         "how are you": {"ur": "آپ کیسے ہیں", "ar": "كيف حالك", "es": "cómo estás"}
@@ -74,7 +73,6 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
                 if out_text:
                     return out_text
         except Exception:
-            # Silently fallback to original text to prevent console clutter and errors
             pass
 
     return clean
