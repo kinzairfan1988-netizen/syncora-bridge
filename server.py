@@ -2,6 +2,8 @@ import os
 import json
 import sqlite3
 import asyncio
+import time
+import base64
 import urllib.request
 import urllib.parse
 import urllib.error
@@ -50,11 +52,15 @@ class TranslationRequest(BaseModel):
     text: str
     target_lang: str = "en"
 
+class VoiceTranslateRequest(BaseModel):
+    audio_url: str
+    target_lang: str = "en"
+
 def get_chat_id(u1: str, u2: str) -> str:
     cleaned = sorted([u1.strip(), u2.strip()])
     return f"chat_{cleaned[0]}_{cleaned}"
 
-def _call_gemini_api(text: str, target_lang: str) -> str:
+def _call_gemini_text_api(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
         return ""
@@ -63,7 +69,7 @@ def _call_gemini_api(text: str, target_lang: str) -> str:
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip() or MANUAL_GEMINI_KEY.strip()
     
     if not gemini_key:
-        print("\n[ERROR]: GEMINI_API_KEY nahi mili! Ya to terminal mein export karein ya code mein MANUAL_GEMINI_KEY ke andar paste karein.\n")
+        print("\n[ERROR]: GEMINI_API_KEY nahi mili!\n")
         return clean
 
     lang_map = {
@@ -89,53 +95,135 @@ def _call_gemini_api(text: str, target_lang: str) -> str:
         "contents": [{"parts": [{"text": prompt}]}]
     }).encode('utf-8')
     
-    # Models jo high availability aur fast response dete hain
     candidate_models = [
-        "gemini-2.0-flash",
-        "gemini-2.5-flash",
         "gemini-flash-latest",
-        "gemini-1.5-flash-latest"
+        "gemini-1.5-flash-8b-latest",
+        "gemini-1.5-pro-latest",
+        "gemini-pro"
     ]
     
     for model_name in candidate_models:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
-        req = urllib.request.Request(
-            url, 
-            data=payload, 
-            headers={'Content-Type': 'application/json'}, 
-            method='POST'
-        )
-        
-        try:
-            with urllib.request.urlopen(req, timeout=12) as response:
-                res_body = response.read().decode('utf-8')
-                res_data = json.loads(res_body)
-                
-                candidates = res_data.get("candidates", [])
-                if candidates:
-                    content_obj = candidates[0].get("content", {})
-                    parts = content_obj.get("parts", [])
-                    if parts:
-                        out_text = parts[0].get("text", "").strip()
-                        if out_text:
-                            print(f"[Gemini Translated via {model_name}]: '{clean}' -> '{out_text}'")
-                            return out_text
-        except urllib.error.HTTPError as he:
-            err_msg = he.read().decode('utf-8', errors='ignore')
-            print(f"[API Notice on {model_name} - HTTP {he.code}]: Agla available model try kar rahe hain...")
-            # 503 (Busy), 429 (Rate limit), ya 404 (Not found) par rukna nahi hai, agla model try karein
-            if he.code in [503, 429, 404, 500]:
-                continue
-            else:
+        for attempt in range(2):
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
+            req = urllib.request.Request(
+                url, 
+                data=payload, 
+                headers={'Content-Type': 'application/json'}, 
+                method='POST'
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=12) as response:
+                    res_body = response.read().decode('utf-8')
+                    res_data = json.loads(res_body)
+                    candidates = res_data.get("candidates", [])
+                    if candidates:
+                        content_obj = candidates[0].get("content", {})
+                        parts = content_obj.get("parts", [])
+                        if parts:
+                            out_text = parts[0].get("text", "").strip()
+                            if out_text:
+                                print(f"[Gemini Text Translated via {model_name}]: '{clean}' -> '{out_text}'")
+                                return out_text
+            except urllib.error.HTTPError as he:
+                if he.code == 503:
+                    time.sleep(1)
+                    continue
+                elif he.code in [404, 429, 500]:
+                    break
+                else:
+                    break
+            except Exception:
                 break
-        except Exception as e:
-            print(f"[Translation Notice on {model_name}]: {e} - Agle model pe switch...")
-            continue
-            
+                
     return clean
 
+def _call_gemini_audio_api(audio_filepath: str, target_lang: str) -> str:
+    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip() or MANUAL_GEMINI_KEY.strip()
+    if not gemini_key or not os.path.exists(audio_filepath):
+        return ""
+
+    try:
+        with open(audio_filepath, "rb") as f:
+            audio_bytes = f.read()
+        base64_audio = base64.b64encode(audio_bytes).decode("utf-8")
+        
+        lang_map = {
+            "ur": "Urdu (Nastaliq script)",
+            "en": "English",
+            "ar": "Arabic",
+            "de": "German",
+            "fr": "French",
+            "es": "Spanish",
+            "hi": "Hindi",
+            "roman_ur": "Roman Urdu"
+        }
+        target_name = lang_map.get(target_lang.strip().lower(), "English")
+        
+        prompt = (
+            f"Listen to this audio voice note carefully. "
+            f"The person is speaking in Urdu, Roman Urdu, Hindi, or English. "
+            f"Translate the spoken words accurately into {target_name}. "
+            f"Return ONLY the translated sentence with no quotation marks, no timestamps, and no extra explanation."
+        )
+        
+        payload = json.dumps({
+            "contents": [{
+                "parts": [
+                    {
+                        "inline_data": {
+                            "mime_type": "audio/webm",
+                            "data": base64_audio
+                        }
+                    },
+                    {"text": prompt}
+                ]
+            }]
+        }).encode('utf-8')
+        
+        candidate_models = [
+            "gemini-flash-latest",
+            "gemini-1.5-flash-8b-latest",
+            "gemini-1.5-pro-latest",
+            "gemini-pro"
+        ]
+        
+        for model_name in candidate_models:
+            for attempt in range(2):
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
+                req = urllib.request.Request(
+                    url, 
+                    data=payload, 
+                    headers={'Content-Type': 'application/json'}, 
+                    method='POST'
+                )
+                try:
+                    with urllib.request.urlopen(req, timeout=15) as response:
+                        res_body = response.read().decode('utf-8')
+                        res_data = json.loads(res_body)
+                        candidates = res_data.get("candidates", [])
+                        if candidates:
+                            content_obj = candidates[0].get("content", {})
+                            parts = content_obj.get("parts", [])
+                            if parts:
+                                out_text = parts[0].get("text", "").strip()
+                                if out_text:
+                                    print(f"[Gemini Audio Translated via {model_name}]: '{out_text}'")
+                                    return out_text
+                except urllib.error.HTTPError as he:
+                    if he.code == 503:
+                        time.sleep(1)
+                        continue
+                    else:
+                        break
+                except Exception:
+                    break
+    except Exception as e:
+        print(f"[Audio Translation Error]: {e}")
+        
+    return ""
+
 async def translate_via_gemini(text: str, target_lang: str) -> str:
-    return await asyncio.to_thread(_call_gemini_api, text, target_lang)
+    return await asyncio.to_thread(_call_gemini_text_api, text, target_lang)
 
 class ConnectionManager:
     def __init__(self):
@@ -215,6 +303,16 @@ async def translate_text(req: TranslationRequest):
     translated = await translate_via_gemini(clean, req.target_lang)
     return {"translated_text": translated}
 
+@app.post("/api/translate-voice")
+async def translate_voice_endpoint(req: VoiceTranslateRequest):
+    filename = os.path.basename(req.audio_url)
+    filepath = os.path.join(UPLOAD_DIR, filename)
+    print(f"[/api/translate-voice Hit]: File='{filename}', Target='{req.target_lang}'")
+    if os.path.exists(filepath):
+        translated = await asyncio.to_thread(_call_gemini_audio_api, filepath, req.target_lang)
+        return {"translated_text": translated}
+    return {"translated_text": ""}
+
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
     try:
@@ -243,7 +341,7 @@ async def get_conversation(phone: str, partner: str):
         for r in rows:
             messages.append({
                 "id": r[0], "sender": r, "receiver": r, "msg_type": r,
-                "content": r[4], "translated_content": r[5], "lang": r[6], "status": r[7], "time": str(r[8])[-8:-3]
+                "content": r, "translated_content": r[5], "lang": r[6], "status": r[7], "time": str(r[8])[-8:-3]
             })
         return {"messages": messages}
     except Exception:
@@ -251,9 +349,9 @@ async def get_conversation(phone: str, partner: str):
 
 @app.post("/api/upload")
 async def upload_media(file: UploadFile = File(...)):
-    # Extension tuple na bane iske liye saaf tareeqa:
-    parts = file.filename.rsplit(".", 1)
-    ext = f".{parts}" if len(parts) > 1 else ".webm"
+    ext = ".webm"
+    if file.filename and "." in file.filename:
+        ext = "." + file.filename.rsplit(".", 1)
     
     filename = f"{os.urandom(8).hex()}{ext}"
     filepath = os.path.join(UPLOAD_DIR, filename)
@@ -283,11 +381,19 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                 lang = payload.get("lang", "en")
                 translated = payload.get("translated", "").strip()
 
-                print(f"[WS Incoming]: Sender={sender}, Content='{content}', FrontTranslated='{translated}', Lang='{lang}'")
+                print(f"[WS Incoming]: Sender={sender}, Type='{msg_type}', Lang='{lang}', FrontTranslated='{translated}'")
 
-                # Agar frontend ne translate na kiya ho ya same text bheja ho
-                if content and (not translated or translated.lower() == content.lower()) and msg_type == "text":
+                # 1. Text Message Translation
+                if msg_type == "text" and content and (not translated or translated.lower() == content.lower()):
                     translated = await translate_via_gemini(content, lang)
+
+                # 2. Voice Note Audio Translation (Gemini Direct Audio Listen)
+                elif msg_type == "voice" and (not translated or translated.strip() == "" or translated == "Voice Note"):
+                    filename = os.path.basename(content)
+                    filepath = os.path.join(UPLOAD_DIR, filename)
+                    if os.path.exists(filepath):
+                        print(f"[WS Voice Processing]: Gemini se voice note '{filename}' direct translate ho raha hai...")
+                        translated = await asyncio.to_thread(_call_gemini_audio_api, filepath, lang)
 
                 try:
                     conn = sqlite3.connect(DB_PATH)
