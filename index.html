@@ -159,9 +159,17 @@
         .bubble-translation {
             font-size: 12px; margin-top: 6px; padding-top: 6px; font-weight: 700;
             border-top: 1px dashed rgba(0, 0, 0, 0.25); color: #1e293b;
+            display: flex; align-items: center; justify-content: space-between; gap: 6px;
         }
         .bubble.received .bubble-translation {
             border-top: 1px dashed var(--border-graphite); color: var(--online-green);
+        }
+        .btn-tts-listen {
+            background: rgba(0,0,0,0.15); border: none; cursor: pointer; padding: 2px 6px;
+            border-radius: 6px; font-size: 12px; display: inline-flex; align-items: center; gap: 3px; font-weight: 700;
+        }
+        .bubble.received .btn-tts-listen {
+            background: rgba(255,255,255,0.1); color: #fff;
         }
 
         .stage-input-bar {
@@ -311,7 +319,6 @@
         </div>
     </div>
 
-    <!-- Caller Language Setup Modal -->
     <div class="call-setup-backdrop" id="call-setup-modal">
         <div class="call-setup-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);">🌐 Select Translation Language</h3>
@@ -403,7 +410,7 @@
             <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Review message text</p>
             <div id="voice-edit-block" style="display:block; text-align:left;">
                 <label style="font-size: 11px; color: var(--text-muted);">Spoken Message / Text:</label>
-                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Edit or type text...">
+                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Speech text will appear here (optional)...">
             </div>
             <div class="lang-options-drawer" id="lang-drawer">
                 <label style="font-size: 11px; color: var(--text-muted);">Select Target Language:</label>
@@ -758,7 +765,7 @@
                         } 
                         else if (data.action === "call_live_caption") {
                             if (isTranslationCallMode) {
-                                document.getElementById("call-original-subtitle").innerText = `${data.sender}:${data.original}`;
+                                document.getElementById("call-original-subtitle").innerText = `${data.sender}: ${data.original}`;
                                 document.getElementById("call-translated-subtitle").innerText = `🌐 ${data.translated}`;
                                 if (data.sender !== myPhone && data.translated && data.translated.trim()) {
                                     playSpokenVoice(data.translated, currentSelectedTargetLang);
@@ -1017,7 +1024,6 @@
                 callSpeechRec = new SR();
                 callSpeechRec.continuous = true; 
                 callSpeechRec.interimResults = false; 
-                // ur-PK or en-US dono ko pick karta hai
                 callSpeechRec.lang = 'ur-PK';
 
                 callSpeechRec.onresult = async (event) => {
@@ -1115,21 +1121,19 @@
                     
                     pendingPayload = { type: "voice", content: data.url };
                     
-                    // User ne jo aawaz mein bola wo text yahan aayega, hardcoded nahi
                     const finalRecordedText = currentRecordedTranscript.trim() || "";
                     document.getElementById("voice-hint-field").value = finalRecordedText;
                     document.getElementById("send-modal-preview").innerText = finalRecordedText ? `"${finalRecordedText}"` : "Voice Note Audio Recorded";
                     document.getElementById("send-modal").style.display = "flex";
                 };
 
-                // Aawaz ko sath sath alfaaz (speech to text) mein convert karein
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
                         voiceSpeechRec = new SR();
                         voiceSpeechRec.continuous = true;
                         voiceSpeechRec.interimResults = true;
-                        voiceSpeechRec.lang = 'ur-PK'; // Urdu / Pakistani accent
+                        voiceSpeechRec.lang = 'ur-PK';
                         voiceSpeechRec.onresult = (e) => {
                             let textSoFar = "";
                             for (let i = 0; i < e.results.length; ++i) {
@@ -1200,24 +1204,45 @@
         async function confirmDispatchTranslation() {
             if (!pendingPayload) return;
             const targetLang = document.getElementById("modal-target-lang").value || "en";
-            
-            // Hardcoded "Voice Note Audio Message" khatam kar diya gaya hai
-            let textToTranslate = document.getElementById("voice-hint-field").value.trim();
-            if (!textToTranslate && pendingPayload.type === "text") {
-                textToTranslate = pendingPayload.content;
-            }
-
             let translatedText = "";
-            if (textToTranslate) {
-                try {
-                    const res = await fetch("/translate", {
-                        method: "POST", headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
-                    });
-                    const data = await res.json();
-                    translatedText = data.translated_text || textToTranslate;
-                } catch (e) {
-                    translatedText = textToTranslate;
+
+            if (pendingPayload.type === "voice") {
+                let speechText = document.getElementById("voice-hint-field").value.trim();
+                
+                // Agar speech recognition ne text pakad liya to direct text translate karein
+                if (speechText) {
+                    try {
+                        const res = await fetch("/translate", {
+                            method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ text: speechText, target_lang: targetLang })
+                        });
+                        const data = await res.json();
+                        translatedText = data.translated_text || speechText;
+                    } catch (e) {}
+                }
+                
+                // Agar speech recognition khali rahi to direct audio file translate karwayein
+                if (!translatedText) {
+                    try {
+                        const res = await fetch("/api/translate-voice", {
+                            method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ audio_url: pendingPayload.content, target_lang: targetLang })
+                        });
+                        const data = await res.json();
+                        translatedText = data.translated_text || "";
+                    } catch (e) {}
+                }
+            } else {
+                let textToTranslate = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
+                if (textToTranslate) {
+                    try {
+                        const res = await fetch("/translate", {
+                            method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
+                        });
+                        const data = await res.json();
+                        translatedText = data.translated_text || textToTranslate;
+                    } catch (e) {}
                 }
             }
 
@@ -1245,19 +1270,24 @@
             let body = "";
             
             if (type === "voice") {
-                // Asal audio player
+                const safeEscaped = (translated || "").replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 body = `
                     <div style="margin-bottom: 6px;">
                         <audio controls src="${content}" style="width: 100%; max-width: 250px; height: 38px; outline: none;"></audio>
                     </div>
                 `;
                 if (translated && translated.trim() !== "") {
-                    body += `<div class="bubble-translation">🌐 AI Translation: ${translated}</div>`;
+                    body += `
+                        <div class="bubble-translation">
+                            <span>🌐 AI Translation: ${translated}</span>
+                            <button class="btn-tts-listen" onclick="playSpokenVoice('${safeEscaped}', '${lang}')" title="Listen Translation">🔊 Listen</button>
+                        </div>
+                    `;
                 }
             } else {
                 body = `<div>${content}</div>`;
                 if (translated && translated.trim() !== "") {
-                    body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
+                    body += `<div class="bubble-translation"><span>AI Translation: ${translated}</span></div>`;
                 }
             }
 
