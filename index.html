@@ -410,7 +410,7 @@
             <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Review message text</p>
             <div id="voice-edit-block" style="display:block; text-align:left;">
                 <label style="font-size: 11px; color: var(--text-muted);">Spoken Message / Text:</label>
-                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Speech text will appear here (optional)...">
+                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Spoken text appears here...">
             </div>
             <div class="lang-options-drawer" id="lang-drawer">
                 <label style="font-size: 11px; color: var(--text-muted);">Select Target Language:</label>
@@ -759,7 +759,7 @@
                         if (data.action === "new_message") {
                             await registerPermanentContact(data.sender);
                             if (data.sender === activePartner) {
-                                appendBubble(data.content, "received", data.translated, data.msg_type, data.time, data.id, data.status, data.lang || "en");
+                                appendBubble(data.content, "received", data.translated, data.msg_type, data.time, data.id, data.status, data.lang || "en", data.speech_text || "");
                             }
                             loadRecentChats();
                         } 
@@ -829,7 +829,7 @@
                 const box = document.getElementById("messages-container");
                 box.innerHTML = "";
                 data.messages.forEach(m => {
-                    appendBubble(m.content, m.sender === myPhone ? "sent" : "received", m.translated_content, m.msg_type, m.time, m.id, m.status, m.lang || "en");
+                    appendBubble(m.content, m.sender === myPhone ? "sent" : "received", m.translated_content, m.msg_type, m.time, m.id, m.status, m.lang || "en", "");
                 });
                 loadRecentChats();
             } catch(e){}
@@ -1114,205 +1114,25 @@
                 
                 mediaRecorder.onstop = async () => {
                     if (recordedChunks.length === 0) return;
-                    const blob = new Blob(recordedChunks, { type: "audio/webm" });
-                    const form = new FormData(); form.append("file", blob, "voice.webm");
-                    const res = await fetch("/api/upload", { method: "POST", body: form });
-                    const data = await res.json();
-                    
-                    pendingPayload = { type: "voice", content: data.url };
-                    
-                    const finalRecordedText = currentRecordedTranscript.trim() || "";
-                    document.getElementById("voice-hint-field").value = finalRecordedText;
-                    document.getElementById("send-modal-preview").innerText = finalRecordedText ? `"${finalRecordedText}"` : "Voice Note Audio Recorded";
-                    document.getElementById("send-modal").style.display = "flex";
-                };
-
-                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (SR) {
                     try {
-                        voiceSpeechRec = new SR();
-                        voiceSpeechRec.continuous = true;
-                        voiceSpeechRec.interimResults = true;
-                        voiceSpeechRec.lang = 'ur-PK';
-                        voiceSpeechRec.onresult = (e) => {
-                            let textSoFar = "";
-                            for (let i = 0; i < e.results.length; ++i) {
-                                textSoFar += e.results[i][0].transcript + " ";
-                            }
-                            currentRecordedTranscript = textSoFar.trim();
-                            const liveWords = document.getElementById("rec-live-words");
-                            if (liveWords && currentRecordedTranscript) {
-                                liveWords.innerText = currentRecordedTranscript;
-                            }
+                        const blob = new Blob(recordedChunks, { type: "audio/webm" });
+                        const form = new FormData(); 
+                        form.append("file", blob, "voice.webm");
+                        
+                        const res = await fetch("/api/upload", { method: "POST", body: form });
+                        if (!res.ok) {
+                            alert("Audio upload failed: Server error " + res.status);
+                            resetRecordingUI();
+                            return;
+                        }
+                        const data = await res.json();
+                        
+                        const finalRecordedText = currentRecordedTranscript.trim() || "";
+                        pendingPayload = { 
+                            type: "voice", 
+                            content: data.url,
+                            speechText: finalRecordedText
                         };
-                        voiceSpeechRec.start();
-                    } catch(err) {
-                        console.log("SpeechRec error:", err);
-                    }
-                }
-
-                mediaRecorder.start();
-                isRecording = true;
-                document.getElementById("input-shell").style.display = "none";
-                document.getElementById("recording-bar").style.display = "flex";
-            } catch (err) { alert("Mic error: " + err.message); }
-        }
-
-        function stopAndFinishRecording() {
-            if (voiceSpeechRec) { try { voiceSpeechRec.stop(); } catch(e){} voiceSpeechRec = null; }
-            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
-            if (activeAudioStream) { activeAudioStream.getTracks().forEach(t => t.stop()); activeAudioStream = null; }
-            resetRecordingUI();
-        }
-
-        function cancelRecording() {
-            if (voiceSpeechRec) { try { voiceSpeechRec.stop(); } catch(e){} voiceSpeechRec = null; }
-            currentRecordedTranscript = "";
-            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
-            if (activeAudioStream) { activeAudioStream.getTracks().forEach(t => t.stop()); activeAudioStream = null; }
-            resetRecordingUI();
-        }
-
-        function resetRecordingUI() {
-            isRecording = false;
-            document.getElementById("recording-bar").style.display = "none";
-            document.getElementById("input-shell").style.display = "flex";
-            document.getElementById("rec-live-words").innerText = "Listening...";
-        }
-
-        function stageMessageForDispatch() {
-            const text = document.getElementById("text-input").value.trim();
-            if (!text || !activePartner) return;
-            pendingPayload = { type: "text", content: text };
-            document.getElementById("voice-hint-field").value = text;
-            document.getElementById("send-modal-preview").innerText = `"${text.substring(0, 30)}"`;
-            document.getElementById("send-modal").style.display = "flex";
-        }
-
-        function cancelDispatch() { pendingPayload = null; document.getElementById("send-modal").style.display = "none"; }
-
-        function confirmDispatchOriginal() {
-            if (!pendingPayload) return;
-            let finalContent = pendingPayload.content;
-            if (pendingPayload.type === "text") {
-                finalContent = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
-            }
-            executeDispatch(finalContent, "", pendingPayload.type);
-            cancelDispatch();
-        }
-
-        async function confirmDispatchTranslation() {
-            if (!pendingPayload) return;
-            const targetLang = document.getElementById("modal-target-lang").value || "en";
-            let translatedText = "";
-
-            if (pendingPayload.type === "voice") {
-                let speechText = document.getElementById("voice-hint-field").value.trim();
-                
-                // Agar speech recognition ne text pakad liya to direct text translate karein
-                if (speechText) {
-                    try {
-                        const res = await fetch("/translate", {
-                            method: "POST", headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ text: speechText, target_lang: targetLang })
-                        });
-                        const data = await res.json();
-                        translatedText = data.translated_text || speechText;
-                    } catch (e) {}
-                }
-                
-                // Agar speech recognition khali rahi to direct audio file translate karwayein
-                if (!translatedText) {
-                    try {
-                        const res = await fetch("/api/translate-voice", {
-                            method: "POST", headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ audio_url: pendingPayload.content, target_lang: targetLang })
-                        });
-                        const data = await res.json();
-                        translatedText = data.translated_text || "";
-                    } catch (e) {}
-                }
-            } else {
-                let textToTranslate = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
-                if (textToTranslate) {
-                    try {
-                        const res = await fetch("/translate", {
-                            method: "POST", headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
-                        });
-                        const data = await res.json();
-                        translatedText = data.translated_text || textToTranslate;
-                    } catch (e) {}
-                }
-            }
-
-            executeDispatch(pendingPayload.content, translatedText, pendingPayload.type, targetLang);
-            cancelDispatch();
-        }
-
-        function executeDispatch(content, translated, msgType, lang = "en") {
-            if (!activePartner) return;
-            const tempId = "msg_temp_" + Date.now();
-            appendBubble(content, "sent", translated, msgType, "now", tempId, "sent", lang);
-            document.getElementById("text-input").value = "";
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ action: "chat_message", receiver: activePartner, msg_type: msgType, content: content, translated: translated, lang: lang }));
-            }
-            loadRecentChats();
-        }
-
-        function appendBubble(content, dir, translated, type, time, msgId = null, status = "sent", lang = "en") {
-            const box = document.getElementById("messages-container");
-            const bubble = document.createElement("div");
-            bubble.className = `bubble ${dir}`;
-            if (msgId) bubble.id = `bubble_${msgId}`;
-
-            let body = "";
-            
-            if (type === "voice") {
-                const safeEscaped = (translated || "").replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                body = `
-                    <div style="margin-bottom: 6px;">
-                        <audio controls src="${content}" style="width: 100%; max-width: 250px; height: 38px; outline: none;"></audio>
-                    </div>
-                `;
-                if (translated && translated.trim() !== "") {
-                    body += `
-                        <div class="bubble-translation">
-                            <span>🌐 AI Translation: ${translated}</span>
-                            <button class="btn-tts-listen" onclick="playSpokenVoice('${safeEscaped}', '${lang}')" title="Listen Translation">🔊 Listen</button>
-                        </div>
-                    `;
-                }
-            } else {
-                body = `<div>${content}</div>`;
-                if (translated && translated.trim() !== "") {
-                    body += `<div class="bubble-translation"><span>AI Translation: ${translated}</span></div>`;
-                }
-            }
-
-            bubble.innerHTML = body;
-            box.appendChild(bubble);
-            box.scrollTop = box.scrollHeight;
-        }
-
-        async function uploadAttachment(e, type) {
-            document.getElementById("attach-menu").style.display = "none";
-            const file = e.target.files[0];
-            if (!file || !activePartner) return;
-            const form = new FormData(); form.append("file", file);
-            const res = await fetch("/api/upload", { method: "POST", body: form });
-            const data = await res.json();
-            executeDispatch(data.url, "", type);
-        }
-
-        function shareLocation() {
-            document.getElementById("attach-menu").style.display = "none";
-            if (!navigator.geolocation || !activePartner) return;
-            navigator.geolocation.getCurrentPosition(pos => {
-                executeDispatch(`https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`, "", "location");
-            });
-        }
-    </script>
-</body>
-</html>
+                        
+                        document.getElementById("voice-hint-field").value = finalRecordedText;
+                        document.getElementById("send-modal-preview").innerText = finalRecorded
