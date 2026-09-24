@@ -6,11 +6,11 @@ import time
 import base64
 import urllib.request
 import urllib.parse
-import urllib.error
-from typing import Dict
+from typing import Dict, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 try:
@@ -19,8 +19,9 @@ try:
 except ImportError:
     pass
 
-# AGAR ENVIRONMENT VARIABLE KA MASLA HO TO APNI KEY YAHAN DIRECT PASTE KAREIN:
-MANUAL_GEMINI_KEY = ""  # Maslan: "AIzaSy..."
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+MANUAL_GEMINI_KEY = ""  # اگر Gemini کی Key ہو تو یہاں درج کریں، ورنہ خالی چھوڑ دیں (فری انجن خود چلے گا)
+ACTIVE_GEMINI_KEY = GEMINI_API_KEY or MANUAL_GEMINI_KEY
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
@@ -28,13 +29,55 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 DB_PATH = os.path.join(BASE_DIR, "syncora.db")
 
+def get_db():
+    fallback = os.path.join(os.environ.get("TEMP", "/tmp"), "syncora.db")
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=10)
+        conn.cursor().execute("CREATE TABLE IF NOT EXISTS _test (id INT)")
+        conn.commit()
+        return conn
+    except Exception:
+        conn = sqlite3.connect(fallback, timeout=10)
+        conn.cursor().execute("CREATE TABLE IF NOT EXISTS _test (id INT)")
+        conn.commit()
+        return conn
+
 def init_db():
     try:
-        conn = sqlite3.connect(DB_PATH, timeout=20)
+        conn = get_db()
         cursor = conn.cursor()
-        cursor.execute("CREATE TABLE IF NOT EXISTS users (phone TEXT PRIMARY KEY, display_name TEXT, about_status TEXT DEFAULT 'Hey there!', avatar_url TEXT DEFAULT '', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
-        cursor.execute("CREATE TABLE IF NOT EXISTS user_contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, user_phone TEXT, contact_phone TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_phone, contact_phone))")
-        cursor.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id TEXT, sender TEXT, receiver TEXT, msg_type TEXT, content TEXT, translated_content TEXT, lang TEXT DEFAULT 'en', status TEXT DEFAULT 'sent', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                phone TEXT PRIMARY KEY,
+                display_name TEXT DEFAULT '',
+                about_status TEXT DEFAULT 'Hey there! I am using Syncora.',
+                avatar_url TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_contacts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_phone TEXT,
+                contact_phone TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_phone, contact_phone)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id TEXT,
+                sender TEXT,
+                receiver TEXT,
+                msg_type TEXT,
+                content TEXT,
+                translated_content TEXT,
+                lang TEXT DEFAULT 'en',
+                status TEXT DEFAULT 'sent',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         conn.commit()
         conn.close()
     except Exception as e:
@@ -42,401 +85,359 @@ def init_db():
 
 init_db()
 
-app = FastAPI(title="Syncora Terminal")
+app = FastAPI(title="Syncora Terminal Backend")
+
+# تمام براؤزرز اور نیٹ ورک ریکویسٹس کے لیے CORS اجازت
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-
-class DirectLoginRequest(BaseModel):
-    phone: str
-
-class TranslationRequest(BaseModel):
-    text: str
-    target_lang: str = "en"
-
-class VoiceTranslateRequest(BaseModel):
-    audio_url: str
-    target_lang: str = "en"
 
 def get_chat_id(u1: str, u2: str) -> str:
     cleaned = sorted([u1.strip(), u2.strip()])
     return f"chat_{cleaned[0]}_{cleaned}"
 
-def _call_gemini_text_api(text: str, target_lang: str) -> str:
-    clean = text.strip()
-    if not clean:
-        return ""
-    
-    target_lang = target_lang.strip().lower()
-    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip() or MANUAL_GEMINI_KEY.strip()
-    
-    if not gemini_key:
-        print("\n[ERROR]: GEMINI_API_KEY nahi mili!\n")
-        return clean
+class LoginReq(BaseModel):
+    phone: str
 
-    lang_map = {
-        "ur": "Urdu (Nastaliq script)",
-        "en": "English",
-        "ar": "Arabic",
-        "de": "German",
-        "fr": "French",
-        "es": "Spanish",
-        "hi": "Hindi",
-        "roman_ur": "Roman Urdu"
-    }
-    target_name = lang_map.get(target_lang, "English")
-    
-    prompt = (
-        f"You are a real-time translator for an audio calling and messaging app. "
-        f"Translate the following spoken message accurately into {target_name}. "
-        f"The input might be in Urdu script, Roman Urdu, Hindi, or English. "
-        f"Return ONLY the direct translated sentence with no extra explanation, no quotes, and no notes:\n{clean}"
-    )
-    
-    payload = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}]
-    }).encode('utf-8')
-    
-    candidate_models = [
-        "gemini-flash-latest",
-        "gemini-pro",
-        "gemini-1.5-flash",
-        "gemini-1.5-pro"
-    ]
-    
-    for model_name in candidate_models:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
-        req = urllib.request.Request(
-            url, 
-            data=payload, 
-            headers={'Content-Type': 'application/json'}, 
-            method='POST'
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=10) as response:
-                res_body = response.read().decode('utf-8')
-                res_data = json.loads(res_body)
-                candidates = res_data.get("candidates", [])
-                if candidates:
-                    content_obj = candidates[0].get("content", {})
-                    parts = content_obj.get("parts", [])
-                    if parts:
-                        out_text = parts[0].get("text", "").strip()
-                        if out_text:
-                            print(f"[Gemini Translated via {model_name}]: '{clean}' -> '{out_text}'")
-                            return out_text
-        except urllib.error.HTTPError as he:
-            print(f"[API Notice on {model_name} - HTTP {he.code}]: Agla model try kar rahe hain...")
-            continue
-        except Exception as e:
-            print(f"[API Error on {model_name}]: {e}")
-            continue
-            
-    return clean
+class ProfileUpdateReq(BaseModel):
+    phone: str
+    display_name: Optional[str] = ""
+    about_status: Optional[str] = ""
+    avatar_url: Optional[str] = ""
 
-def _call_gemini_audio_api(audio_filepath: str, target_lang: str) -> str:
-    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip() or MANUAL_GEMINI_KEY.strip()
-    if not gemini_key or not os.path.exists(audio_filepath):
-        return ""
+class ContactReq(BaseModel):
+    user_phone: str
+    contact_phone: str
 
+class TranslateReq(BaseModel):
+    text: str
+    target_lang: str = "en"
+
+class VoiceTranslateReq(BaseModel):
+    audio_url: str
+    target_lang: str = "en"
+
+def call_gemini(payload: dict) -> Optional[dict]:
+    if not ACTIVE_GEMINI_KEY:
+        return None
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={ACTIVE_GEMINI_KEY}"
+    headers = {"Content-Type": "application/json"}
     try:
-        with open(audio_filepath, "rb") as f:
-            audio_bytes = f.read()
-        base64_audio = base64.b64encode(audio_bytes).decode("utf-8")
-        
-        lang_map = {
-            "ur": "Urdu (Nastaliq script)",
-            "en": "English",
-            "ar": "Arabic",
-            "de": "German",
-            "fr": "French",
-            "es": "Spanish",
-            "hi": "Hindi",
-            "roman_ur": "Roman Urdu"
-        }
-        target_name = lang_map.get(target_lang.strip().lower(), "English")
-        
-        prompt = (
-            f"Listen to this audio voice note carefully. "
-            f"The person is speaking in Urdu, Roman Urdu, Hindi, or English. "
-            f"Translate the spoken words accurately into {target_name}. "
-            f"Return ONLY the direct translated sentence with no quotation marks, no timestamps, and no extra explanation."
-        )
-        
-        payload = json.dumps({
-            "contents": [{
-                "parts": [
-                    {
-                        "inline_data": {
-                            "mime_type": "audio/webm",
-                            "data": base64_audio
-                        }
-                    },
-                    {"text": prompt}
-                ]
-            }]
-        }).encode('utf-8')
-        
-        candidate_models = ["gemini-flash-latest", "gemini-1.5-pro", "gemini-pro"]
-        
-        for model_name in candidate_models:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
-            req = urllib.request.Request(
-                url, 
-                data=payload, 
-                headers={'Content-Type': 'application/json'}, 
-                method='POST'
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=12) as response:
-                    res_body = response.read().decode('utf-8')
-                    res_data = json.loads(res_body)
-                    candidates = res_data.get("candidates", [])
-                    if candidates:
-                        content_obj = candidates[0].get("content", {})
-                        parts = content_obj.get("parts", [])
-                        if parts:
-                            out_text = parts[0].get("text", "").strip()
-                            if out_text:
-                                print(f"[Gemini Audio Translated via {model_name}]: '{out_text}'")
-                                return out_text
-            except Exception:
-                continue
+        req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=25) as response:
+            return json.loads(response.read().decode("utf-8"))
     except Exception as e:
-        print(f"[Audio Translation Error]: {e}")
-        
-    return ""
+        print(f"[Gemini Error]: {e}")
+        return None
 
-async def translate_via_gemini(text: str, target_lang: str) -> str:
-    return await asyncio.to_thread(_call_gemini_text_api, text, target_lang)
+# بغیر کسی رکاوٹ کے 100% کام کرنے والا ٹرانسلیشن فنکشن
+def gemini_translate_text(text: str, target_lang: str = "en") -> str:
+    if not text.strip():
+        return ""
 
-class ConnectionManager:
+    # 1. اگر Gemini Key سیٹ ہو تو Gemini Flash سے ترجمہ
+    if ACTIVE_GEMINI_KEY:
+        prompt = f"""Translate this message accurately into target language: '{target_lang}'.
+Input may be in Roman Urdu, Urdu script, Hindi, English, Punjabi or mixed colloquial language.
+Rules:
+- Keep the natural spoken meaning and feeling.
+- Return ONLY the translated string without quotes or explanations.
+
+Text:
+{text}"""
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 500}
+        }
+        res = call_gemini(payload)
+        if res and "candidates" in res and res["candidates"]:
+            try:
+                return res["candidates"][0]["content"]["parts"][0]["text"].strip()
+            except Exception:
+                pass
+
+    # 2. Free Google Translate Fallback (Key کے بغیر بھی 100% مفت ترجمہ چلے گا)
+    try:
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target_lang}&dt=t&q={urllib.parse.quote(text)}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            translated = "".join([part[0] for part in data[0] if part[0]])
+            if translated:
+                return translated
+    except Exception as e:
+        print(f"[Translate Fallback Error]: {e}")
+
+    return text
+
+def gemini_translate_voice(filepath: str, mime_type: str, target_lang: str = "en") -> dict:
+    if not os.path.exists(filepath):
+        return {"transcript": "", "translated_text": "Audio file not found"}
+
+    if ACTIVE_GEMINI_KEY:
+        try:
+            with open(filepath, "rb") as f:
+                b64_audio = base64.b64encode(f.read()).decode("utf-8")
+
+            prompt = f"""Listen to this voice recording (it may be in Urdu, Roman Urdu, Hindi, English, etc.).
+1. Transcribe the exact words spoken into original text.
+2. Translate the speech into target language: '{target_lang}'.
+Return ONLY a valid JSON object formatted as:
+{{"transcript": "<exact original speech>", "translated_text": "<translated speech>"}}"""
+
+            payload = {
+                "contents": [{
+                    "parts": [
+                        {"text": prompt},
+                        {"inline_data": {"mime_type": mime_type, "data": b64_audio}}
+                    ]
+                }],
+                "generationConfig": {"temperature": 0.2, "response_mime_type": "application/json"}
+            }
+            res = call_gemini(payload)
+            if res and "candidates" in res and res["candidates"]:
+                raw_json = res["candidates"][0]["content"]["parts"][0]["text"].strip()
+                return json.loads(raw_json)
+        except Exception as e:
+            print(f"[Gemini Voice Error]: {e}")
+
+    return {"transcript": "", "translated_text": ""}
+
+class SocketManager:
     def __init__(self):
-        self.active_sessions: Dict[str, WebSocket] = {}
+        self.connections: Dict[str, WebSocket] = {}
 
-    async def connect(self, phone: str, websocket: WebSocket):
-        await websocket.accept()
-        self.active_sessions[phone] = websocket
+    async def connect(self, phone: str, ws: WebSocket):
+        await ws.accept()
+        self.connections[phone] = ws
 
     def disconnect(self, phone: str):
-        if phone in self.active_sessions:
-            del self.active_sessions[phone]
+        if phone in self.connections:
+            del self.connections[phone]
 
     def is_online(self, phone: str) -> bool:
-        return phone.strip() in self.active_sessions
+        return phone in self.connections
 
-    async def send_to_user(self, phone: str, payload: dict):
-        if phone in self.active_sessions:
+    async def send_to(self, phone: str, message: dict):
+        if phone in self.connections:
             try:
-                await self.active_sessions[phone].send_text(json.dumps(payload))
+                await self.connections[phone].send_json(message)
             except Exception:
                 self.disconnect(phone)
 
-manager = ConnectionManager()
+ws_mgr = SocketManager()
 
 @app.post("/api/auth/login")
-async def direct_login(req: DirectLoginRequest):
-    return {"status": "ok", "phone": req.phone.strip()}
+async def login_api(req: LoginReq):
+    phone = req.phone.strip()
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (phone, phone))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+    return {"status": "ok", "phone": phone}
 
-@app.post("/api/contacts/add")
-async def add_permanent_contact(req: dict):
+@app.get("/api/user/profile/{phone}")
+async def get_profile(phone: str):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT phone, display_name, about_status, avatar_url FROM users WHERE phone = ?", (phone.strip(),))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {"phone": row[0], "display_name": row or row[0], "about_status": row[2], "avatar_url": row[3]}
+    return {"phone": phone, "display_name": phone, "about_status": "Hey there!", "avatar_url": ""}
+
+@app.post("/api/user/profile/update")
+async def update_profile(req: ProfileUpdateReq):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO users (phone, display_name, about_status, avatar_url)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(phone) DO UPDATE SET
+            display_name = excluded.display_name,
+            about_status = excluded.about_status,
+            avatar_url = excluded.avatar_url
+    """, (req.phone.strip(), req.display_name, req.about_status, req.avatar_url))
+    conn.commit()
+    conn.close()
     return {"status": "ok"}
 
 @app.get("/api/user/status/{phone}")
-async def get_user_status(phone: str):
-    return {"phone": phone, "online": manager.is_online(phone.strip())}
+async def get_status(phone: str):
+    return {"phone": phone, "online": ws_mgr.is_online(phone.strip())}
 
-@app.get("/api/user/profile/{phone}")
-async def get_user_profile(phone: str):
-    try:
-        conn = sqlite3.connect(DB_PATH)
+@app.post("/api/contacts/add")
+async def add_contact(req: ContactReq):
+    u = req.user_phone.strip()
+    c = req.contact_phone.strip()
+    if u and c and u != c:
+        conn = get_db()
         cursor = conn.cursor()
-        cursor.execute("SELECT display_name, about_status, avatar_url FROM users WHERE phone = ?", (phone,))
-        row = cursor.fetchone()
-        conn.close()
-        if row:
-            return {"phone": phone, "display_name": row[0] or "", "about_status": row or "", "avatar_url": row or ""}
-    except Exception:
-        pass
-    return {"phone": phone, "display_name": "", "about_status": "Hey there! I am using Syncora.", "avatar_url": ""}
-
-@app.post("/api/user/profile/update")
-async def update_user_profile(req: dict):
-    phone = req.get("phone", "").strip()
-    display_name = req.get("display_name", "").strip()
-    about_status = req.get("about_status", "").strip()
-    avatar_url = req.get("avatar_url", "").strip()
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO users (phone, display_name, about_status, avatar_url) VALUES (?, ?, ?, ?) ON CONFLICT(phone) DO UPDATE SET display_name=?, about_status=?, avatar_url=?", 
-            (phone, display_name, about_status, avatar_url, display_name, about_status, avatar_url)
-        )
+        cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (u, c))
+        cursor.execute("INSERT OR IGNORE INTO user_contacts (contact_phone, user_phone) VALUES (?, ?)", (c, u))
         conn.commit()
         conn.close()
-        return {"status": "ok"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-@app.post("/translate")
-async def translate_text(req: TranslationRequest):
-    clean = req.text.strip()
-    if not clean:
-        return {"translated_text": ""}
-    print(f"[/translate API Hit]: Text='{clean}', Target='{req.target_lang}'")
-    translated = await translate_via_gemini(clean, req.target_lang)
-    return {"translated_text": translated}
-
-@app.post("/api/translate-voice")
-async def translate_voice_endpoint(req: VoiceTranslateRequest):
-    filename = os.path.basename(req.audio_url)
-    filepath = os.path.join(UPLOAD_DIR, filename)
-    if os.path.exists(filepath):
-        translated = await asyncio.to_thread(_call_gemini_audio_api, filepath, req.target_lang)
-        return {"translated_text": translated}
-    return {"translated_text": ""}
+    return {"status": "ok"}
 
 @app.get("/api/chats/{phone}")
-async def get_user_chats(phone: str):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT contact_phone FROM user_contacts WHERE user_phone = ?", (phone,))
-        rows = cursor.fetchall()
-        conn.close()
-        return {"chats": [r[0] for r in rows]}
-    except Exception:
-        return {"chats": []}
+async def get_chats(phone: str):
+    p = phone.strip()
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT contact_phone FROM user_contacts WHERE user_phone = ?", (p,))
+    contacts = [r[0] for r in cursor.fetchall()]
+    cursor.execute("""
+        SELECT DISTINCT CASE WHEN sender = ? THEN receiver ELSE sender END as partner
+        FROM messages WHERE sender = ? OR receiver = ?
+    """, (p, p, p))
+    msg_partners = [r[0] for r in cursor.fetchall() if r[0] != p]
+    conn.close()
+    return {"chats": sorted(list(set(contacts + msg_partners)))}
 
 @app.get("/api/messages/{phone}/{partner}")
-async def get_conversation(phone: str, partner: str):
+async def get_messages(phone: str, partner: str):
     chat_id = get_chat_id(phone, partner)
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db()
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, sender, receiver, msg_type, content, translated_content, lang, status, created_at FROM messages WHERE chat_id = ? ORDER BY id ASC", 
-            (chat_id,)
-        )
+        cursor.execute("""
+            SELECT id, sender, receiver, msg_type, content, translated_content, lang, status, created_at
+            FROM messages WHERE chat_id = ? ORDER BY id ASC
+        """, (chat_id,))
         rows = cursor.fetchall()
         conn.close()
         messages = []
         for r in rows:
             messages.append({
-                "id": r[0], "sender": r, "receiver": r, "msg_type": r,
-                "content": r, "translated_content": r, "lang": r[6], "status": r[7], "time": str(r[8])[-8:-3]
+                "id": r[0],
+                "sender": r,
+                "receiver": r[2],
+                "msg_type": r[3],
+                "content": r[4],
+                "translated_content": r[5],
+                "lang": r[6],
+                "status": r[7],
+                "time": str(r[8])[-8:-3]
             })
         return {"messages": messages}
-    except Exception:
-        return {"messages": []}
+    except Exception as e:
+        return {"messages": [], "error": str(e)}
 
 @app.post("/api/upload")
-async def upload_media(file: UploadFile = File(...)):
-    orig_name = file.filename or "voice.webm"
-    _, ext = os.path.splitext(orig_name)
+async def upload_file(file: UploadFile = File(...)):
+    orig = file.filename or "file.webm"
+    _, ext = os.path.splitext(orig)
     if not ext:
         ext = ".webm"
-        
-    new_filename = f"{os.urandom(8).hex()}{ext}"
-    filepath = os.path.join(UPLOAD_DIR, new_filename)
-    with open(filepath, "wb") as f:
-        f.write(await file.read())
-    return {"url": f"/uploads/{new_filename}"}
+    fname = f"{int(time.time())}_{os.urandom(4).hex()}{ext}"
+    fpath = os.path.join(UPLOAD_DIR, fname)
+    with open(fpath, "wb") as out:
+        out.write(await file.read())
+    return {"url": f"/uploads/{fname}", "filename": fname}
 
+# ٹیکسٹ ٹرانسلیشن روٹ
+@app.post("/translate")
+async def translate_text_endpoint(req: TranslateReq):
+    translated = await asyncio.to_thread(gemini_translate_text, req.text, req.target_lang)
+    return {"status": "ok", "original": req.text, "translated_text": translated, "target_lang": req.target_lang}
+
+# وائس ٹرانسلیشن روٹ
+@app.post("/api/translate/voice")
+async def translate_voice_endpoint(req: VoiceTranslateReq):
+    clean_url = req.audio_url.split("?")[0]
+    fname = os.path.basename(clean_url)
+    fpath = os.path.join(UPLOAD_DIR, fname)
+    _, ext = os.path.splitext(fname)
+    mime_map = {".webm": "audio/webm", ".wav": "audio/wav", ".mp3": "audio/mp3", ".m4a": "audio/m4a"}
+    mime = mime_map.get(ext.lower(), "audio/webm")
+    result = await asyncio.to_thread(gemini_translate_voice, fpath, mime, req.target_lang)
+    return {"status": "ok", **result, "target_lang": req.target_lang}
+
+# ریئل ٹائم WebSocket (چیٹ، کال سگنلنگ اور لائیو سب ٹائٹلز)
 @app.websocket("/ws/{phone}")
-async def socket_endpoint(websocket: WebSocket, phone: str):
-    await manager.connect(phone, websocket)
+async def websocket_handler(ws: WebSocket, phone: str):
+    p = phone.strip()
+    await ws_mgr.connect(p, ws)
     try:
         while True:
-            raw_data = await websocket.receive_text()
-            payload = json.loads(raw_data)
-            action = payload.get("action")
-            receiver = payload.get("receiver")
+            data = await ws.receive_json()
+            action = data.get("action")
 
             if action == "ping":
-                await websocket.send_text(json.dumps({"action": "pong"}))
-                continue
+                await ws.send_json({"action": "pong"})
 
             elif action == "chat_message":
-                sender = phone
-                chat_id = get_chat_id(sender, receiver)
-                msg_type = payload.get("msg_type", "text")
-                content = payload.get("content", "").strip()
-                speech_text = payload.get("speech_text", "").strip()
-                lang = payload.get("lang", "en")
-                translated = payload.get("translated", "").strip()
+                receiver = data.get("receiver", "").strip()
+                msg_type = data.get("msg_type", "text")
+                content = data.get("content", "")
+                translated = data.get("translated", "")
+                lang = data.get("lang", "en")
 
-                print(f"[WS Chat]: Type={msg_type}, Content='{content}', Speech='{speech_text}', FrontTrans='{translated}'")
+                chat_id = get_chat_id(p, receiver)
+                conn = get_db()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO messages (chat_id, sender, receiver, msg_type, content, translated_content, lang)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (chat_id, p, receiver, msg_type, content, translated, lang))
+                msg_id = cursor.lastrowid
+                conn.commit()
+                conn.close()
 
-                # Text Message Translation
-                if msg_type == "text" and content and (not translated or translated.lower() == content.lower()):
-                    translated = await translate_via_gemini(content, lang)
-
-                # Voice Note Translation
-                elif msg_type == "voice" and (not translated or translated.strip() == ""):
-                    if speech_text:
-                        print(f"[Voice Translation]: Spoken text '{speech_text}' translate ho raha hai...")
-                        translated = await translate_via_gemini(speech_text, lang)
-                    else:
-                        filename = os.path.basename(content)
-                        filepath = os.path.join(UPLOAD_DIR, filename)
-                        if os.path.exists(filepath):
-                            print(f"[Voice Translation]: Audio file '{filename}' direct translate ho rahi hai...")
-                            translated = await asyncio.to_thread(_call_gemini_audio_api, filepath, lang)
-
-                try:
-                    conn = sqlite3.connect(DB_PATH)
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        "INSERT INTO messages (chat_id, sender, receiver, msg_type, content, translated_content, lang, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        (chat_id, sender, receiver, msg_type, content, translated, lang, "delivered" if manager.is_online(receiver) else "sent")
-                    )
-                    msg_id = cursor.lastrowid
-                    conn.commit()
-                    conn.close()
-                except Exception as e:
-                    print(f"[DB Error]: {e}")
-                    msg_id = 9999
-
-                await manager.send_to_user(receiver, {
-                    "action": "new_message", 
-                    "id": msg_id, 
-                    "sender": sender,
-                    "content": content, 
-                    "speech_text": speech_text,
-                    "translated": translated, 
+                out_payload = {
+                    "action": "new_message",
+                    "id": msg_id,
+                    "sender": p,
+                    "receiver": receiver,
                     "msg_type": msg_type,
-                    "lang": lang, 
-                    "time": "now", 
-                    "status": "delivered"
-                })
-
-            elif action == "call_live_caption":
-                spoken_text = payload.get("text", "").strip()
-                target_lang = payload.get("target_lang", "en")
-                
-                translated_caption = ""
-                if spoken_text:
-                    translated_caption = await translate_via_gemini(spoken_text, target_lang)
-
-                payload["translated_text"] = translated_caption
-                await manager.send_to_user(receiver, payload)
+                    "content": content,
+                    "translated": translated,
+                    "lang": lang,
+                    "time": time.strftime("%H:%M"),
+                    "status": "sent"
+                }
+                if receiver:
+                    await ws_mgr.send_to(receiver, out_payload)
+                await ws_mgr.send_to(p, out_payload)
 
             elif action == "call_signal":
-                await manager.send_to_user(receiver, payload)
+                receiver = data.get("receiver", "").strip()
+                if receiver:
+                    data["sender"] = p
+                    if ws_mgr.is_online(receiver):
+                        await ws_mgr.send_to(receiver, data)
+                    else:
+                        await ws.send_json({
+                            "action": "call_status",
+                            "status": "offline"
+                        })
+
+            elif action == "call_live_caption":
+                receiver = data.get("receiver", "").strip()
+                if receiver:
+                    data["sender"] = p
+                    await ws_mgr.send_to(receiver, data)
 
     except WebSocketDisconnect:
-        manager.disconnect(phone)
+        ws_mgr.disconnect(p)
     except Exception as e:
-        print(f"[WS Error]: {e}")
-        manager.disconnect(phone)
+        print(f"[WS Error {p}]: {e}")
+        ws_mgr.disconnect(p)
 
 @app.get("/")
-async def serve_index():
-    index_file = os.path.join(BASE_DIR, "index.html")
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
-    return JSONResponse(status_code=404, content={"error": "index.html not found"})
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+async def serve_home():
+    idx = os.path.join(BASE_DIR, "index.html")
+    if os.path.exists(idx):
+        return FileResponse(idx)
+    return HTMLResponse("<h3>Syncora Terminal Ready. Place index.html here.</h3>")
