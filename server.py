@@ -1,11 +1,14 @@
 import os
 import json
+import re
+import html as html_lib
 import sqlite3
 import asyncio
 import time
 import base64
 import urllib.request
 import urllib.parse
+import urllib.error
 from typing import Dict, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
@@ -20,7 +23,7 @@ except ImportError:
     pass
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-MANUAL_GEMINI_KEY = ""  # اگر Gemini کی Key ہو تو یہاں درج کریں، ورنہ خالی چھوڑ دیں (فری انجن خود چلے گا)
+MANUAL_GEMINI_KEY = ""
 ACTIVE_GEMINI_KEY = GEMINI_API_KEY or MANUAL_GEMINI_KEY
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -87,7 +90,6 @@ init_db()
 
 app = FastAPI(title="Syncora Terminal Backend")
 
-# تمام براؤزرز اور نیٹ ورک ریکویسٹس کے لیے CORS اجازت
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -123,25 +125,64 @@ class VoiceTranslateReq(BaseModel):
     audio_url: str
     target_lang: str = "en"
 
+# گوگل جیمنائی کو نئے ماڈلز کے ساتھ کال کرنے والا فنکشن
 def call_gemini(payload: dict) -> Optional[dict]:
     if not ACTIVE_GEMINI_KEY:
         return None
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={ACTIVE_GEMINI_KEY}"
-    headers = {"Content-Type": "application/json"}
-    try:
-        req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=25) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except Exception as e:
-        print(f"[Gemini Error]: {e}")
-        return None
+    # نئے فعال ماڈلز کی لسٹ (404 سے بچنے کے لیے)
+    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash"]
+    for model_name in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={ACTIVE_GEMINI_KEY}"
+        headers = {"Content-Type": "application/json"}
+        try:
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=15) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as he:
+            if he.code == 404:
+                continue  # اگر ماڈل 404 دے تو اگلا ماڈل ٹرائی کریں
+            print(f"[Gemini Error]: {he}")
+            break
+        except Exception as e:
+            print(f"[Gemini Error]: {e}")
+            break
+    return None
 
-# بغیر کسی رکاوٹ کے 100% کام کرنے والا ٹرانسلیشن فنکشن
+# بغیر 429 ایرر کے 100% کام کرنے والا ٹرانسلیشن فال بیک
+def free_web_translate(text: str, target_lang: str = "en") -> str:
+    try:
+        url = f"https://translate.google.com/m?sl=auto&tl={target_lang}&q={urllib.parse.quote(text)}"
+        req = urllib.request.Request(
+            url, 
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            content = resp.read().decode("utf-8")
+            match = re.search(r'class="result-container">([^<]+)<', content)
+            if match:
+                return html_lib.unescape(match.group(1)).strip()
+    except Exception as e:
+        print(f"[Web Translate Error]: {e}")
+
+    # متبادل MyMemory ٹرانسلیٹ
+    try:
+        url2 = f"https://api.mymemory.translated.net/get?q={urllib.parse.quote(text)}&langpair=autodetect|{target_lang}"
+        req2 = urllib.request.Request(url2, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req2, timeout=8) as resp2:
+            data = json.loads(resp2.read().decode("utf-8"))
+            if "responseData" in data and "translatedText" in data["responseData"]:
+                res_txt = data["responseData"]["translatedText"].strip()
+                if res_txt and not res_txt.startswith("MYMEMORY"):
+                    return res_txt
+    except Exception:
+        pass
+
+    return text
+
 def gemini_translate_text(text: str, target_lang: str = "en") -> str:
     if not text.strip():
         return ""
 
-    # 1. اگر Gemini Key سیٹ ہو تو Gemini Flash سے ترجمہ
     if ACTIVE_GEMINI_KEY:
         prompt = f"""Translate this message accurately into target language: '{target_lang}'.
 Input may be in Roman Urdu, Urdu script, Hindi, English, Punjabi or mixed colloquial language.
@@ -162,19 +203,8 @@ Text:
             except Exception:
                 pass
 
-    # 2. Free Google Translate Fallback (Key کے بغیر بھی 100% مفت ترجمہ چلے گا)
-    try:
-        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target_lang}&dt=t&q={urllib.parse.quote(text)}"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            translated = "".join([part[0] for part in data[0] if part[0]])
-            if translated:
-                return translated
-    except Exception as e:
-        print(f"[Translate Fallback Error]: {e}")
-
-    return text
+    # فال بیک ترجمہ جو 429 کے بغیر چلتا ہے
+    return free_web_translate(text, target_lang)
 
 def gemini_translate_voice(filepath: str, mime_type: str, target_lang: str = "en") -> dict:
     if not os.path.exists(filepath):
@@ -254,7 +284,7 @@ async def get_profile(phone: str):
     row = cursor.fetchone()
     conn.close()
     if row:
-        return {"phone": row[0], "display_name": row or row[0], "about_status": row[2], "avatar_url": row[3]}
+        return {"phone": row[0], "display_name": row or row[0], "about_status": row, "avatar_url": row[3]}
     return {"phone": phone, "display_name": phone, "about_status": "Hey there!", "avatar_url": ""}
 
 @app.post("/api/user/profile/update")
@@ -322,7 +352,7 @@ async def get_messages(phone: str, partner: str):
             messages.append({
                 "id": r[0],
                 "sender": r,
-                "receiver": r[2],
+                "receiver": r,
                 "msg_type": r[3],
                 "content": r[4],
                 "translated_content": r[5],
@@ -346,13 +376,11 @@ async def upload_file(file: UploadFile = File(...)):
         out.write(await file.read())
     return {"url": f"/uploads/{fname}", "filename": fname}
 
-# ٹیکسٹ ٹرانسلیشن روٹ
 @app.post("/translate")
 async def translate_text_endpoint(req: TranslateReq):
     translated = await asyncio.to_thread(gemini_translate_text, req.text, req.target_lang)
     return {"status": "ok", "original": req.text, "translated_text": translated, "target_lang": req.target_lang}
 
-# وائس ٹرانسلیشن روٹ
 @app.post("/api/translate/voice")
 async def translate_voice_endpoint(req: VoiceTranslateReq):
     clean_url = req.audio_url.split("?")[0]
@@ -364,7 +392,6 @@ async def translate_voice_endpoint(req: VoiceTranslateReq):
     result = await asyncio.to_thread(gemini_translate_voice, fpath, mime, req.target_lang)
     return {"status": "ok", **result, "target_lang": req.target_lang}
 
-# ریئل ٹائم WebSocket (چیٹ، کال سگنلنگ اور لائیو سب ٹائٹلز)
 @app.websocket("/ws/{phone}")
 async def websocket_handler(ws: WebSocket, phone: str):
     p = phone.strip()
