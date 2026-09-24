@@ -6,10 +6,11 @@ import sqlite3
 import asyncio
 import time
 import base64
+import shutil
 import urllib.request
 import urllib.parse
 import urllib.error
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -125,7 +126,7 @@ class VoiceTranslateReq(BaseModel):
     audio_url: str
     target_lang: str = "en"
 
-# عام رومن اردو کی درست انگلش ڈکشنری (غلط ترجمے کی روک تھام)
+# Roman Urdu Dictionary
 ROMAN_URDU_QUICK_MAP = {
     "kaisy hain": "How are you?",
     "kaise hain": "How are you?",
@@ -171,7 +172,6 @@ def call_gemini(payload: dict) -> Optional[dict]:
     return None
 
 def free_web_translate(text: str, target_lang: str = "en") -> str:
-    # 1. رومن اردو چیک
     clean_lower = text.strip().lower()
     if target_lang == "en" and clean_lower in ROMAN_URDU_QUICK_MAP:
         return ROMAN_URDU_QUICK_MAP[clean_lower]
@@ -299,6 +299,166 @@ async def get_profile(phone: str):
 
 @app.post("/api/user/profile/update")
 async def update_profile(req: ProfileUpdateReq):
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE users 
+            SET display_name = ?, about_status = ?, avatar_url = ? 
+            WHERE phone = ?
+        """, (req.display_name or "", req.about_status or "", req.avatar_url or "", req.phone.strip()))
+        conn.commit()
+        conn.close()
+        return {"status": "ok"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+@app.post("/api/contacts/add")
+async def add_contact(req: ContactReq):
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (req.contact_phone.strip(), req.contact_phone.strip()))
+        cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (req.user_phone.strip(), req.contact_phone.strip()))
+        conn.commit()
+        conn.close()
+        return {"status": "ok"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+@app.get("/api/contacts/{phone}")
+async def get_contacts(phone: str):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.
+    cursor.execute("""
+        SELECT u.phone, u.display_name, u.about_status, u.avatar_url 
+        FROM user_contacts c 
+        JOIN users u ON c.contact_phone = u.phone 
+        WHERE c.user_phone = ?
+    """, (phone.strip(),))
+    rows = cursor.fetchall()
+    conn.close()
+    contacts = []
+    for r in rows:
+        contacts.append({
+            "phone": r[0],
+            "display_name": r or r[0],
+            "about_status": r,
+            "avatar_url": r,
+            "online": ws_mgr.is_online(r[0])
+        })
+    return {"contacts": contacts}
+
+@app.post("/api/translate")
+async def translate_text(req: TranslateReq):
+    translated = gemini_translate_text(req.text, req.target_lang)
+    return {"original": req.text, "translated": translated, "target_lang": req.target_lang}
+
+@app.post("/api/translate/voice")
+async def translate_voice_api(req: VoiceTranslateReq):
+    filename = os.path.basename(req.audio_url)
+    filepath = os.path.join(UPLOAD_DIR, filename)
+    mime_type = "audio/webm"
+    if filename.endswith(".wav"):
+        mime_type = "audio/wav"
+    elif filename.endswith(".mp3"):
+        mime_type = "audio/mp3"
+    elif filename.endswith(".ogg"):
+        mime_type = "audio/ogg"
+
+    result = gemini_translate_voice(filepath, mime_type, req.target_lang)
+    return result
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    filename = f"{int(time.time()*1000)}_{file.filename}"
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    return {"url": f"/uploads/{filename}", "filename": filename}
+
+@app.get("/api/messages/{chat_id}")
+async def get_messages(chat_id: str):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, chat_id, sender, receiver, msg_type, content, translated_content, lang, status, created_at FROM messages WHERE chat_id = ? ORDER BY id ASC", (chat_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    msgs = []
+    for r in rows:
+        msgs.append({
+            "id": r[0],
+            "chat_id": r,
+            "sender": r,
+            "receiver": r,
+            "msg_type": r[4],
+            "content": r[5],
+            "translated_content": r[6],
+            "lang": r[7],
+            "status": r[8],
+            "created_at": r[9]
+        })
+    return {"messages": msgs}
+
+@app.websocket("/ws/{phone}")
+async def websocket_endpoint(websocket: WebSocket, phone: str):
+    phone = phone.strip()
+    await ws_mgr.connect(phone, websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            msg = json.loads(data)
+            action = msg.get("action")
+            receiver = msg.get("receiver", "").strip()
+
+            # Handle Chat Messages
+            if action == "chat_message":
+                chat_id = get_chat_id(phone, receiver)
+                content = msg.get("content", "")
+                msg_type = msg.get("msg_type", "text")
+                target_lang = msg.get("target_lang", "en")
+                translated = ""
+
+                if msg_type == "text" and content:
+                    translated = gemini_translate_text(content, target_lang)
+                elif msg_type == "voice" and content:
+                    filename = os.path.basename(content)
+                    filepath = os.path.join(UPLOAD_DIR, filename)
+                    v_res = gemini_translate_voice(filepath, "audio/webm", target_lang)
+                    translated = v_res.get("translated_text", "")
+
+                conn = get_db()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO messages (chat_id, sender, receiver, msg_type, content, translated_content, lang)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (chat_id, phone, receiver, msg_type, content, translated, target_lang))
+                msg_id = cursor.lastrowid
+                conn.commit()
+                conn.close()
+
+                payload = {
+                    "action": "new_message",
+                    "id": msg_id,
+                    "chat_id": chat_id,
+                    "sender": phone,
+                    "receiver": receiver,
+                    "msg_type": msg_type,
+                    "content": content,
+                    "translated_content": translated,
+                    "lang": target_lang,
+                    "status": "sent"
+                }
+
+                await ws_mgr.send_to(receiver, payload)
+                await ws_mgr.send_to(phone, payload)
+
+            # WebRTC Call Signaling (Audio / Video Calls)
+            elif action in ["call_offer", "call_answer", "ice_candidate", "call_reject", "call_end"]:
+                msg["sender"] = phone
+                await ws_mgr.send_to(receiver, msg)
+
+    except WebSocketDisconnect:
+        ws_mgr.disconnect(phone)
+    except Exception as e:
+        ws_mgr.disconnect(phone)
