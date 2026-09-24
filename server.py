@@ -302,18 +302,21 @@ class SocketManager:
 
 ws_mgr = SocketManager()
 
-@app.post("/api/auth/login")
-async def login_api(req: LoginReq):
-    phone = req.phone.strip()
+@app.post("/api/user/profile/update")
+async def update_profile(req: ProfileUpdateReq):
     try:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (phone, phone))
+        cursor.execute("""
+            UPDATE users 
+            SET display_name = ?, about_status = ?, avatar_url = ? 
+            WHERE phone = ?
+        """, (req.display_name or "", req.about_status or "", req.avatar_url or "", req.phone.strip()))
         conn.commit()
         conn.close()
-    except Exception:
-        pass
-    return {"status": "ok", "phone": phone}
+        return {"status": "ok"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 @app.get("/api/user/profile/{phone}")
 async def get_profile(phone: str):
