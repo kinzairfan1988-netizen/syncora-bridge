@@ -323,7 +323,7 @@ async def get_conversation(phone: str, partner: str):
         for r in rows:
             messages.append({
                 "id": r[0], "sender": r, "receiver": r, "msg_type": r,
-                "content": r, "translated_content": r[5], "lang": r[6], "status": r[7], "time": str(r[8])[-8:-3]
+                "content": r, "translated_content": r, "lang": r[6], "status": r[7], "time": str(r[8])[-8:-3]
             })
         return {"messages": messages}
     except Exception:
@@ -331,10 +331,9 @@ async def get_conversation(phone: str, partner: str):
 
 @app.post("/api/upload")
 async def upload_media(file: UploadFile = File(...)):
-    # 100% Safe Extension Extraction (No tuples, no lists)
     orig_name = file.filename or "voice.webm"
-    ext = os.path.splitext(orig_name)
-    if not ext or len(ext) < 2:
+    _, ext = os.path.splitext(orig_name)
+    if not ext:
         ext = ".webm"
         
     new_filename = f"{os.urandom(8).hex()}{ext}"
@@ -372,10 +371,10 @@ async def socket_endpoint(websocket: WebSocket, phone: str):
                 if msg_type == "text" and content and (not translated or translated.lower() == content.lower()):
                     translated = await translate_via_gemini(content, lang)
 
-                # Voice Note Translation (Speech text se ya direct audio se)
+                # Voice Note Translation
                 elif msg_type == "voice" and (not translated or translated.strip() == ""):
                     if speech_text:
-                        print(f"[Voice Translation]: Spoken text '{speech_text}' ko translate kar rahe hain...")
+                        print(f"[Voice Translation]: Spoken text '{speech_text}' translate ho raha hai...")
                         translated = await translate_via_gemini(speech_text, lang)
                     else:
                         filename = os.path.basename(content)
