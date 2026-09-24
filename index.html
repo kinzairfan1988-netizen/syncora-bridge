@@ -417,8 +417,8 @@
             <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Confirm Dispatch</h3>
             <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Review message text</p>
             <div id="voice-edit-block" style="display:block; text-align:left;">
-                <label style="font-size: 11px; color: var(--text-muted);">Message / Content:</label>
-                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Edit text if needed...">
+                <label style="font-size: 11px; color: var(--text-muted);">Spoken Words / Content:</label>
+                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Words will appear here...">
             </div>
             <div class="lang-options-drawer" id="lang-drawer">
                 <label style="font-size: 11px; color: var(--text-muted);">Select Target Language:</label>
@@ -493,13 +493,13 @@
             <footer class="stage-input-bar">
                 <div class="input-shell" id="input-shell">
                     <button class="icon-btn" type="button" onclick="toggleAttachMenu()" title="Attach Link">📎</button>
-                    <input type="text" id="text-input" class="main-text-input" placeholder="Message..." onkeydown="if(event.key==='Enter'){ event.preventDefault(); stageMessageForDispatch(); }">
+                    <input type="text" id="text-input" class="main-text-input" placeholder="Type message in Roman Urdu or English..." onkeydown="if(event.key==='Enter'){ event.preventDefault(); stageMessageForDispatch(); }">
                     <button class="btn-inside-mic" id="inside-mic-btn" type="button" onclick="toggleVoiceRecording()" title="Record Voice Note">🎙️</button>
                 </div>
                 <div class="recording-bar" id="recording-bar">
                     <div class="rec-indicator">
                         <div class="rec-dot"></div>
-                        <span id="rec-live-words" style="font-size:12px; color:var(--accent-amber); max-width:140px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">Listening...</span>
+                        <span id="rec-live-words" style="font-size:12px; color:var(--accent-amber); max-width:140px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">Recording Voice...</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <button class="icon-btn" type="button" onclick="cancelRecording()" style="color: var(--danger-red);">🗑️</button>
@@ -551,6 +551,8 @@
         let recordedChunks = [];
         let isRecording = false;
         let activeAudioStream = null;
+        let voiceSpeechRec = null;
+        let currentRecordedTranscript = "";
 
         let pendingPayload = null;
         let currentAvatarUrl = "";
@@ -632,7 +634,6 @@
             } catch(e){}
         }
 
-        // لاگ ان کو فوری ان لاک کرنے والا درست فنکشن
         async function executeDirectLogin() {
             unlockMobileAudio();
             const input = document.getElementById("my-phone-input").value.trim();
@@ -644,14 +645,13 @@
             myPhone = input;
             try { localStorage.setItem("syncora_user_phone", myPhone); } catch(e){}
 
-            // فوراً اسکرین ہٹائیں تاکہ یوزر کسی صورت نہ رکے
+            // فوراً اسکرین ہٹائیں
             document.getElementById("auth-overlay").style.display = "none";
             document.getElementById("my-status-label").innerText = `● ${myPhone}`;
 
             initSocketSafe();
             loadUserProfileData();
 
-            // بیک گراؤنڈ میں سرور کو رجسٹر کریں
             try {
                 fetch("/api/auth/login", {
                     method: "POST", headers: { "Content-Type": "application/json" },
@@ -795,7 +795,7 @@
                         }
                         else if (data.action === "call_status" && data.status === "offline") {
                             document.getElementById("call-status-text").innerText = "Partner is Offline";
-                            alert("Dost abhi online nahi hai! Pehle unhein WhatsApp link send karein taake wo connect hon.");
+                            alert("Dost abhi online nahi hai! Pehle unhein WhatsApp link send karein.");
                             setTimeout(endCurrentCall, 1500);
                         }
                     } catch(e){}
@@ -1148,11 +1148,37 @@
             else stopAndFinishRecording();
         }
 
+        // وائس نوٹ بولنے کے دوران لائیو الفاظ پکڑنے والا فنکشن
         async function startVoiceRecording() {
             try {
                 activeAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(activeAudioStream);
                 recordedChunks = [];
+                currentRecordedTranscript = "";
+
+                // بولتے وقت آواز کے اصل الفاظ ریکارڈ کرنا
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (SR) {
+                    try {
+                        voiceSpeechRec = new SR();
+                        voiceSpeechRec.continuous = true;
+                        voiceSpeechRec.interimResults = true;
+                        voiceSpeechRec.lang = 'ur-PK';
+                        voiceSpeechRec.onresult = (e) => {
+                            let interim = "";
+                            for (let i = 0; i < e.results.length; ++i) {
+                                interim += e.results[i][0].transcript + " ";
+                            }
+                            currentRecordedTranscript = interim.trim();
+                            const liveEl = document.getElementById("rec-live-words");
+                            if (liveEl && currentRecordedTranscript) {
+                                liveEl.innerText = currentRecordedTranscript;
+                            }
+                        };
+                        voiceSpeechRec.start();
+                    } catch(e){}
+                }
+
                 mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
                 mediaRecorder.onstop = async () => {
                     if (recordedChunks.length === 0) return;
@@ -1162,8 +1188,9 @@
                     const data = await res.json();
                     
                     pendingPayload = { type: "voice", content: data.url };
-                    document.getElementById("voice-hint-field").value = "Voice Note Audio";
-                    document.getElementById("send-modal-preview").innerText = "Voice Note Recorded Successfully";
+                    // اصل الفاظ باکس میں سیٹ ہوں گے
+                    document.getElementById("voice-hint-field").value = currentRecordedTranscript || "Voice Note Message";
+                    document.getElementById("send-modal-preview").innerText = currentRecordedTranscript ? `"${currentRecordedTranscript}"` : "Voice Note Recorded";
                     document.getElementById("send-modal").style.display = "flex";
                 };
                 mediaRecorder.start();
@@ -1174,12 +1201,15 @@
         }
 
         function stopAndFinishRecording() {
+            if (voiceSpeechRec) { try { voiceSpeechRec.stop(); } catch(e){} voiceSpeechRec = null; }
             if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
             if (activeAudioStream) { activeAudioStream.getTracks().forEach(t => t.stop()); activeAudioStream = null; }
             resetRecordingUI();
         }
 
         function cancelRecording() {
+            if (voiceSpeechRec) { try { voiceSpeechRec.stop(); } catch(e){} voiceSpeechRec = null; }
+            currentRecordedTranscript = "";
             if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
             if (activeAudioStream) { activeAudioStream.getTracks().forEach(t => t.stop()); activeAudioStream = null; }
             resetRecordingUI();
@@ -1212,34 +1242,37 @@
             cancelDispatch();
         }
 
+        // وائس اور ٹیکسٹ دونوں کا اصل ترجمہ کرنے والا فنکشن
         async function confirmDispatchTranslation() {
             if (!pendingPayload) return;
             const targetLang = document.getElementById("modal-target-lang").value || "en";
+            let textToTranslate = document.getElementById("voice-hint-field").value.trim() || currentRecordedTranscript || "Voice Note";
             let translatedText = "";
 
-            if (pendingPayload.type === "voice") {
-                try {
-                    const res = await fetch("/api/translate/voice", {
+            try {
+                // اگر وائس نوٹ ہو تو سرور کے آڈیو ماڈل پر کوشش کریں
+                if (pendingPayload.type === "voice" && pendingPayload.content) {
+                    const vRes = await fetch("/api/translate/voice", {
                         method: "POST", headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ audio_url: pendingPayload.content, target_lang: targetLang })
                     });
-                    const data = await res.json();
-                    translatedText = data.translated_text || data.transcript || "Voice Note";
-                } catch(e) {
-                    translatedText = "Voice Note Audio";
+                    const vData = await vRes.json();
+                    if (vData.translated_text && vData.translated_text !== "Could not transcribe audio" && !vData.translated_text.includes("[Set GEMINI")) {
+                        translatedText = vData.translated_text;
+                    }
                 }
-            } else {
-                let textToTranslate = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
-                try {
+
+                // اگر آڈیو ٹرانسلیشن سے ٹیکسٹ نہ ملا ہو تو بولے گئے الفاظ کا براہِ راست ترجمہ کریں
+                if (!translatedText) {
                     const res = await fetch("/translate", {
                         method: "POST", headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
                     });
                     const data = await res.json();
                     translatedText = data.translated_text || textToTranslate;
-                } catch (e) {
-                    translatedText = textToTranslate;
                 }
+            } catch (e) {
+                translatedText = textToTranslate;
             }
 
             executeDispatch(pendingPayload.content, translatedText, pendingPayload.type, targetLang);
