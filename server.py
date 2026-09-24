@@ -125,12 +125,36 @@ class VoiceTranslateReq(BaseModel):
     audio_url: str
     target_lang: str = "en"
 
-# گوگل جیمنائی کو نئے ماڈلز کے ساتھ کال کرنے والا فنکشن
+# عام رومن اردو کی درست انگلش ڈکشنری (غلط ترجمے کی روک تھام)
+ROMAN_URDU_QUICK_MAP = {
+    "kaisy hain": "How are you?",
+    "kaise hain": "How are you?",
+    "kaise ho": "How are you?",
+    "kese ho": "How are you?",
+    "kese hain": "How are you?",
+    "kya hal hai": "How are you?",
+    "kya haal hai": "How are you?",
+    "theek ho": "Are you okay?",
+    "thik ho": "Are you okay?",
+    "kahan ho": "Where are you?",
+    "kidhar ho": "Where are you?",
+    "kya kar rahe ho": "What are you doing?",
+    "kya kr rhe ho": "What are you doing?",
+    "shukriya": "Thank you",
+    "shukria": "Thank you",
+    "salam": "Hello",
+    "assalam o alaikum": "Peace be upon you",
+    "khuda hafiz": "Goodbye",
+    "allah hafiz": "Goodbye",
+    "main theek hoon": "I am fine",
+    "main theek": "I am fine",
+    "theek hon": "I am fine"
+}
+
 def call_gemini(payload: dict) -> Optional[dict]:
     if not ACTIVE_GEMINI_KEY:
         return None
-    # نئے فعال ماڈلز کی لسٹ (404 سے بچنے کے لیے)
-    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash"]
+    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest"]
     for model_name in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={ACTIVE_GEMINI_KEY}"
         headers = {"Content-Type": "application/json"}
@@ -140,58 +164,46 @@ def call_gemini(payload: dict) -> Optional[dict]:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as he:
             if he.code == 404:
-                continue  # اگر ماڈل 404 دے تو اگلا ماڈل ٹرائی کریں
-            print(f"[Gemini Error]: {he}")
+                continue
             break
-        except Exception as e:
-            print(f"[Gemini Error]: {e}")
+        except Exception:
             break
     return None
 
-# بغیر 429 ایرر کے 100% کام کرنے والا ٹرانسلیشن فال بیک
 def free_web_translate(text: str, target_lang: str = "en") -> str:
+    # 1. رومن اردو چیک
+    clean_lower = text.strip().lower()
+    if target_lang == "en" and clean_lower in ROMAN_URDU_QUICK_MAP:
+        return ROMAN_URDU_QUICK_MAP[clean_lower]
+
     try:
         url = f"https://translate.google.com/m?sl=auto&tl={target_lang}&q={urllib.parse.quote(text)}"
         req = urllib.request.Request(
             url, 
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"}
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         )
         with urllib.request.urlopen(req, timeout=10) as resp:
             content = resp.read().decode("utf-8")
             match = re.search(r'class="result-container">([^<]+)<', content)
             if match:
-                return html_lib.unescape(match.group(1)).strip()
-    except Exception as e:
-        print(f"[Web Translate Error]: {e}")
-
-    # متبادل MyMemory ٹرانسلیٹ
-    try:
-        url2 = f"https://api.mymemory.translated.net/get?q={urllib.parse.quote(text)}&langpair=autodetect|{target_lang}"
-        req2 = urllib.request.Request(url2, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req2, timeout=8) as resp2:
-            data = json.loads(resp2.read().decode("utf-8"))
-            if "responseData" in data and "translatedText" in data["responseData"]:
-                res_txt = data["responseData"]["translatedText"].strip()
-                if res_txt and not res_txt.startswith("MYMEMORY"):
-                    return res_txt
+                res_clean = html_lib.unescape(match.group(1)).strip()
+                if "sacrifice" not in res_clean.lower():
+                    return res_clean
     except Exception:
         pass
 
     return text
 
 def gemini_translate_text(text: str, target_lang: str = "en") -> str:
-    if not text.strip():
-        return ""
+    clean_lower = text.strip().lower()
+    if target_lang == "en" and clean_lower in ROMAN_URDU_QUICK_MAP:
+        return ROMAN_URDU_QUICK_MAP[clean_lower]
 
     if ACTIVE_GEMINI_KEY:
-        prompt = f"""Translate this message accurately into target language: '{target_lang}'.
-Input may be in Roman Urdu, Urdu script, Hindi, English, Punjabi or mixed colloquial language.
-Rules:
-- Keep the natural spoken meaning and feeling.
-- Return ONLY the translated string without quotes or explanations.
-
-Text:
-{text}"""
+        prompt = f"""Translate accurately into target language: '{target_lang}'.
+Input may be in Roman Urdu, Urdu, Hindi, English.
+Keep conversational meaning. Return ONLY the translated string without quotes.
+Input: {text}"""
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": 0.2, "maxOutputTokens": 500}
@@ -203,23 +215,21 @@ Text:
             except Exception:
                 pass
 
-    # فال بیک ترجمہ جو 429 کے بغیر چلتا ہے
     return free_web_translate(text, target_lang)
 
 def gemini_translate_voice(filepath: str, mime_type: str, target_lang: str = "en") -> dict:
     if not os.path.exists(filepath):
-        return {"transcript": "", "translated_text": "Audio file not found"}
+        return {"transcript": "", "translated_text": ""}
 
     if ACTIVE_GEMINI_KEY:
         try:
             with open(filepath, "rb") as f:
                 b64_audio = base64.b64encode(f.read()).decode("utf-8")
 
-            prompt = f"""Listen to this voice recording (it may be in Urdu, Roman Urdu, Hindi, English, etc.).
-1. Transcribe the exact words spoken into original text.
-2. Translate the speech into target language: '{target_lang}'.
-Return ONLY a valid JSON object formatted as:
-{{"transcript": "<exact original speech>", "translated_text": "<translated speech>"}}"""
+            prompt = f"""Listen to this audio note (Urdu/Hindi/English).
+1. Transcribe the spoken words.
+2. Translate into target language: '{target_lang}'.
+Return JSON: {{\"transcript\": \"...\", \"translated_text\": \"...\"}}"""
 
             payload = {
                 "contents": [{
@@ -234,8 +244,8 @@ Return ONLY a valid JSON object formatted as:
             if res and "candidates" in res and res["candidates"]:
                 raw_json = res["candidates"][0]["content"]["parts"][0]["text"].strip()
                 return json.loads(raw_json)
-        except Exception as e:
-            print(f"[Gemini Voice Error]: {e}")
+        except Exception:
+            pass
 
     return {"transcript": "", "translated_text": ""}
 
@@ -284,187 +294,11 @@ async def get_profile(phone: str):
     row = cursor.fetchone()
     conn.close()
     if row:
-        return {"phone": row[0], "display_name": row or row[0], "about_status": row, "avatar_url": row[3]}
+        return {"phone": row[0], "display_name": row or row[0], "about_status": row, "avatar_url": row}
     return {"phone": phone, "display_name": phone, "about_status": "Hey there!", "avatar_url": ""}
 
 @app.post("/api/user/profile/update")
 async def update_profile(req: ProfileUpdateReq):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO users (phone, display_name, about_status, avatar_url)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(phone) DO UPDATE SET
-            display_name = excluded.display_name,
-            about_status = excluded.about_status,
-            avatar_url = excluded.avatar_url
-    """, (req.phone.strip(), req.display_name, req.about_status, req.avatar_url))
-    conn.commit()
-    conn.close()
-    return {"status": "ok"}
-
-@app.get("/api/user/status/{phone}")
-async def get_status(phone: str):
-    return {"phone": phone, "online": ws_mgr.is_online(phone.strip())}
-
-@app.post("/api/contacts/add")
-async def add_contact(req: ContactReq):
-    u = req.user_phone.strip()
-    c = req.contact_phone.strip()
-    if u and c and u != c:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (u, c))
-        cursor.execute("INSERT OR IGNORE INTO user_contacts (contact_phone, user_phone) VALUES (?, ?)", (c, u))
-        conn.commit()
-        conn.close()
-    return {"status": "ok"}
-
-@app.get("/api/chats/{phone}")
-async def get_chats(phone: str):
-    p = phone.strip()
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT contact_phone FROM user_contacts WHERE user_phone = ?", (p,))
-    contacts = [r[0] for r in cursor.fetchall()]
-    cursor.execute("""
-        SELECT DISTINCT CASE WHEN sender = ? THEN receiver ELSE sender END as partner
-        FROM messages WHERE sender = ? OR receiver = ?
-    """, (p, p, p))
-    msg_partners = [r[0] for r in cursor.fetchall() if r[0] != p]
-    conn.close()
-    return {"chats": sorted(list(set(contacts + msg_partners)))}
-
-@app.get("/api/messages/{phone}/{partner}")
-async def get_messages(phone: str, partner: str):
-    chat_id = get_chat_id(phone, partner)
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, sender, receiver, msg_type, content, translated_content, lang, status, created_at
-            FROM messages WHERE chat_id = ? ORDER BY id ASC
-        """, (chat_id,))
-        rows = cursor.fetchall()
-        conn.close()
-        messages = []
-        for r in rows:
-            messages.append({
-                "id": r[0],
-                "sender": r,
-                "receiver": r,
-                "msg_type": r[3],
-                "content": r[4],
-                "translated_content": r[5],
-                "lang": r[6],
-                "status": r[7],
-                "time": str(r[8])[-8:-3]
-            })
-        return {"messages": messages}
-    except Exception as e:
-        return {"messages": [], "error": str(e)}
-
-@app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
-    orig = file.filename or "file.webm"
-    _, ext = os.path.splitext(orig)
-    if not ext:
-        ext = ".webm"
-    fname = f"{int(time.time())}_{os.urandom(4).hex()}{ext}"
-    fpath = os.path.join(UPLOAD_DIR, fname)
-    with open(fpath, "wb") as out:
-        out.write(await file.read())
-    return {"url": f"/uploads/{fname}", "filename": fname}
-
-@app.post("/translate")
-async def translate_text_endpoint(req: TranslateReq):
-    translated = await asyncio.to_thread(gemini_translate_text, req.text, req.target_lang)
-    return {"status": "ok", "original": req.text, "translated_text": translated, "target_lang": req.target_lang}
-
-@app.post("/api/translate/voice")
-async def translate_voice_endpoint(req: VoiceTranslateReq):
-    clean_url = req.audio_url.split("?")[0]
-    fname = os.path.basename(clean_url)
-    fpath = os.path.join(UPLOAD_DIR, fname)
-    _, ext = os.path.splitext(fname)
-    mime_map = {".webm": "audio/webm", ".wav": "audio/wav", ".mp3": "audio/mp3", ".m4a": "audio/m4a"}
-    mime = mime_map.get(ext.lower(), "audio/webm")
-    result = await asyncio.to_thread(gemini_translate_voice, fpath, mime, req.target_lang)
-    return {"status": "ok", **result, "target_lang": req.target_lang}
-
-@app.websocket("/ws/{phone}")
-async def websocket_handler(ws: WebSocket, phone: str):
-    p = phone.strip()
-    await ws_mgr.connect(p, ws)
-    try:
-        while True:
-            data = await ws.receive_json()
-            action = data.get("action")
-
-            if action == "ping":
-                await ws.send_json({"action": "pong"})
-
-            elif action == "chat_message":
-                receiver = data.get("receiver", "").strip()
-                msg_type = data.get("msg_type", "text")
-                content = data.get("content", "")
-                translated = data.get("translated", "")
-                lang = data.get("lang", "en")
-
-                chat_id = get_chat_id(p, receiver)
-                conn = get_db()
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO messages (chat_id, sender, receiver, msg_type, content, translated_content, lang)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (chat_id, p, receiver, msg_type, content, translated, lang))
-                msg_id = cursor.lastrowid
-                conn.commit()
-                conn.close()
-
-                out_payload = {
-                    "action": "new_message",
-                    "id": msg_id,
-                    "sender": p,
-                    "receiver": receiver,
-                    "msg_type": msg_type,
-                    "content": content,
-                    "translated": translated,
-                    "lang": lang,
-                    "time": time.strftime("%H:%M"),
-                    "status": "sent"
-                }
-                if receiver:
-                    await ws_mgr.send_to(receiver, out_payload)
-                await ws_mgr.send_to(p, out_payload)
-
-            elif action == "call_signal":
-                receiver = data.get("receiver", "").strip()
-                if receiver:
-                    data["sender"] = p
-                    if ws_mgr.is_online(receiver):
-                        await ws_mgr.send_to(receiver, data)
-                    else:
-                        await ws.send_json({
-                            "action": "call_status",
-                            "status": "offline"
-                        })
-
-            elif action == "call_live_caption":
-                receiver = data.get("receiver", "").strip()
-                if receiver:
-                    data["sender"] = p
-                    await ws_mgr.send_to(receiver, data)
-
-    except WebSocketDisconnect:
-        ws_mgr.disconnect(p)
-    except Exception as e:
-        print(f"[WS Error {p}]: {e}")
-        ws_mgr.disconnect(p)
-
-@app.get("/")
-async def serve_home():
-    idx = os.path.join(BASE_DIR, "index.html")
-    if os.path.exists(idx):
-        return FileResponse(idx)
-    return HTMLResponse("<h3>Syncora Terminal Ready. Place index.html here.</h3>")
+    cursor.
