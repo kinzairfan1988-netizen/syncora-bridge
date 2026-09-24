@@ -1,483 +1,215 @@
-import os
-import json
-import re
-import html as html_lib
-import sqlite3
-import asyncio
-import time
-import base64
-import shutil
-import urllib.request
-import urllib.parse
-import urllib.error
-from typing import Dict, Optional, List
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-MANUAL_GEMINI_KEY = ""
-ACTIVE_GEMINI_KEY = GEMINI_API_KEY or MANUAL_GEMINI_KEY
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-STATIC_DIR = os.path.join(BASE_DIR, "static")
-os.makedirs(STATIC_DIR, exist_ok=True)
-
-DB_PATH = os.path.join(BASE_DIR, "syncora.db")
-
-def get_db():
-    fallback = os.path.join(os.environ.get("TEMP", "/tmp"), "syncora.db")
-    try:
-        conn = sqlite3.connect(DB_PATH, timeout=10)
-        conn.cursor().execute("CREATE TABLE IF NOT EXISTS _test (id INT)")
-        conn.commit()
-        return conn
-    except Exception:
-        conn = sqlite3.connect(fallback, timeout=10)
-        conn.cursor().execute("CREATE TABLE IF NOT EXISTS _test (id INT)")
-        conn.commit()
-        return conn
-
-def init_db():
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                phone TEXT PRIMARY KEY,
-                display_name TEXT DEFAULT '',
-                about_status TEXT DEFAULT 'Hey there! I am using Syncora.',
-                avatar_url TEXT DEFAULT '',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS user_contacts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_phone TEXT,
-                contact_phone TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(user_phone, contact_phone)
-            )
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                chat_id TEXT,
-                sender TEXT,
-                receiver TEXT,
-                msg_type TEXT,
-                content TEXT,
-                translated_content TEXT,
-                lang TEXT DEFAULT 'en',
-                status TEXT DEFAULT 'sent',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"[DB Init Error]: {e}")
-
-init_db()
-
-app = FastAPI(title="Syncora Terminal Backend")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-if os.path.exists(STATIC_DIR):
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-@app.get("/")
-async def root_endpoint():
-    index_in_root = os.path.join(BASE_DIR, "index.html")
-    index_in_static = os.path.join(STATIC_DIR, "index.html")
-    if os.path.exists(index_in_root):
-        return FileResponse(index_in_root)
-    if os.path.exists(index_in_static):
-        return FileResponse(index_in_static)
-    return HTMLResponse("""
-        <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 50px;">
-            <h2>Syncora Backend is running successfully!</h2>
-            <p>API documentation dekhne ke liye yahan click karein: <a href="/docs"><b>/docs</b></a></p>
-        </div>
-    """)
-
-def get_chat_id(u1: str, u2: str) -> str:
-    cleaned = sorted([u1.strip(), u2.strip()])
-    return f"chat_{cleaned[0]}_{cleaned}"
-
-class LoginReq(BaseModel):
-    phone: str
-
-class ProfileUpdateReq(BaseModel):
-    phone: str
-    display_name: Optional[str] = ""
-    about_status: Optional[str] = ""
-    avatar_url: Optional[str] = ""
-
-class ContactReq(BaseModel):
-    user_phone: str
-    contact_phone: str
-
-class TranslateReq(BaseModel):
-    text: str
-    target_lang: str = "en"
-
-class VoiceTranslateReq(BaseModel):
-    audio_url: str
-    target_lang: str = "en"
-
-ROMAN_URDU_QUICK_MAP = {
-    "kaisy hain": "How are you?",
-    "kaise hain": "How are you?",
-    "kaise ho": "How are you?",
-    "kese ho": "How are you?",
-    "kese hain": "How are you?",
-    "kya hal hai": "How are you?",
-    "kya haal hai": "How are you?",
-    "theek ho": "Are you okay?",
-    "thik ho": "Are you okay?",
-    "kahan ho": "Where are you?",
-    "kidhar ho": "Where are you?",
-    "kya kar rahe ho": "What are you doing?",
-    "kya kr rhe ho": "What are you doing?",
-    "shukriya": "Thank you",
-    "shukria": "Thank you",
-    "salam": "Hello",
-    "assalam o alaikum": "Peace be upon you",
-    "khuda hafiz": "Goodbye",
-    "allah hafiz": "Goodbye",
-    "main theek hoon": "I am fine",
-    "main theek": "I am fine",
-    "theek hon": "I am fine"
-}
-
-def call_gemini(payload: dict) -> Optional[dict]:
-    if not ACTIVE_GEMINI_KEY:
-        return None
-    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest"]
-    for model_name in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={ACTIVE_GEMINI_KEY}"
-        headers = {"Content-Type": "application/json"}
-        try:
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=15) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as he:
-            if he.code == 404:
-                continue
-            break
-        except Exception:
-            break
-    return None
-
-def free_web_translate(text: str, target_lang: str = "en") -> str:
-    clean_lower = text.strip().lower()
-    if target_lang == "en" and clean_lower in ROMAN_URDU_QUICK_MAP:
-        return ROMAN_URDU_QUICK_MAP[clean_lower]
-
-    try:
-        url = f"https://translate.google.com/m?sl=auto&tl={target_lang}&q={urllib.parse.quote(text)}"
-        req = urllib.request.Request(
-            url, 
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            content = resp.read().decode("utf-8")
-            match = re.search(r'class="result-container">([^<]+)<', content)
-            if match:
-                res_clean = html_lib.unescape(match.group(1)).strip()
-                if "sacrifice" not in res_clean.lower():
-                    return res_clean
-    except Exception:
-        pass
-
-    return text
-
-def gemini_translate_text(text: str, target_lang: str = "en") -> str:
-    clean_lower = text.strip().lower()
-    if target_lang == "en" and clean_lower in ROMAN_URDU_QUICK_MAP:
-        return ROMAN_URDU_QUICK_MAP[clean_lower]
-
-    if ACTIVE_GEMINI_KEY:
-        prompt = f"""Translate accurately into target language: '{target_lang}'.
-Input may be in Roman Urdu, Urdu, Hindi, English.
-Keep conversational meaning. Return ONLY the translated string without quotes.
-Input: {text}"""
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 500}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Syncora - Audio Call & Translator</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
         }
-        res = call_gemini(payload)
-        if res and "candidates" in res and res["candidates"]:
-            try:
-                return res["candidates"][0]["content"]["parts"][0]["text"].strip()
-            except Exception:
-                pass
+        .call-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 20px;
+            padding: 30px;
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+        .logo { font-size: 28px; font-weight: 800; color: #38bdf8; margin-bottom: 6px; }
+        .subtitle { font-size: 14px; color: #94a3b8; margin-bottom: 24px; }
+        .room-box {
+            background: #0f172a;
+            border: 1px dashed #475569;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            margin-bottom: 24px;
+            word-break: break-all;
+        }
+        .room-box b { color: #38bdf8; }
+        .btn-call {
+            background: #10b981;
+            color: #ffffff;
+            border: none;
+            padding: 16px;
+            font-size: 17px;
+            font-weight: 700;
+            border-radius: 12px;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 12px;
+        }
+        .btn-call:hover { background: #059669; }
+        .btn-call:disabled { background: #475569; cursor: not-allowed; }
+        .btn-hangup {
+            background: #ef4444;
+            display: none;
+        }
+        .btn-hangup:hover { background: #dc2626; }
+        .status-box {
+            font-size: 14px;
+            color: #cbd5e1;
+            padding: 10px;
+            background: rgba(51, 65, 85, 0.5);
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        .pulse {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #10b981;
+            margin-right: 6px;
+            animation: blink 1.2s infinite;
+        }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    </style>
+</head>
+<body>
 
-    return free_web_translate(text, target_lang)
+<div class="call-card">
+    <div class="logo">Syncora Call</div>
+    <div class="subtitle">Real-time Audio Calling with Translation</div>
 
-def gemini_translate_voice(filepath: str, mime_type: str, target_lang: str = "en") -> dict:
-    if not os.path.exists(filepath):
-        return {"transcript": "", "translated_text": ""}
+    <div class="room-box">
+        Room ID: <b id="roomText">Detecting...</b>
+    </div>
 
-    if ACTIVE_GEMINI_KEY:
-        try:
-            with open(filepath, "rb") as f:
-                b64_audio = base64.b64encode(f.read()).decode("utf-8")
+    <button id="callBtn" class="btn-call" onclick="startCall()">Join Audio Call</button>
+    <button id="hangupBtn" class="btn-call btn-hangup" onclick="endCall()">End Call</button>
 
-            prompt = f"""Listen to this audio note (Urdu/Hindi/English).
-1. Transcribe the spoken words.
-2. Translate into target language: '{target_lang}'.
-Return JSON: {{\"transcript\": \"...\", \"translated_text\": \"...\"}}"""
+    <div class="status-box" id="statusText">Ready to connect...</div>
+    <audio id="remoteAudio" autoplay playsinline></audio>
+</div>
 
-            payload = {
-                "contents": [{
-                    "parts": [
-                        {"text": prompt},
-                        {"inline_data": {"mime_type": mime_type, "data": b64_audio}}
-                    ]
-                }],
-                "generationConfig": {"temperature": 0.2, "response_mime_type": "application/json"}
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const room = urlParams.get('room') || 'default_room';
+    document.getElementById('roomText').innerText = room;
+
+    const myId = 'user_' + Math.random().toString(36).substring(2, 8);
+    const statusText = document.getElementById('statusText');
+    const callBtn = document.getElementById('callBtn');
+    const hangupBtn = document.getElementById('hangupBtn');
+    const remoteAudio = document.getElementById('remoteAudio');
+
+    let localStream = null;
+    let peerConn = null;
+    let ws = null;
+
+    const rtcConfig = {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+    };
+
+    async function startCall() {
+        callBtn.disabled = true;
+        statusText.innerHTML = '<span class="pulse"></span>Microphone access manga ja raha hai...';
+
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            connectSignaling();
+        } catch (err) {
+            statusText.innerText = 'Microphone permission error: ' + err.message;
+            callBtn.disabled = false;
+        }
+    }
+
+    function connectSignaling() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${protocol}//${window.location.host}/ws/${myId}`);
+
+        ws.onopen = () => {
+            statusText.innerHTML = '<span class="pulse"></span>Room se connect ho gaya. Doosre user ka intezar...';
+            setupPeerConnection();
+            ws.send(JSON.stringify({ action: 'join_room', room: room }));
+            callBtn.style.display = 'none';
+            hangupBtn.style.display = 'block';
+        };
+
+        ws.onmessage = async (e) => {
+            const data = JSON.parse(e.data);
+
+            if (data.action === 'user_joined') {
+                statusText.innerHTML = '<span class="pulse"></span>User room mein agaya! Calling...';
+                const offer = await peerConn.createOffer();
+                await peerConn.setLocalDescription(offer);
+                ws.send(JSON.stringify({ action: 'call_offer', offer: offer, room: room }));
             }
-            res = call_gemini(payload)
-            if res and "candidates" in res and res["candidates"]:
-                raw_json = res["candidates"][0]["content"]["parts"][0]["text"].strip()
-                return json.loads(raw_json)
-        except Exception:
-            pass
+            else if (data.action === 'call_offer') {
+                statusText.innerHTML = '<span class="pulse"></span>Call receive ho rahi hai...';
+                await peerConn.setRemoteDescription(new RTCSessionDescription(data.offer));
+                const answer = await peerConn.createAnswer();
+                await peerConn.setLocalDescription(answer);
+                ws.send(JSON.stringify({ action: 'call_answer', answer: answer, room: room }));
+                statusText.innerHTML = '🟢 <b>Call Connected!</b> Audio live hai.';
+            }
+            else if (data.action === 'call_answer') {
+                await peerConn.setRemoteDescription(new RTCSessionDescription(data.answer));
+                statusText.innerHTML = '🟢 <b>Call Connected!</b> Audio live hai.';
+            }
+            else if (data.action === 'ice_candidate' && data.candidate) {
+                try {
+                    await peerConn.addIceCandidate(new RTCIceCandidate(data.candidate));
+                } catch (err) {}
+            }
+            else if (data.action === 'call_end') {
+                endCall(false);
+            }
+        };
 
-    return {"transcript": "", "translated_text": ""}
+        ws.onclose = () => {
+            statusText.innerText = 'Server disconnected.';
+        };
+    }
 
-class SocketManager:
-    def __init__(self):
-        self.connections: Dict[str, WebSocket] = {}
+    function setupPeerConnection() {
+        peerConn = new RTCPeerConnection(rtcConfig);
 
-    async def connect(self, phone: str, ws: WebSocket):
-        await ws.accept()
-        self.connections[phone] = ws
+        localStream.getTracks().forEach(track => {
+            peerConn.addTrack(track, localStream);
+        });
 
-    def disconnect(self, phone: str):
-        if phone in self.connections:
-            del self.connections[phone]
+        peerConn.ontrack = (event) => {
+            remoteAudio.srcObject = event.streams[0];
+        };
 
-    def is_online(self, phone: str) -> bool:
-        return phone in self.connections
+        peerConn.onicecandidate = (event) => {
+            if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: 'ice_candidate', candidate: event.candidate, room: room }));
+            }
+        };
+    }
 
-    async def send_to(self, phone: str, message: dict):
-        if phone in self.connections:
-            try:
-                await self.connections[phone].send_json(message)
-            except Exception:
-                self.disconnect(phone)
+    function endCall(notify = true) {
+        if (notify && ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ action: 'call_end', room: room }));
+        }
+        if (peerConn) { peerConn.close(); peerConn = null; }
+        if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+        if (ws) { ws.close(); ws = null; }
 
-ws_mgr = SocketManager()
+        callBtn.style.display = 'block';
+        callBtn.disabled = false;
+        hangupBtn.style.display = 'none';
+        statusText.innerText = 'Call khatam ho gayi.';
+    }
+</script>
 
-@app.post("/api/auth/login")
-async def login_api(req: LoginReq):
-    phone = req.phone.strip()
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (phone, phone))
-        conn.commit()
-        conn.close()
-    except Exception:
-        pass
-    return {"status": "ok", "phone": phone}
-
-@app.get("/api/user/profile/{phone}")
-async def get_profile(phone: str):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT phone, display_name, about_status, avatar_url FROM users WHERE phone = ?", (phone.strip(),))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return {"phone": row[0], "display_name": row or row[0], "about_status": row, "avatar_url": row}
-    return {"phone": phone, "display_name": phone, "about_status": "Hey there!", "avatar_url": ""}
-
-@app.post("/api/user/profile/update")
-async def update_profile(req: ProfileUpdateReq):
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE users 
-            SET display_name = ?, about_status = ?, avatar_url = ? 
-            WHERE phone = ?
-        """, (req.display_name or "", req.about_status or "", req.avatar_url or "", req.phone.strip()))
-        conn.commit()
-        conn.close()
-        return {"status": "ok"}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-
-@app.post("/api/contacts/add")
-async def add_contact(req: ContactReq):
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("INSERT OR IGNORE INTO users (phone, display_name) VALUES (?, ?)", (req.contact_phone.strip(), req.contact_phone.strip()))
-        cursor.execute("INSERT OR IGNORE INTO user_contacts (user_phone, contact_phone) VALUES (?, ?)", (req.user_phone.strip(), req.contact_phone.strip()))
-        conn.commit()
-        conn.close()
-        return {"status": "ok"}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-
-@app.get("/api/contacts/{phone}")
-async def get_contacts(phone: str):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT u.phone, u.display_name, u.about_status, u.avatar_url 
-        FROM user_contacts c 
-        JOIN users u ON c.contact_phone = u.phone 
-        WHERE c.user_phone = ?
-    """, (phone.strip(),))
-    rows = cursor.fetchall()
-    conn.close()
-    contacts = []
-    for r in rows:
-        contacts.append({
-            "phone": r[0],
-            "display_name": r or r[0],
-            "about_status": r,
-            "avatar_url": r,
-            "online": ws_mgr.is_online(r[0])
-        })
-    return {"contacts": contacts}
-
-@app.post("/api/translate")
-async def translate_text(req: TranslateReq):
-    translated = gemini_translate_text(req.text, req.target_lang)
-    return {"original": req.text, "translated": translated, "target_lang": req.target_lang}
-
-@app.post("/api/translate/voice")
-async def translate_voice_api(req: VoiceTranslateReq):
-    filename = os.path.basename(req.audio_url)
-    filepath = os.path.join(UPLOAD_DIR, filename)
-    mime_type = "audio/webm"
-    if filename.endswith(".wav"):
-        mime_type = "audio/wav"
-    elif filename.endswith(".mp3"):
-        mime_type = "audio/mp3"
-    elif filename.endswith(".ogg"):
-        mime_type = "audio/ogg"
-
-    result = gemini_translate_voice(filepath, mime_type, req.target_lang)
-    return result
-
-@app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
-    filename = f"{int(time.time()*1000)}_{file.filename}"
-    file_path = os.path.join(UPLOAD_DIR, filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    return {"url": f"/uploads/{filename}", "filename": filename}
-
-@app.get("/api/messages/{chat_id}")
-async def get_messages(chat_id: str):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, chat_id, sender, receiver, msg_type, content, translated_content, lang, status, created_at FROM messages WHERE chat_id = ? ORDER BY id ASC", (chat_id,))
-    rows = cursor.fetchall()
-    conn.close()
-    msgs = []
-    for r in rows:
-        msgs.append({
-            "id": r[0],
-            "chat_id": r,
-            "sender": r,
-            "receiver": r,
-            "msg_type": r,
-            "content": r[5],
-            "translated_content": r[6],
-            "lang": r[7],
-            "status": r[8],
-            "created_at": r[9]
-        })
-    return {"messages": msgs}
-
-@app.websocket("/ws/{phone}")
-async def websocket_endpoint(websocket: WebSocket, phone: str):
-    phone = phone.strip()
-    await ws_mgr.connect(phone, websocket)
-    try:
-        while True:
-            data = await websocket.receive_text()
-            msg = json.loads(data)
-            action = msg.get("action")
-            receiver = msg.get("receiver", "").strip()
-
-            # Chat Messages
-            if action == "chat_message":
-                chat_id = get_chat_id(phone, receiver)
-                content = msg.get("content", "")
-                msg_type = msg.get("msg_type", "text")
-                target_lang = msg.get("target_lang", "en")
-                translated = ""
-
-                if msg_type == "text" and content:
-                    translated = gemini_translate_text(content, target_lang)
-                elif msg_type == "voice" and content:
-                    filename = os.path.basename(content)
-                    filepath = os.path.join(UPLOAD_DIR, filename)
-                    v_res = gemini_translate_voice(filepath, "audio/webm", target_lang)
-                    translated = v_res.get("translated_text", "")
-
-                conn = get_db()
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO messages (chat_id, sender, receiver, msg_type, content, translated_content, lang)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (chat_id, phone, receiver, msg_type, content, translated, target_lang))
-                msg_id = cursor.lastrowid
-                conn.commit()
-                conn.close()
-
-                payload = {
-                    "action": "new_message",
-                    "id": msg_id,
-                    "chat_id": chat_id,
-                    "sender": phone,
-                    "receiver": receiver,
-                    "msg_type": msg_type,
-                    "content": content,
-                    "translated_content": translated,
-                    "lang": target_lang,
-                    "status": "sent"
-                }
-
-                await ws_mgr.send_to(receiver, payload)
-                await ws_mgr.send_to(phone, payload)
-
-            # WebRTC Call Signaling (Audio / Video)
-            elif action in ["call_offer", "call_answer", "ice_candidate", "call_reject", "call_end"]:
-                msg["sender"] = phone
-                await ws_mgr.send_to(receiver, msg)
-
-    except WebSocketDisconnect:
-        ws_mgr.disconnect(phone)
-    except Exception:
-        ws_mgr.disconnect(phone)
+</body>
+</html>
