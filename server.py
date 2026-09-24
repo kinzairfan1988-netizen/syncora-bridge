@@ -10,7 +10,7 @@ import shutil
 import urllib.request
 import urllib.parse
 import urllib.error
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Set
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -30,6 +30,9 @@ ACTIVE_GEMINI_KEY = GEMINI_API_KEY or MANUAL_GEMINI_KEY
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+os.makedirs(STATIC_DIR, exist_ok=True)
 
 DB_PATH = os.path.join(BASE_DIR, "syncora.db")
 
@@ -89,7 +92,7 @@ def init_db():
 
 init_db()
 
-app = FastAPI(title="Syncora Terminal Backend")
+app = FastAPI(title="Syncora Calling & Chat Backend")
 
 app.add_middleware(
     CORSMiddleware,
@@ -100,6 +103,117 @@ app.add_middleware(
 )
 
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+if os.path.exists(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+@app.get("/")
+async def root_call_page(room: Optional[str] = None):
+    # Check for index.html in project directories
+    candidates = [
+        os.path.join(BASE_DIR, "index.html"),
+        os.path.join(STATIC_DIR, "index.html"),
+        os.path.join(BASE_DIR, "templates", "index.html")
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return FileResponse(path)
+
+    # Built-in Fallback WebRTC Audio Calling Interface
+    room_title = room if room else "General"
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Syncora Audio Call - Room {room_title}</title>
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
+            .card {{ background: #1e293b; padding: 30px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; max-width: 400px; width: 90%; }}
+            h2 {{ margin-top: 0; color: #38bdf8; }}
+            .room-badge {{ display: inline-block; background: #334155; padding: 6px 14px; border-radius: 20px; font-size: 14px; margin-bottom: 20px; color: #94a3b8; }}
+            button {{ background: #10b981; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; cursor: pointer; transition: 0.2s; width: 100%; font-weight: bold; }}
+            button:hover {{ background: #059669; }}
+            #status {{ margin-top: 15px; font-size: 14px; color: #cbd5e1; }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <h2>Syncora Audio Call</h2>
+            <div class="room-badge">Room: {room_title}</div>
+            <p>Connect with your friend with real-time translation.</p>
+            <button id="joinBtn" onclick="startCall()">Join Audio Call</button>
+            <div id="status">Ready to connect...</div>
+            <audio id="remoteAudio" autoplay playsinline></audio>
+        </div>
+        <script>
+            const room = "{room or 'default'}";
+            let localStream, peerConn, ws;
+            const statusEl = document.getElementById('status');
+            const joinBtn = document.getElementById('joinBtn');
+
+            function startCall() {{
+                joinBtn.disabled = true;
+                statusEl.innerText = "Requesting microphone...";
+                navigator.mediaDevices.getUserMedia({{ audio: true }})
+                    .then(stream => {{
+                        localStream = stream;
+                        connectWebSocket();
+                    }})
+                    .catch(err => {{
+                        statusEl.innerText = "Microphone error: " + err.message;
+                        joinBtn.disabled = false;
+                    }});
+            }}
+
+            function connectWebSocket() {{
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                ws = new WebSocket(`${{protocol}}//${{window.location.host}}/ws/room_${{room}}`);
+
+                ws.onopen = () => {{
+                    statusEl.innerText = "Connected to room! Waiting for peer...";
+                    setupPeerConnection();
+                    ws.send(JSON.stringify({{ action: "join_room", room: room }}));
+                }};
+
+                ws.onmessage = async (e) => {{
+                    const msg = JSON.parse(e.data);
+                    if (msg.action === "call_offer") {{
+                        await peerConn.setRemoteDescription(new RTCSessionDescription(msg.offer));
+                        const answer = await peerConn.createAnswer();
+                        await peerConn.setLocalDescription(answer);
+                        ws.send(JSON.stringify({{ action: "call_answer", answer: answer, room: room }}));
+                        statusEl.innerText = "In call (Connected)!";
+                    }} else if (msg.action === "call_answer") {{
+                        await peerConn.setRemoteDescription(new RTCSessionDescription(msg.answer));
+                        statusEl.innerText = "In call (Connected)!";
+                    }} else if (msg.action === "ice_candidate" && msg.candidate) {{
+                        try {{ await peerConn.addIceCandidate(new RTCIceCandidate(msg.candidate)); }} catch(e) {{}}
+                    }}
+                }};
+            }}
+
+            function setupPeerConnection() {{
+                const config = {{ iceServers: [{{ urls: "stun:stun.l.google.com:19302" }}] }};
+                peerConn = new RTCPeerConnection(config);
+
+                localStream.getTracks().forEach(track => peerConn.addTrack(track, localStream));
+
+                peerConn.ontrack = (event) => {{
+                    document.getElementById('remoteAudio').srcObject = event.streams[0];
+                }};
+
+                peerConn.onicecandidate = (event) => {{
+                    if (event.candidate) {{
+                        ws.send(JSON.stringify({{ action: "ice_candidate", candidate: event.candidate, room: room }}));
+                    }}
+                }};
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
 
 def get_chat_id(u1: str, u2: str) -> str:
     cleaned = sorted([u1.strip(), u2.strip()])
@@ -126,7 +240,6 @@ class VoiceTranslateReq(BaseModel):
     audio_url: str
     target_lang: str = "en"
 
-# Roman Urdu Dictionary
 ROMAN_URDU_QUICK_MAP = {
     "kaisy hain": "How are you?",
     "kaise hain": "How are you?",
@@ -252,24 +365,39 @@ Return JSON: {{\"transcript\": \"...\", \"translated_text\": \"...\"}}"""
 class SocketManager:
     def __init__(self):
         self.connections: Dict[str, WebSocket] = {}
+        self.rooms: Dict[str, Set[str]] = {}
 
-    async def connect(self, phone: str, ws: WebSocket):
+    async def connect(self, client_id: str, ws: WebSocket):
         await ws.accept()
-        self.connections[phone] = ws
+        self.connections[client_id] = ws
 
-    def disconnect(self, phone: str):
-        if phone in self.connections:
-            del self.connections[phone]
+    def join_room(self, room: str, client_id: str):
+        if room not in self.rooms:
+            self.rooms[room] = set()
+        self.rooms[room].add(client_id)
 
-    def is_online(self, phone: str) -> bool:
-        return phone in self.connections
+    def disconnect(self, client_id: str):
+        if client_id in self.connections:
+            del self.connections[client_id]
+        for room, members in list(self.rooms.items()):
+            if client_id in members:
+                members.remove(client_id)
 
-    async def send_to(self, phone: str, message: dict):
-        if phone in self.connections:
+    def is_online(self, client_id: str) -> bool:
+        return client_id in self.connections
+
+    async def send_to(self, client_id: str, message: dict):
+        if client_id in self.connections:
             try:
-                await self.connections[phone].send_json(message)
+                await self.connections[client_id].send_json(message)
             except Exception:
-                self.disconnect(phone)
+                self.disconnect(client_id)
+
+    async def broadcast_room(self, room: str, sender_id: str, message: dict):
+        if room in self.rooms:
+            for member in list(self.rooms[room]):
+                if member != sender_id:
+                    await self.send_to(member, message)
 
 ws_mgr = SocketManager()
 
@@ -391,8 +519,8 @@ async def get_messages(chat_id: str):
             "chat_id": r,
             "sender": r,
             "receiver": r,
-            "msg_type": r[4],
-            "content": r[5],
+            "msg_type": r,
+            "content": r,
             "translated_content": r[6],
             "lang": r[7],
             "status": r[8],
@@ -400,20 +528,34 @@ async def get_messages(chat_id: str):
         })
     return {"messages": msgs}
 
-@app.websocket("/ws/{phone}")
-async def websocket_endpoint(websocket: WebSocket, phone: str):
-    phone = phone.strip()
-    await ws_mgr.connect(phone, websocket)
+@app.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    client_id = client_id.strip()
+    await ws_mgr.connect(client_id, websocket)
     try:
         while True:
             data = await websocket.receive_text()
             msg = json.loads(data)
             action = msg.get("action")
+            room = msg.get("room")
             receiver = msg.get("receiver", "").strip()
 
-            # Handle Chat Messages
-            if action == "chat_message":
-                chat_id = get_chat_id(phone, receiver)
+            # Room-based WebRTC Calling (Joining room & signaling)
+            if action == "join_room" and room:
+                ws_mgr.join_room(room, client_id)
+                # Broadcast that a user joined
+                await ws_mgr.broadcast_room(room, client_id, {"action": "user_joined", "sender": client_id})
+
+            elif action in ["call_offer", "call_answer", "ice_candidate", "call_reject", "call_end"]:
+                msg["sender"] = client_id
+                if room:
+                    await ws_mgr.broadcast_room(room, client_id, msg)
+                elif receiver:
+                    await ws_mgr.send_to(receiver, msg)
+
+            # Chat Messages
+            elif action == "chat_message":
+                chat_id = get_chat_id(client_id, receiver)
                 content = msg.get("content", "")
                 msg_type = msg.get("msg_type", "text")
                 target_lang = msg.get("target_lang", "en")
@@ -432,7 +574,7 @@ async def websocket_endpoint(websocket: WebSocket, phone: str):
                 cursor.execute("""
                     INSERT INTO messages (chat_id, sender, receiver, msg_type, content, translated_content, lang)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (chat_id, phone, receiver, msg_type, content, translated, target_lang))
+                """, (chat_id, client_id, receiver, msg_type, content, translated, target_lang))
                 msg_id = cursor.lastrowid
                 conn.commit()
                 conn.close()
@@ -441,7 +583,7 @@ async def websocket_endpoint(websocket: WebSocket, phone: str):
                     "action": "new_message",
                     "id": msg_id,
                     "chat_id": chat_id,
-                    "sender": phone,
+                    "sender": client_id,
                     "receiver": receiver,
                     "msg_type": msg_type,
                     "content": content,
@@ -451,14 +593,9 @@ async def websocket_endpoint(websocket: WebSocket, phone: str):
                 }
 
                 await ws_mgr.send_to(receiver, payload)
-                await ws_mgr.send_to(phone, payload)
-
-            # WebRTC Call Signaling (Audio / Video Calls)
-            elif action in ["call_offer", "call_answer", "ice_candidate", "call_reject", "call_end"]:
-                msg["sender"] = phone
-                await ws_mgr.send_to(receiver, msg)
+                await ws_mgr.send_to(client_id, payload)
 
     except WebSocketDisconnect:
-        ws_mgr.disconnect(phone)
-    except Exception as e:
-        ws_mgr.disconnect(phone)
+        ws_mgr.disconnect(client_id)
+    except Exception:
+        ws_mgr.disconnect(client_id)
