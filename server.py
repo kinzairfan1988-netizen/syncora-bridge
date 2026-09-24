@@ -107,113 +107,14 @@ if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/")
-async def root_call_page(room: Optional[str] = None):
-    # Check for index.html in project directories
-    candidates = [
-        os.path.join(BASE_DIR, "index.html"),
-        os.path.join(STATIC_DIR, "index.html"),
-        os.path.join(BASE_DIR, "templates", "index.html")
-    ]
-    for path in candidates:
-        if os.path.exists(path):
-            return FileResponse(path)
-
-    # Built-in Fallback WebRTC Audio Calling Interface
-    room_title = room if room else "General"
-    html_content = f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Syncora Audio Call - Room {room_title}</title>
-        <style>
-            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
-            .card {{ background: #1e293b; padding: 30px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; max-width: 400px; width: 90%; }}
-            h2 {{ margin-top: 0; color: #38bdf8; }}
-            .room-badge {{ display: inline-block; background: #334155; padding: 6px 14px; border-radius: 20px; font-size: 14px; margin-bottom: 20px; color: #94a3b8; }}
-            button {{ background: #10b981; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; cursor: pointer; transition: 0.2s; width: 100%; font-weight: bold; }}
-            button:hover {{ background: #059669; }}
-            #status {{ margin-top: 15px; font-size: 14px; color: #cbd5e1; }}
-        </style>
-    </head>
-    <body>
-        <div class="card">
-            <h2>Syncora Audio Call</h2>
-            <div class="room-badge">Room: {room_title}</div>
-            <p>Connect with your friend with real-time translation.</p>
-            <button id="joinBtn" onclick="startCall()">Join Audio Call</button>
-            <div id="status">Ready to connect...</div>
-            <audio id="remoteAudio" autoplay playsinline></audio>
-        </div>
-        <script>
-            const room = "{room or 'default'}";
-            let localStream, peerConn, ws;
-            const statusEl = document.getElementById('status');
-            const joinBtn = document.getElementById('joinBtn');
-
-            function startCall() {{
-                joinBtn.disabled = true;
-                statusEl.innerText = "Requesting microphone...";
-                navigator.mediaDevices.getUserMedia({{ audio: true }})
-                    .then(stream => {{
-                        localStream = stream;
-                        connectWebSocket();
-                    }})
-                    .catch(err => {{
-                        statusEl.innerText = "Microphone error: " + err.message;
-                        joinBtn.disabled = false;
-                    }});
-            }}
-
-            function connectWebSocket() {{
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                ws = new WebSocket(`${{protocol}}//${{window.location.host}}/ws/room_${{room}}`);
-
-                ws.onopen = () => {{
-                    statusEl.innerText = "Connected to room! Waiting for peer...";
-                    setupPeerConnection();
-                    ws.send(JSON.stringify({{ action: "join_room", room: room }}));
-                }};
-
-                ws.onmessage = async (e) => {{
-                    const msg = JSON.parse(e.data);
-                    if (msg.action === "call_offer") {{
-                        await peerConn.setRemoteDescription(new RTCSessionDescription(msg.offer));
-                        const answer = await peerConn.createAnswer();
-                        await peerConn.setLocalDescription(answer);
-                        ws.send(JSON.stringify({{ action: "call_answer", answer: answer, room: room }}));
-                        statusEl.innerText = "In call (Connected)!";
-                    }} else if (msg.action === "call_answer") {{
-                        await peerConn.setRemoteDescription(new RTCSessionDescription(msg.answer));
-                        statusEl.innerText = "In call (Connected)!";
-                    }} else if (msg.action === "ice_candidate" && msg.candidate) {{
-                        try {{ await peerConn.addIceCandidate(new RTCIceCandidate(msg.candidate)); }} catch(e) {{}}
-                    }}
-                }};
-            }}
-
-            function setupPeerConnection() {{
-                const config = {{ iceServers: [{{ urls: "stun:stun.l.google.com:19302" }}] }};
-                peerConn = new RTCPeerConnection(config);
-
-                localStream.getTracks().forEach(track => peerConn.addTrack(track, localStream));
-
-                peerConn.ontrack = (event) => {{
-                    document.getElementById('remoteAudio').srcObject = event.streams[0];
-                }};
-
-                peerConn.onicecandidate = (event) => {{
-                    if (event.candidate) {{
-                        ws.send(JSON.stringify({{ action: "ice_candidate", candidate: event.candidate, room: room }}));
-                    }}
-                }};
-            }}
-        </script>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content)
+async def serve_index(room: Optional[str] = None):
+    index_file = os.path.join(BASE_DIR, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    static_index = os.path.join(STATIC_DIR, "index.html")
+    if os.path.exists(static_index):
+        return FileResponse(static_index)
+    return HTMLResponse("<h2>index.html file nahi mili. Barah-e-karam index.html file banayein.</h2>")
 
 def get_chat_id(u1: str, u2: str) -> str:
     cleaned = sorted([u1.strip(), u2.strip()])
@@ -521,7 +422,7 @@ async def get_messages(chat_id: str):
             "receiver": r,
             "msg_type": r,
             "content": r,
-            "translated_content": r[6],
+            "translated_content": r,
             "lang": r[7],
             "status": r[8],
             "created_at": r[9]
@@ -540,10 +441,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             room = msg.get("room")
             receiver = msg.get("receiver", "").strip()
 
-            # Room-based WebRTC Calling (Joining room & signaling)
             if action == "join_room" and room:
                 ws_mgr.join_room(room, client_id)
-                # Broadcast that a user joined
                 await ws_mgr.broadcast_room(room, client_id, {"action": "user_joined", "sender": client_id})
 
             elif action in ["call_offer", "call_answer", "ice_candidate", "call_reject", "call_end"]:
@@ -553,7 +452,6 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 elif receiver:
                     await ws_mgr.send_to(receiver, msg)
 
-            # Chat Messages
             elif action == "chat_message":
                 chat_id = get_chat_id(client_id, receiver)
                 content = msg.get("content", "")
