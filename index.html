@@ -622,28 +622,36 @@
             } catch(e){}
         }
 
+        // INSTANT LOGIN: Screen kabhi block nahi hogi
         async function executeDirectLogin() {
             unlockMobileAudio();
             const input = document.getElementById("my-phone-input").value.trim();
-            if (!input || input.length < 7) { alert("Please valid mobile number enter karein."); return; }
+            if (!input || input.length < 7) { 
+                alert("Please valid mobile number enter karein."); 
+                return; 
+            }
 
-            try {
-                const res = await fetch("/api/auth/login", {
-                    method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ phone: input })
-                });
-                if (res.ok) {
-                    myPhone = input;
-                    localStorage.setItem("syncora_user_phone", myPhone);
-                    document.getElementById("auth-overlay").style.display = "none";
-                    document.getElementById("my-status-label").innerText = `● ${myPhone}`;
-                    initSocketSafe();
-                    loadUserProfileData();
-                    if (directChatParam && directChatParam !== myPhone) await registerPermanentContact(directChatParam);
-                    await loadRecentChats();
-                    if (allChatsCache.length > 0) selectChat(allChatsCache[0]);
-                }
-            } catch(err) { alert("Network error: " + err.message); }
+            myPhone = input;
+            localStorage.setItem("syncora_user_phone", myPhone);
+            
+            // Screen foran close karein
+            document.getElementById("auth-overlay").style.display = "none";
+            document.getElementById("my-status-label").innerText = `● ${myPhone}`;
+            
+            fetch("/api/auth/login", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: input })
+            }).catch(() => {});
+
+            initSocketSafe();
+            loadUserProfileData();
+            if (directChatParam && directChatParam !== myPhone) {
+                await registerPermanentContact(directChatParam);
+            }
+            await loadRecentChats();
+            if (allChatsCache.length > 0) {
+                selectChat(allChatsCache[0]);
+            }
         }
 
         function openContactsModal() { document.getElementById("contacts-modal").style.display = "flex"; }
@@ -1135,4 +1143,198 @@
                         };
                         
                         document.getElementById("voice-hint-field").value = finalRecordedText;
-                        document.getElementById("send-modal-preview").innerText = finalRecorded
+                        document.getElementById("send-modal-preview").innerText = finalRecordedText ? `"${finalRecordedText}"` : "Voice Note Audio Recorded";
+                        document.getElementById("send-modal").style.display = "flex";
+                    } catch(err) {
+                        alert("Upload error: " + err.message);
+                        resetRecordingUI();
+                    }
+                };
+
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (SR) {
+                    try {
+                        voiceSpeechRec = new SR();
+                        voiceSpeechRec.continuous = true;
+                        voiceSpeechRec.interimResults = true;
+                        voiceSpeechRec.lang = 'ur-PK';
+                        voiceSpeechRec.onresult = (e) => {
+                            let textSoFar = "";
+                            for (let i = 0; i < e.results.length; ++i) {
+                                textSoFar += e.results[i][0].transcript + " ";
+                            }
+                            currentRecordedTranscript = textSoFar.trim();
+                            const liveWords = document.getElementById("rec-live-words");
+                            if (liveWords && currentRecordedTranscript) {
+                                liveWords.innerText = currentRecordedTranscript;
+                            }
+                        };
+                        voiceSpeechRec.start();
+                    } catch(err) {
+                        console.log("SpeechRec error:", err);
+                    }
+                }
+
+                mediaRecorder.start();
+                isRecording = true;
+                document.getElementById("input-shell").style.display = "none";
+                document.getElementById("recording-bar").style.display = "flex";
+            } catch (err) { alert("Mic error: " + err.message); }
+        }
+
+        function stopAndFinishRecording() {
+            if (voiceSpeechRec) { try { voiceSpeechRec.stop(); } catch(e){} voiceSpeechRec = null; }
+            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+            if (activeAudioStream) { activeAudioStream.getTracks().forEach(t => t.stop()); activeAudioStream = null; }
+            resetRecordingUI();
+        }
+
+        function cancelRecording() {
+            if (voiceSpeechRec) { try { voiceSpeechRec.stop(); } catch(e){} voiceSpeechRec = null; }
+            currentRecordedTranscript = "";
+            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+            if (activeAudioStream) { activeAudioStream.getTracks().forEach(t => t.stop()); activeAudioStream = null; }
+            resetRecordingUI();
+        }
+
+        function resetRecordingUI() {
+            isRecording = false;
+            document.getElementById("recording-bar").style.display = "none";
+            document.getElementById("input-shell").style.display = "flex";
+            document.getElementById("rec-live-words").innerText = "Listening...";
+        }
+
+        function stageMessageForDispatch() {
+            const text = document.getElementById("text-input").value.trim();
+            if (!text || !activePartner) return;
+            pendingPayload = { type: "text", content: text, speechText: "" };
+            document.getElementById("voice-hint-field").value = text;
+            document.getElementById("send-modal-preview").innerText = `"${text.substring(0, 30)}"`;
+            document.getElementById("send-modal").style.display = "flex";
+        }
+
+        function cancelDispatch() { pendingPayload = null; document.getElementById("send-modal").style.display = "none"; }
+
+        function confirmDispatchOriginal() {
+            if (!pendingPayload) return;
+            const payloadCopy = { ...pendingPayload };
+            const speechText = document.getElementById("voice-hint-field").value.trim() || payloadCopy.speechText || "";
+            cancelDispatch();
+            
+            let finalContent = payloadCopy.content;
+            if (payloadCopy.type === "text") {
+                finalContent = speechText || payloadCopy.content;
+            }
+            executeDispatch(finalContent, "", payloadCopy.type, "en", speechText);
+        }
+
+        async function confirmDispatchTranslation() {
+            if (!pendingPayload) return;
+            const targetLang = document.getElementById("modal-target-lang").value || "en";
+            const payloadCopy = { ...pendingPayload };
+            const speechText = document.getElementById("voice-hint-field").value.trim() || payloadCopy.speechText || "";
+            
+            cancelDispatch();
+
+            let textToTranslate = speechText;
+            if (!textToTranslate && payloadCopy.type === "text") {
+                textToTranslate = payloadCopy.content;
+            }
+
+            let translatedText = "";
+            if (textToTranslate) {
+                try {
+                    const res = await fetch("/translate", {
+                        method: "POST", 
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        translatedText = data.translated_text || "";
+                    }
+                } catch (e) {
+                    console.error("Translate error:", e);
+                }
+            }
+
+            executeDispatch(payloadCopy.content, translatedText, payloadCopy.type, targetLang, speechText);
+        }
+
+        function executeDispatch(content, translated, msgType, lang = "en", speechText = "") {
+            if (!activePartner) return;
+            const tempId = "msg_temp_" + Date.now();
+            appendBubble(content, "sent", translated, msgType, "now", tempId, "sent", lang, speechText);
+            document.getElementById("text-input").value = "";
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ 
+                    action: "chat_message", 
+                    receiver: activePartner, 
+                    msg_type: msgType, 
+                    content: content, 
+                    speech_text: speechText,
+                    translated: translated, 
+                    lang: lang 
+                }));
+            }
+            loadRecentChats();
+        }
+
+        function appendBubble(content, dir, translated, type, time, msgId = null, status = "sent", lang = "en", speechText = "") {
+            const box = document.getElementById("messages-container");
+            const bubble = document.createElement("div");
+            bubble.className = `bubble ${dir}`;
+            if (msgId) bubble.id = `bubble_${msgId}`;
+
+            let body = "";
+            
+            if (type === "voice") {
+                const safeEscaped = (translated || "").replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                body = `
+                    <div style="margin-bottom: 6px;">
+                        <audio controls src="${content}" style="width: 100%; max-width: 250px; height: 38px; outline: none;"></audio>
+                    </div>
+                `;
+                if (speechText && speechText.trim()) {
+                    body += `<div style="font-size: 11px; opacity: 0.85; margin-bottom: 4px;">🎙️ "${speechText}"</div>`;
+                }
+                if (translated && translated.trim() !== "") {
+                    body += `
+                        <div class="bubble-translation">
+                            <span>🌐 AI Translation: ${translated}</span>
+                            <button class="btn-tts-listen" onclick="playSpokenVoice('${safeEscaped}', '${lang}')" title="Listen Translation">🔊 Listen</button>
+                        </div>
+                    `;
+                }
+            } else {
+                body = `<div>${content}</div>`;
+                if (translated && translated.trim() !== "") {
+                    body += `<div class="bubble-translation"><span>AI Translation: ${translated}</span></div>`;
+                }
+            }
+
+            bubble.innerHTML = body;
+            box.appendChild(bubble);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function uploadAttachment(e, type) {
+            document.getElementById("attach-menu").style.display = "none";
+            const file = e.target.files[0];
+            if (!file || !activePartner) return;
+            const form = new FormData(); form.append("file", file);
+            const res = await fetch("/api/upload", { method: "POST", body: form });
+            const data = await res.json();
+            executeDispatch(data.url, "", type);
+        }
+
+        function shareLocation() {
+            document.getElementById("attach-menu").style.display = "none";
+            if (!navigator.geolocation || !activePartner) return;
+            navigator.geolocation.getCurrentPosition(pos => {
+                executeDispatch(`https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`, "", "location");
+            });
+        }
+    </script>
+</body>
+</html>
