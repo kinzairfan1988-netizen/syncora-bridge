@@ -1271,7 +1271,8 @@
                     if (btnEl) {
                         btnEl.onclick = () => {
                             unlockMobileAudio();
-                            if (translated && translated.trim() !== "") {
+                            // Yahan check karein ke agar translated text mojood hai, toh strictly wahi bola jaye
+                            if (translated && translated.trim() !== "" && translated !== content) {
                                 playSpokenVoice(translated, lang);
                             } else {
                                 const audio = new Audio(audioFileUrl);
@@ -1280,7 +1281,6 @@
                         };
                     }
                 }, 50);
-            }
 
             if (translated && translated.trim() !== "" && type !== "voice") {
                 body += `<div class="bubble-translation">Translation: ${translated}</div>`;
