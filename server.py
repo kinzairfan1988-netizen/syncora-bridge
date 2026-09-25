@@ -49,15 +49,12 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
         return ""
     
     target_lang = target_lang.strip().lower()
-    
-    # Mapping app language codes to standard ISO codes for translation
-    lang_map = {"ur": "ur", "en": "en", "ar": "ar", "de": "de", "fr": "fr", "es": "es"}
-    t_lang = lang_map.get(target_lang, "en")
+    t_lang = target_lang if target_lang in ["ur", "en", "ar", "de", "fr", "es"] else "en"
+    src_lang = "ur" if t_lang == "en" else "en"
     
     try:
-        # Using MyMemory Free Translation API (No Key Required, 100% Stable)
         encoded_text = urllib.parse.quote(clean)
-        url = f"https://api.mymemory.translated.net/get?q={encoded_text}&langpair=auto|{t_lang}"
+        url = f"https://api.mymemory.translated.net/get?q={encoded_text}&langpair={src_lang}|{t_lang}"
         
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=10) as response:
@@ -67,7 +64,7 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
             matches = res_data.get("responseData", {})
             translated_text = matches.get("translatedText", "").strip()
             
-            if translated_text and "MYMEMORY WARNING" not in translated_text:
+            if translated_text and "MYMEMORY WARNING" not in translated_text and "INVALID" not in translated_text.upper():
                 return translated_text
     except Exception as e:
         print(f"[Translation Engine Error]: {e}")
