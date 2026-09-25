@@ -18,9 +18,8 @@ def translate_text_engine(text: str, target_lang: str) -> str:
         return ""
     
     target_lang = target_lang.strip().lower()
-    print(f"[DEBUG] Received target_lang from frontend: '{target_lang}'")
     
-    # Secure language mapping for all supported options
+    # Secure language mapping for all supported options including Chinese
     lang_mapping = {
         "en": "en",
         "ur": "ur",
@@ -34,7 +33,6 @@ def translate_text_engine(text: str, target_lang: str) -> str:
     }
     
     t_lang = lang_mapping.get(target_lang, "en")
-    print(f"[DEBUG] Mapped target language for Google GTX: '{t_lang}'")
     
     try:
         encoded_text = urllib.parse.quote(clean)
@@ -56,7 +54,12 @@ def translate_text_engine(text: str, target_lang: str) -> str:
 @app.post("/translate")
 async def translate_endpoint(req: TranslationRequest):
     try:
+        # Printing exact values to check in logs
+        print(f"--> Incoming Request Text: '{req.text}' | Target Lang: '{req.target_lang}'")
+        
         translated = translate_text_engine(req.text, req.target_lang)
+        
+        print(f"--> Translated Result: '{translated}'")
         return {"status": "success", "original": req.text, "target_lang": req.target_lang, "translated_text": translated}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
