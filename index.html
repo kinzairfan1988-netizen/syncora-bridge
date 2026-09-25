@@ -336,6 +336,7 @@
                 <option value="en" selected>English (US)</option>
                 <option value="ur">Urdu (اردو)</option>
                 <option value="ar">Arabic (العربية)</option>
+                <option value="zh">Chinese (中文)</option>
                 <option value="de">German (Deutsch)</option>
                 <option value="fr">French (Français)</option>
                 <option value="es">Spanish (Español)</option>
@@ -1153,7 +1154,7 @@
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
                     
-                    const finalCaptured = voiceTranscriptText.trim() || "kaisa hai";
+                    const finalCaptured = voiceTranscriptText.trim() || "audio note";
                     pendingPayload = { type: "voice", content: data.url };
                     document.getElementById("voice-hint-field").value = finalCaptured;
                     document.getElementById("send-modal-preview").innerText = "Voice Note Captured Successfully";
@@ -1221,7 +1222,13 @@
                 translatedText = data.translated_text || textToTranslate;
             } catch (e) {}
 
-            executeDispatch(pendingPayload.content, translatedText, pendingPayload.type, targetLang);
+            // Agar voice note hai, toh backend par translated audio URL ya path bhej sakte hain, yahan hum original audio URL hi bhej rahe hain taake sirf voice message jaye
+            let dispatchContent = pendingPayload.content;
+            if (pendingPayload.type === "voice") {
+                dispatchContent = pendingPayload.content;
+            }
+
+            executeDispatch(dispatchContent, translatedText, pendingPayload.type, targetLang);
             cancelDispatch();
         }
 
@@ -1267,11 +1274,11 @@
                 }, 50);
             }
 
+            // Voice messages ke liye text/transcript translation bubble ko bilkul off rakha gaya hai
             if (translated && translated.trim() !== "" && type !== "voice") {
                 body += `<div class="bubble-translation">Translation: ${translated}</div>`;
-            } else if (translated && translated.trim() !== "" && type === "voice") {
-                body += `<div class="bubble-translation">Transcript: ${translated}</div>`;
             }
+            
             bubble.innerHTML = body + `<div style="font-size:9px; opacity:0.6; text-align:right; margin-top:2px;">${time}</div>`;
             box.appendChild(bubble);
             box.scrollTop = box.scrollHeight;
