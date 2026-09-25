@@ -51,25 +51,27 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
     target_lang = target_lang.strip().lower()
     t_lang = target_lang if target_lang in ["ur", "en", "ar", "de", "fr", "es"] else "en"
     
-    # Ensure source and target languages are distinct
-    src_lang = "ur" if t_lang == "en" else "en"
-    if src_lang == t_lang:
-        src_lang = "fr" if t_lang != "fr" else "en"
-    
     try:
-        encoded_text = urllib.parse.quote(clean)
-        url = f"https://api.mymemory.translated.net/get?q={encoded_text}&langpair={src_lang}|{t_lang}"
+        payload = json.dumps({
+            "q": clean,
+            "source": "auto",
+            "target": t_lang,
+            "format": "text"
+        }).encode('utf-8')
         
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        req = urllib.request.Request(
+            "https://translate.argosopentech.com/translate",
+            data=payload,
+            headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
+            method="POST"
+        )
+        
         with urllib.request.urlopen(req, timeout=10) as response:
             res_body = response.read().decode('utf-8')
             res_data = json.loads(res_body)
-            
-            matches = res_data.get("responseData", {})
-            translated_text = matches.get("translatedText", "").strip()
-            
-            if translated_text and "WARNING" not in translated_text.upper() and "INVALID" not in translated_text.upper() and "PLEASE SELECT" not in translated_text.upper():
-                return translated_text
+            translated = res_data.get("translatedText", "").strip()
+            if translated:
+                return translated
     except Exception as e:
         print(f"[Translation Engine Error]: {e}")
         
