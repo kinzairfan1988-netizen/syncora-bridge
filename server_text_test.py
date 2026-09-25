@@ -18,6 +18,7 @@ def translate_text_engine(text: str, target_lang: str) -> str:
         return ""
     
     target_lang = target_lang.strip().lower()
+    print(f"[DEBUG] Received target_lang from frontend: '{target_lang}'")
     
     # Secure language mapping for all supported options
     lang_mapping = {
@@ -33,10 +34,10 @@ def translate_text_engine(text: str, target_lang: str) -> str:
     }
     
     t_lang = lang_mapping.get(target_lang, "en")
+    print(f"[DEBUG] Mapped target language for Google GTX: '{t_lang}'")
     
     try:
         encoded_text = urllib.parse.quote(clean)
-        # Using auto detection with strict target language parameter
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={t_lang}&dt=t&q={encoded_text}"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=6) as response:
@@ -45,11 +46,7 @@ def translate_text_engine(text: str, target_lang: str) -> str:
             if res_data and isinstance(res_data, list) and len(res_data) > 0:
                 translated_sentences = [s[0] for s in res_data[0] if s and s[0]]
                 translated_text = "".join(translated_sentences).strip()
-                
-                # If translation is successful and not just an echo of the input text
-                if translated_text and translated_text.lower() != clean.lower():
-                    return translated_text
-                elif translated_text:
+                if translated_text:
                     return translated_text
     except Exception as e:
         print(f"[Translation Error]: {e}")
