@@ -424,8 +424,8 @@
             <div class="lang-options-drawer" id="lang-drawer">
                 <label style="font-size: 11px; color: var(--text-muted);">Select Target Language:</label>
                 <select class="lang-dropdown" id="modal-target-lang">
-                    <option value="en" selected>English (US)</option>
-                    <option value="ur">Urdu (اردو)</option>
+                    <option value="en">English (US)</option>
+                    <option value="ur" selected>Urdu (اردو)</option>
                     <option value="ar">Arabic (العربية)</option>
                     <option value="de">German (Deutsch)</option>
                     <option value="fr">French (Français)</option>
@@ -556,7 +556,7 @@
 
         let currentCallType = "audio";
         let isTranslationCallMode = false;
-        let currentSelectedTargetLang = "en";
+        let currentSelectedTargetLang = "ur";
         let isMicMuted = false;
         let callSpeechRec = null;
 
@@ -605,11 +605,11 @@
             if (!clean) return;
 
             const utterance = new SpeechSynthesisUtterance(clean);
-            const target = (lang || 'en').toLowerCase();
+            const target = (lang || 'ur').toLowerCase();
             const voices = window.speechSynthesis.getVoices();
             const mv = voices.find(v => v.lang.toLowerCase().startsWith(target));
             if (mv) { utterance.voice = mv; utterance.lang = mv.lang; }
-            else { utterance.lang = target === 'ur' ? 'ur-PK' : 'en-US'; }
+            else { utterance.lang = target === 'en' ? 'en-US' : 'ur-PK'; }
             utterance.rate = 0.95;
             utterance.pitch = 1.0;
             utterance.volume = 1.0;
@@ -768,7 +768,7 @@
                         if (data.action === "new_message") {
                             await registerPermanentContact(data.sender);
                             if (data.sender === activePartner) {
-                                appendBubble(data.content, "received", data.translated, data.msg_type, data.time, data.id, data.status, data.lang || "en");
+                                appendBubble(data.content, "received", data.translated, data.msg_type, data.time, data.id, data.status, data.lang || "ur");
                             }
                             loadRecentChats();
                         } 
@@ -838,7 +838,7 @@
                 const box = document.getElementById("messages-container");
                 box.innerHTML = "";
                 data.messages.forEach(m => {
-                    appendBubble(m.content, m.sender === myPhone ? "sent" : "received", m.translated_content, m.msg_type, m.time, m.id, m.status, m.lang || "en");
+                    appendBubble(m.content, m.sender === myPhone ? "sent" : "received", m.translated_content, m.msg_type, m.time, m.id, m.status, m.lang || "ur");
                 });
                 loadRecentChats();
             } catch(e){}
@@ -867,7 +867,7 @@
 
         function confirmAndStartTranslationCall() {
             const selectEl = document.getElementById("call-target-lang-select");
-            currentSelectedTargetLang = selectEl ? selectEl.value : "en";
+            currentSelectedTargetLang = selectEl ? selectEl.value : "ur";
             document.getElementById("call-setup-modal").style.display = "none";
             startNativeCall('audio', true);
         }
@@ -967,7 +967,7 @@
             if (data.signal_type === "offer") {
                 currentCallType = data.call_type || "audio";
                 isTranslationCallMode = data.translate || false;
-                currentSelectedTargetLang = data.lang || "en";
+                currentSelectedTargetLang = data.lang || "ur";
 
                 document.getElementById("call-partner-name").innerText = sender;
                 document.getElementById("call-avatar-icon").innerText = currentCallType === "video" ? "📹" : (isTranslationCallMode ? "🌐" : "📞");
@@ -1033,7 +1033,7 @@
                 callSpeechRec = new SR();
                 callSpeechRec.continuous = true; 
                 callSpeechRec.interimResults = false; 
-                callSpeechRec.lang = 'en-US';
+                callSpeechRec.lang = 'ur-PK';
 
                 callSpeechRec.onresult = async (event) => {
                     if (!isTranslationCallMode) return;
@@ -1152,7 +1152,7 @@
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
                     
-                    const finalCaptured = voiceTranscriptText.trim() || "Aap kaise hain?";
+                    const finalCaptured = voiceTranscriptText.trim() || "kaisy hain";
                     pendingPayload = { type: "voice", content: data.url };
                     document.getElementById("voice-hint-field").value = finalCaptured;
                     document.getElementById("send-modal-preview").innerText = "Voice Note Captured Successfully";
@@ -1207,7 +1207,7 @@
 
         async function confirmDispatchTranslation() {
             if (!pendingPayload) return;
-            const targetLang = document.getElementById("modal-target-lang").value || "en";
+            const targetLang = document.getElementById("modal-target-lang").value || "ur";
             let textToTranslate = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
 
             let translatedText = textToTranslate;
@@ -1224,7 +1224,7 @@
             cancelDispatch();
         }
 
-        function executeDispatch(content, translated, msgType, lang = "en") {
+        function executeDispatch(content, translated, msgType, lang = "ur") {
             if (!activePartner) return;
             const tempId = "msg_temp_" + Date.now();
             appendBubble(content, "sent", translated, msgType, "now", tempId, "sent", lang);
@@ -1235,7 +1235,7 @@
             loadRecentChats();
         }
 
-        function appendBubble(content, dir, translated, type, time, msgId = null, status = "sent", lang = "en") {
+        function appendBubble(content, dir, translated, type, time, msgId = null, status = "sent", lang = "ur") {
             const box = document.getElementById("messages-container");
             const bubble = document.createElement("div");
             bubble.className = `bubble ${dir}`;
@@ -1243,29 +1243,34 @@
 
             let body = `<div>${content}</div>`;
             if (type === "voice") {
-                const safeTrans = (translated || "").replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 const uniqueBtnId = "voice_btn_" + Math.random().toString(36).substring(2, 9);
                 body = `
                     <div class="voice-card-private">
                         <button id="${uniqueBtnId}" class="btn-play-voice-circle" title="Play Voice Note">▶</button>
                         <div class="voice-info-wrap">
-                            <span class="voice-title-label">🎙️ AI Voice Note (${lang.toUpperCase()})</span>
+                            <span class="voice-title-label">🎙️ Voice Note (${lang.toUpperCase()})</span>
                             <span class="voice-sub-label">Click ▶ to listen</span>
                         </div>
                     </div>
                 `;
                 setTimeout(() => {
                     const btnEl = document.getElementById(uniqueBtnId);
-                    if (btnEl) btnEl.onclick = () => playSpokenVoice(safeTrans, lang);
+                    if (btnEl) {
+                        btnEl.onclick = () => {
+                            unlockMobileAudio();
+                            const audio = new Audio(content);
+                            audio.play().catch(err => alert("Audio play error: " + err.message));
+                        };
+                    }
                 }, 50);
             }
             if (translated && translated.trim() !== "" && type !== "voice") {
-                body += `<div class="bubble-translation">AI Translation: ${translated}</div>`;
+                body += `<div class="bubble-translation">Translation: ${translated}</div>`;
             } else if (translated && translated.trim() !== "" && type === "voice") {
                 body += `<div class="bubble-translation">Transcript/Translation: ${translated}</div>`;
             }
-            bubble.innerHTML = body + `<div class="call-modal-overlay"><span>${time}</span></div>`;
-            box.appendChild(box.appendChild(bubble));
+            bubble.innerHTML = body + `<div style="font-size:9px; opacity:0.6; text-align:right; margin-top:2px;">${time}</div>`;
+            box.appendChild(bubble);
             box.scrollTop = box.scrollHeight;
         }
 
