@@ -1222,13 +1222,7 @@
                 translatedText = data.translated_text || textToTranslate;
             } catch (e) {}
 
-            // Agar voice note hai, toh backend par translated audio URL ya path bhej sakte hain, yahan hum original audio URL hi bhej rahe hain taake sirf voice message jaye
-            let dispatchContent = pendingPayload.content;
-            if (pendingPayload.type === "voice") {
-                dispatchContent = pendingPayload.content;
-            }
-
-            executeDispatch(dispatchContent, translatedText, pendingPayload.type, targetLang);
+            executeDispatch(pendingPayload.content, translatedText, pendingPayload.type, targetLang);
             cancelDispatch();
         }
 
@@ -1258,7 +1252,7 @@
                         <button id="${uniqueBtnId}" class="btn-play-voice-circle" title="Play Voice Note">▶</button>
                         <div class="voice-info-wrap">
                             <span class="voice-title-label">🎙️ Voice Note (${lang.toUpperCase()})</span>
-                            <span class="voice-sub-label">Click ▶ to listen audio</span>
+                            <span class="voice-sub-label">Click ▶ to listen & speak</span>
                         </div>
                     </div>
                 `;
@@ -1267,14 +1261,17 @@
                     if (btnEl) {
                         btnEl.onclick = () => {
                             unlockMobileAudio();
-                            const audio = new Audio(audioFileUrl);
-                            audio.play().catch(err => alert("Audio play error: " + err.message));
+                            if (translated && translated.trim() !== "") {
+                                playSpokenVoice(translated, lang);
+                            } else {
+                                const audio = new Audio(audioFileUrl);
+                                audio.play().catch(err => alert("Audio play error: " + err.message));
+                            }
                         };
                     }
                 }, 50);
             }
 
-            // Voice messages ke liye text/transcript translation bubble ko bilkul off rakha gaya hai
             if (translated && translated.trim() !== "" && type !== "voice") {
                 body += `<div class="bubble-translation">Translation: ${translated}</div>`;
             }
