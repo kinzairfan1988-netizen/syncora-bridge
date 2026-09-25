@@ -19,13 +19,26 @@ def translate_text_engine(text: str, target_lang: str) -> str:
     
     target_lang = target_lang.strip().lower()
     
-    # Supported languages including Chinese (zh-cn) and German (de)
-    allowed_langs = ["ur", "en", "ar", "de", "fr", "es", "zh-cn", "zh"]
-    t_lang = target_lang if target_lang in allowed_langs else "en"
+    # Fully supported languages including Chinese (zh-cn)
+    lang_mapping = {
+        "en": "en",
+        "ur": "ur",
+        "ar": "ar",
+        "de": "de",
+        "fr": "fr",
+        "es": "es",
+        "zh": "zh-CN",
+        "zh-cn": "zh-CN"
+    }
+    
+    t_lang = lang_mapping.get(target_lang, "en")
+    
+    # Prevent same source-target loop mixup
+    sl_lang = "ur" if t_lang == "en" else "auto"
     
     try:
         encoded_text = urllib.parse.quote(clean)
-        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={t_lang}&dt=t&q={encoded_text}"
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={sl_lang}&tl={t_lang}&dt=t&q={encoded_text}"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=6) as response:
             res_body = response.read().decode('utf-8')
@@ -33,7 +46,7 @@ def translate_text_engine(text: str, target_lang: str) -> str:
             if res_data and isinstance(res_data, list) and len(res_data) > 0:
                 translated_sentences = [s[0] for s in res_data[0] if s and s[0]]
                 translated_text = "".join(translated_sentences).strip()
-                if translated_text:
+                if translated_text and translated_text.lower() != clean.lower():
                     return translated_text
     except Exception as e:
         print(f"[Translation Error]: {e}")
