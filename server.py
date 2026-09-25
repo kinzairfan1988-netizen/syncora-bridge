@@ -50,11 +50,10 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
     
     target_lang = target_lang.strip().lower()
     t_lang = target_lang if target_lang in ["ur", "en", "ar", "de", "fr", "es"] else "en"
-    src_lang = "ur" if t_lang == "en" else "en"
     
     try:
         encoded_text = urllib.parse.quote(clean)
-        url = f"https://api.mymemory.translated.net/get?q={encoded_text}&langpair={src_lang}|{t_lang}"
+        url = f"https://api.mymemory.translated.net/get?q={encoded_text}&langpair=en|{t_lang}"
         
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=10) as response:
