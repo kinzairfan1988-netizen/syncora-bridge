@@ -18,9 +18,11 @@ def translate_text_engine(text: str, target_lang: str) -> str:
         return ""
     
     target_lang = target_lang.strip().lower()
-    t_lang = target_lang if target_lang in ["ur", "en", "ar", "de", "fr", "es"] else "en"
     
-    # Google Translate Direct GTX Endpoint (Fast & Reliable for isolated text)
+    # Supported languages including Chinese (zh-cn) and German (de)
+    allowed_langs = ["ur", "en", "ar", "de", "fr", "es", "zh-cn", "zh"]
+    t_lang = target_lang if target_lang in allowed_langs else "en"
+    
     try:
         encoded_text = urllib.parse.quote(clean)
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={t_lang}&dt=t&q={encoded_text}"
