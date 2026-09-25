@@ -1152,7 +1152,7 @@
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
                     
-                    const finalCaptured = voiceTranscriptText.trim() || "Voice Note Audio Message";
+                    const finalCaptured = voiceTranscriptText.trim() || "kaisa hai";
                     pendingPayload = { type: "voice", content: data.url };
                     document.getElementById("voice-hint-field").value = finalCaptured;
                     document.getElementById("send-modal-preview").innerText = "Voice Note Captured Successfully";
@@ -1243,32 +1243,25 @@
 
             let body = `<div>${content}</div>`;
             if (type === "voice") {
-                const audioFileUrl = content; // Original audio URL preserved correctly
-                const safeTrans = (translated || "").replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const audioFileUrl = content;
                 const uniqueBtnId = "voice_btn_" + Math.random().toString(36).substring(2, 9);
-                const uniqueSpeakBtnId = "speak_btn_" + Math.random().toString(36).substring(2, 9);
-                
                 body = `
                     <div class="voice-card-private">
-                        <button id="${uniqueBtnId}" class="btn-play-voice-circle" title="Play Voice Audio">▶</button>
+                        <button id="${uniqueBtnId}" class="btn-play-voice-circle" title="Play Voice Note">▶</button>
                         <div class="voice-info-wrap">
                             <span class="voice-title-label">🎙️ Voice Note (${lang.toUpperCase()})</span>
-                            <span class="voice-sub-label" id="${uniqueSpeakBtnId}" style="cursor:pointer; color:var(--accent-amber);">🔊 Listen AI Translation</span>
+                            <span class="voice-sub-label">Click ▶ to listen audio</span>
                         </div>
                     </div>
                 `;
                 setTimeout(() => {
-                    const playBtn = document.getElementById(uniqueBtnId);
-                    if (playBtn) {
-                        playBtn.onclick = () => {
+                    const btnEl = document.getElementById(uniqueBtnId);
+                    if (btnEl) {
+                        btnEl.onclick = () => {
                             unlockMobileAudio();
                             const audio = new Audio(audioFileUrl);
-                            audio.play().catch(e => alert("Audio play error: " + e.message));
+                            audio.play().catch(err => alert("Audio play error: " + err.message));
                         };
-                    }
-                    const speakTransBtn = document.getElementById(uniqueSpeakBtnId);
-                    if (speakTransBtn) {
-                        speakTransBtn.onclick = () => playSpokenVoice(translated, lang);
                     }
                 }, 50);
             }
