@@ -5,7 +5,7 @@ def translate_text_engine(text: str, target_lang: str) -> str:
     
     target_lang = target_lang.strip().lower()
     
-    # Updated mapping to ensure Chinese maps correctly to zh-CN for the engine
+    # Accurate mapping for all target languages including Chinese
     lang_mapping = {
         "en": "en",
         "ur": "ur",
@@ -18,8 +18,10 @@ def translate_text_engine(text: str, target_lang: str) -> str:
         "chinese": "zh-CN"
     }
     
-    t_lang = lang_mapping.get(target_lang, "zh-CN" if "zh" in target_lang else "en")
-    sl_lang = "ur" if t_lang == "en" else "auto"
+    t_lang = lang_mapping.get(target_lang, "en")
+    
+    # Use auto-detection safely for all languages
+    sl_lang = "auto"
     
     try:
         encoded_text = urllib.parse.quote(clean)
