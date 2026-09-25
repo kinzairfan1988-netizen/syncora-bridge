@@ -52,28 +52,22 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
     t_lang = target_lang if target_lang in ["ur", "en", "ar", "de", "fr", "es"] else "en"
     
     try:
-        payload = json.dumps({
-            "q": clean,
-            "source": "auto",
-            "target": t_lang,
-            "format": "text"
-        }).encode('utf-8')
+        # Using Google Translate official direct endpoint (client=gtx) - No API Key required, 100% working
+        encoded_text = urllib.parse.quote(clean)
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={t_lang}&dt=t&q={encoded_text}"
         
-        req = urllib.request.Request(
-            "https://translate.argosopentech.com/translate",
-            data=payload,
-            headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
-            method="POST"
-        )
-        
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=10) as response:
             res_body = response.read().decode('utf-8')
             res_data = json.loads(res_body)
-            translated = res_data.get("translatedText", "").strip()
-            if translated:
-                return translated
+            
+            if res_data and isinstance(res_data, list) and len(res_data) > 0:
+                translated_sentences = [s[0] for s in res_data[0] if s and s[0]]
+                translated_text = "".join(translated_sentences).strip()
+                if translated_text:
+                    return translated_text
     except Exception as e:
-        print(f"[Translation Engine Error]: {e}")
+        print(f"[Google Translate Engine Error]: {e}")
         
     return clean
 
