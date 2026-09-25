@@ -17,22 +17,18 @@ def translate_text_engine(text: str, target_lang: str) -> str:
     if not clean:
         return ""
     
-    target_lang = target_lang.strip().lower()
+    target_lang = str(target_lang).strip().lower()
+    print(f"[DEBUG] Target Lang received: '{target_lang}' | Text: '{clean}'")
     
-    # Secure language mapping for all supported options including Chinese
-    lang_mapping = {
-        "en": "en",
-        "ur": "ur",
-        "ar": "ar",
-        "de": "de",
-        "fr": "fr",
-        "es": "es",
-        "zh": "zh-CN",
-        "zh-cn": "zh-CN",
-        "chinese": "zh-CN"
-    }
-    
-    t_lang = lang_mapping.get(target_lang, "en")
+    # Strict mapping for all languages
+    if "zh" in target_lang or "chin" in target_lang:
+        t_lang = "zh-CN"
+    elif target_lang in ["ur", "ar", "de", "fr", "es"]:
+        t_lang = target_lang
+    else:
+        t_lang = "en"
+        
+    print(f"[DEBUG] Final mapped language for Google: '{t_lang}'")
     
     try:
         encoded_text = urllib.parse.quote(clean)
@@ -54,12 +50,7 @@ def translate_text_engine(text: str, target_lang: str) -> str:
 @app.post("/translate")
 async def translate_endpoint(req: TranslationRequest):
     try:
-        # Printing exact values to check in logs
-        print(f"--> Incoming Request Text: '{req.text}' | Target Lang: '{req.target_lang}'")
-        
         translated = translate_text_engine(req.text, req.target_lang)
-        
-        print(f"--> Translated Result: '{translated}'")
         return {"status": "success", "original": req.text, "target_lang": req.target_lang, "translated_text": translated}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
