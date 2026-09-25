@@ -49,7 +49,21 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
         return ""
     
     target_lang = target_lang.strip().lower()
-    t_lang = target_lang if target_lang in ["ur", "en", "ar", "de", "fr", "es"] else "en"
+    
+    # Supported languages including Chinese (zh-CN)
+    lang_mapping = {
+        "en": "en",
+        "ur": "ur",
+        "ar": "ar",
+        "de": "de",
+        "fr": "fr",
+        "es": "es",
+        "zh": "zh-CN",
+        "zh-cn": "zh-CN",
+        "chinese": "zh-CN"
+    }
+    
+    t_lang = lang_mapping.get(target_lang, "en")
     
     try:
         encoded_text = urllib.parse.quote(clean)
