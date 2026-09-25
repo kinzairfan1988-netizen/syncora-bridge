@@ -51,7 +51,6 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
     target_lang = target_lang.strip().lower()
     t_lang = target_lang if target_lang in ["ur", "en", "ar", "de", "fr", "es"] else "en"
     
-    # 1. Try Google Translate Direct Engine first (Robust & Accurate)
     try:
         encoded_text = urllib.parse.quote(clean)
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={t_lang}&dt=t&q={encoded_text}"
@@ -62,34 +61,10 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
             if res_data and isinstance(res_data, list) and len(res_data) > 0:
                 translated_sentences = [s[0] for s in res_data[0] if s and s[0]]
                 translated_text = "".join(translated_sentences).strip()
-                if translated_text and translated_text.lower() != clean.lower():
+                if translated_text:
                     return translated_text
     except Exception as e:
         print(f"[Google Translate Engine Error]: {e}")
-
-    # 2. Fallback to MyMemory Public API if Google blocks
-    try:
-        src_lang = "ur" if t_lang == "en" else "en"
-        if any(ord(c) > 127 for c in clean) and t_lang == "ur":
-            src_lang = "en"
-        elif not any(ord(c) > 127 for c in clean) and t_lang == "en":
-            src_lang = "ur"
-
-        if src_lang == t_lang:
-            src_lang = "en" if t_lang != "en" else "ur"
-
-        encoded_text = urllib.parse.quote(clean)
-        url = f"https://api.mymemory.translated.net/get?q={encoded_text}&langpair={src_lang}|{t_lang}"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=6) as response:
-            res_body = response.read().decode('utf-8')
-            res_data = json.loads(res_body)
-            matches = res_data.get("responseData", {})
-            translated_text = matches.get("translatedText", "").strip()
-            if translated_text and "WARNING" not in translated_text.upper() and "INVALID" not in translated_text.upper() and translated_text.lower() != clean.lower():
-                return translated_text
-    except Exception as e:
-        print(f"[MyMemory Engine Error]: {e}")
         
     return clean
 
@@ -168,6 +143,28 @@ async def translate_text(req: TranslationRequest):
     translated = translate_via_gemini(clean, req.target_lang)
     return {"translated_text": translated}
 
+@app.post("/api/tts")
+async def text_to_speech(req: dict):
+    # Generates translated speech audio file using Google TTS backend
+    text = req.get("text", "").strip()
+    lang = req.get("lang", "en").strip()
+    if not text:
+        return {"url": ""}
+    try:
+        encoded_text = urllib.parse.quote(text)
+        tts_url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={encoded_text}&tl={lang}&client=tw-ob"
+        req_tts = urllib.request.Request(tts_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req_tts, timeout=10) as response:
+            audio_data = response.read()
+            filename = f"tts_{os.urandom(6).hex()}.mp3"
+            filepath = os.path.join(UPLOAD_DIR, filename)
+            with open(filepath, "wb") as f:
+                f.write(audio_data)
+            return {"url": f"/uploads/{filename}"}
+    except Exception as e:
+        print(f"[TTS Error]: {e}")
+    return {"url": ""}
+
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
     try:
@@ -187,8 +184,17 @@ async def get_conversation(phone: str, partner: str):
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT id, sender, receiver, msg_type, content, translated_content, lang, status, created_at FROM messages WHERE chat_id = ? ORDER BY id ASC", (chat_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        messages = []
+        for r in rows:
+            messages.append({
+                "id": r[0], "sender": r[1], "receiver": r[2], "msg_type": r[3],
+                "content": r[4], "translated_content": r[5], "lang": r[6], "status": r[7], "time": str(r[8])[-8:-3]
+            })
+        return {"messages": messages}
     except Exception:
-        pass
+        return {"messages": []}
 
 @app.post("/api/upload")
 async def upload_media(file: UploadFile = File(...)):
