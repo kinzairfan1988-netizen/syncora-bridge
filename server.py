@@ -52,7 +52,6 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
     t_lang = target_lang if target_lang in ["ur", "en", "ar", "de", "fr", "es"] else "en"
     
     try:
-        # Using Google Translate official direct endpoint (client=gtx) - No API Key required, 100% working
         encoded_text = urllib.parse.quote(clean)
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={t_lang}&dt=t&q={encoded_text}"
         
@@ -67,7 +66,7 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
                 if translated_text:
                     return translated_text
     except Exception as e:
-        print(f"[Google Translate Engine Error]: {e}")
+        print(f"[Translation Engine Error]: {e}")
         
     return clean
 
