@@ -611,11 +611,13 @@
             const voices = window.speechSynthesis.getVoices();
             const mv = voices.find(v => v.lang.toLowerCase().startsWith(target));
             if (mv) { utterance.voice = mv; utterance.lang = mv.lang; }
-            else { utterance.lang = target === 'ur' ? 'ur-PK' : 'en-US'; }
+            else { utterance.lang = target === 'ur' ? 'ur-PK' : (target === 'zh' ? 'zh-CN' : 'en-US'); }
+            
             utterance.rate = 0.95;
             utterance.pitch = 1.0;
             utterance.volume = 1.0;
-            setTimeout(() => { window.speechSynthesis.speak(utterance); }, 100);
+
+            window.speechSynthesis.speak(utterance);
         }
 
         async function registerPermanentContact(partnerPhone) {
@@ -1121,10 +1123,12 @@
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
                     try {
+                        if (voiceRecInstance) { try { voiceRecInstance.stop(); } catch(e){} }
                         voiceRecInstance = new SR();
                         voiceRecInstance.continuous = true;
                         voiceRecInstance.interimResults = true;
                         voiceRecInstance.lang = 'ur-PK';
+                        
                         voiceRecInstance.onresult = (event) => {
                             let interim = "";
                             for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -1136,8 +1140,9 @@
                             }
                             const displayTxt = (voiceTranscriptText + interim).trim();
                             const liveEl = document.getElementById("rec-live-words");
-                            if (liveEl) liveEl.innerText = displayTxt || "Listening...";
+                            if (liveEl) liveEl.innerText = displayTxt || "Listening carefully...";
                         };
+
                         voiceRecInstance.start();
                     } catch(e) {}
                 }
@@ -1146,20 +1151,25 @@
                 mediaRecorder = new MediaRecorder(activeAudioStream);
                 recordedChunks = [];
                 mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
+                
                 mediaRecorder.onstop = async () => {
-                    if (voiceRecInstance) { try { voiceRecInstance.stop(); } catch(e){} }
-                    if (recordedChunks.length === 0) return;
-                    const blob = new Blob(recordedChunks, { type: "audio/webm" });
-                    const form = new FormData(); form.append("file", blob, "voice.webm");
-                    const res = await fetch("/api/upload", { method: "POST", body: form });
-                    const data = await res.json();
-                    
-                    const finalCaptured = voiceTranscriptText.trim() || "audio note";
-                    pendingPayload = { type: "voice", content: data.url };
-                    document.getElementById("voice-hint-field").value = finalCaptured;
-                    document.getElementById("send-modal-preview").innerText = "Voice Note Captured Successfully";
-                    document.getElementById("send-modal").style.display = "flex";
+                    setTimeout(async () => {
+                        if (voiceRecInstance) { try { voiceRecInstance.stop(); } catch(e){} }
+                        if (recordedChunks.length === 0) return;
+                        
+                        const blob = new Blob(recordedChunks, { type: "audio/webm" });
+                        const form = new FormData(); form.append("file", blob, "voice.webm");
+                        const res = await fetch("/api/upload", { method: "POST", body: form });
+                        const data = await res.json();
+                        
+                        const finalCaptured = voiceTranscriptText.trim() || "voice message";
+                        pendingPayload = { type: "voice", content: data.url };
+                        document.getElementById("voice-hint-field").value = finalCaptured;
+                        document.getElementById("send-modal-preview").innerText = "Voice Note Captured Successfully";
+                        document.getElementById("send-modal").style.display = "flex";
+                    }, 400);
                 };
+
                 mediaRecorder.start();
                 isRecording = true;
                 document.getElementById("input-shell").style.display = "none";
@@ -1252,7 +1262,7 @@
                         <button id="${uniqueBtnId}" class="btn-play-voice-circle" title="Play Voice Note">▶</button>
                         <div class="voice-info-wrap">
                             <span class="voice-title-label">🎙️ Voice Note (${lang.toUpperCase()})</span>
-                            <span class="voice-sub-label">Click ▶ to listen & speak</span>
+                            <span class="voice-sub-label">Click ▶ to listen speech</span>
                         </div>
                     </div>
                 `;
