@@ -548,6 +548,8 @@
         let recordedChunks = [];
         let isRecording = false;
         let activeAudioStream = null;
+        let voiceTranscriptText = "";
+        let voiceRecInstance = null;
 
         let pendingPayload = null;
         let currentAvatarUrl = "";
@@ -1113,20 +1115,45 @@
 
         async function startVoiceRecording() {
             try {
+                voiceTranscriptText = "";
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (SR) {
+                    voiceRecInstance = new SR();
+                    voiceRecInstance.continuous = true;
+                    voiceRecInstance.interimResults = true;
+                    voiceRecInstance.lang = 'ur-PK'; // Default capturing Urdu/Roman Urdu
+                    voiceRecInstance.onresult = (event) => {
+                        let interim = "";
+                        for (let i = event.resultIndex; i < event.results.length; ++i) {
+                            if (event.results[i].isFinal) {
+                                voiceTranscriptText += event.results[i][0].transcript + " ";
+                            } else {
+                                interim += event.results[i][0].transcript;
+                            }
+                        }
+                        const displayTxt = (voiceTranscriptText + interim).trim();
+                        const liveEl = document.getElementById("rec-live-words");
+                        if (liveEl) liveEl.innerText = displayTxt || "Listening...";
+                    };
+                    voiceRecInstance.start();
+                }
+
                 activeAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(activeAudioStream);
                 recordedChunks = [];
                 mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
                 mediaRecorder.onstop = async () => {
+                    if (voiceRecInstance) { try { voiceRecInstance.stop(); } catch(e){} }
                     if (recordedChunks.length === 0) return;
                     const blob = new Blob(recordedChunks, { type: "audio/webm" });
                     const form = new FormData(); form.append("file", blob, "voice.webm");
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
                     
+                    const finalCaptured = voiceTranscriptText.trim() || "Voice Note Audio Message";
                     pendingPayload = { type: "voice", content: data.url };
-                    document.getElementById("voice-hint-field").value = "Voice Note Message";
-                    document.getElementById("send-modal-preview").innerText = "Voice Note Recorded Successfully";
+                    document.getElementById("voice-hint-field").value = finalCaptured;
+                    document.getElementById("send-modal-preview").innerText = "Voice Note Captured Successfully";
                     document.getElementById("send-modal").style.display = "flex";
                 };
                 mediaRecorder.start();
@@ -1143,6 +1170,7 @@
         }
 
         function cancelRecording() {
+            if (voiceRecInstance) { try { voiceRecInstance.stop(); } catch(e){} }
             if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
             if (activeAudioStream) { activeAudioStream.getTracks().forEach(t => t.stop()); activeAudioStream = null; }
             resetRecordingUI();
@@ -1168,10 +1196,10 @@
         function confirmDispatchOriginal() {
             if (!pendingPayload) return;
             let finalContent = pendingPayload.content;
-            if (pendingPayload.type === "text") {
+            if (pendingPayload.type === "text" || pendingPayload.type === "voice") {
                 finalContent = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
             }
-            executeDispatch(finalContent, "", pendingPayload.type);
+            executeDispatch(pendingPayload.content, finalContent, pendingPayload.type);
             cancelDispatch();
         }
 
@@ -1179,9 +1207,6 @@
             if (!pendingPayload) return;
             const targetLang = document.getElementById("modal-target-lang").value || "en";
             let textToTranslate = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
-            if (pendingPayload.type === "voice") {
-                textToTranslate = "Voice Note Audio Message";
-            }
 
             let translatedText = textToTranslate;
             try {
