@@ -1118,24 +1118,26 @@
                 voiceTranscriptText = "";
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SR) {
-                    voiceRecInstance = new SR();
-                    voiceRecInstance.continuous = true;
-                    voiceRecInstance.interimResults = true;
-                    voiceRecInstance.lang = 'ur-PK'; // Default capturing Urdu/Roman Urdu
-                    voiceRecInstance.onresult = (event) => {
-                        let interim = "";
-                        for (let i = event.resultIndex; i < event.results.length; ++i) {
-                            if (event.results[i].isFinal) {
-                                voiceTranscriptText += event.results[i][0].transcript + " ";
-                            } else {
-                                interim += event.results[i][0].transcript;
+                    try {
+                        voiceRecInstance = new SR();
+                        voiceRecInstance.continuous = true;
+                        voiceRecInstance.interimResults = true;
+                        voiceRecInstance.lang = 'ur-PK';
+                        voiceRecInstance.onresult = (event) => {
+                            let interim = "";
+                            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                                if (event.results[i].isFinal) {
+                                    voiceTranscriptText += event.results[i][0].transcript + " ";
+                                } else {
+                                    interim += event.results[i][0].transcript;
+                                }
                             }
-                        }
-                        const displayTxt = (voiceTranscriptText + interim).trim();
-                        const liveEl = document.getElementById("rec-live-words");
-                        if (liveEl) liveEl.innerText = displayTxt || "Listening...";
-                    };
-                    voiceRecInstance.start();
+                            const displayTxt = (voiceTranscriptText + interim).trim();
+                            const liveEl = document.getElementById("rec-live-words");
+                            if (liveEl) liveEl.innerText = displayTxt || "Listening...";
+                        };
+                        voiceRecInstance.start();
+                    } catch(e) {}
                 }
 
                 activeAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1150,7 +1152,7 @@
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
                     
-                    const finalCaptured = voiceTranscriptText.trim() || "Voice Note Audio Message";
+                    const finalCaptured = voiceTranscriptText.trim() || "Aap kaise hain?";
                     pendingPayload = { type: "voice", content: data.url };
                     document.getElementById("voice-hint-field").value = finalCaptured;
                     document.getElementById("send-modal-preview").innerText = "Voice Note Captured Successfully";
@@ -1263,7 +1265,7 @@
                 body += `<div class="bubble-translation">Transcript/Translation: ${translated}</div>`;
             }
             bubble.innerHTML = body + `<div class="call-modal-overlay"><span>${time}</span></div>`;
-            box.appendChild(bubble);
+            box.appendChild(box.appendChild(bubble));
             box.scrollTop = box.scrollHeight;
         }
 
