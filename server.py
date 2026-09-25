@@ -55,7 +55,7 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
         encoded_text = urllib.parse.quote(clean)
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={t_lang}&dt=t&q={encoded_text}"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=6) as response:
+        with urllib.request.urlopen(req, timeout=8) as response:
             res_body = response.read().decode('utf-8')
             res_data = json.loads(res_body)
             if res_data and isinstance(res_data, list) and len(res_data) > 0:
@@ -64,7 +64,7 @@ def translate_via_gemini(text: str, target_lang: str) -> str:
                 if translated_text:
                     return translated_text
     except Exception as e:
-        print(f"[Google Translate Engine Error]: {e}")
+        print(f"[Translation Engine Error]: {e}")
         
     return clean
 
@@ -142,28 +142,6 @@ async def translate_text(req: TranslationRequest):
         return {"translated_text": ""}
     translated = translate_via_gemini(clean, req.target_lang)
     return {"translated_text": translated}
-
-@app.post("/api/tts")
-async def text_to_speech(req: dict):
-    # Generates translated speech audio file using Google TTS backend
-    text = req.get("text", "").strip()
-    lang = req.get("lang", "en").strip()
-    if not text:
-        return {"url": ""}
-    try:
-        encoded_text = urllib.parse.quote(text)
-        tts_url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={encoded_text}&tl={lang}&client=tw-ob"
-        req_tts = urllib.request.Request(tts_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req_tts, timeout=10) as response:
-            audio_data = response.read()
-            filename = f"tts_{os.urandom(6).hex()}.mp3"
-            filepath = os.path.join(UPLOAD_DIR, filename)
-            with open(filepath, "wb") as f:
-                f.write(audio_data)
-            return {"url": f"/uploads/{filename}"}
-    except Exception as e:
-        print(f"[TTS Error]: {e}")
-    return {"url": ""}
 
 @app.get("/api/chats/{phone}")
 async def get_user_chats(phone: str):
