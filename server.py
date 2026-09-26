@@ -1,8 +1,9 @@
 import os
+import shutil
 import json
 import urllib.request
 import urllib.parse
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, File, UploadFile, shutil
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, File, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -24,19 +25,6 @@ message_history = {}
 class TranslationRequest(BaseModel):
     text: str
     target_lang: str = "en"
-
-class LoginRequest(BaseModel):
-    phone: str
-
-class ContactRequest(BaseModel):
-    user_phone: str
-    contact_phone: str
-
-class ProfileRequest(BaseModel):
-    phone: str
-    display_name: str = ""
-    about_status: str = ""
-    avatar_url: str = ""
 
 # Stable Translation Engine
 def translate_text_engine(text: str, target_lang: str) -> str:
@@ -152,26 +140,11 @@ def read_root():
             background: var(--accent-amber); color: #000; border: none; font-size: 22px; display: flex;
             align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px var(--accent-amber-glow); z-index: 40;
         }
-        .bottom-nav-bar {
-            height: 56px; border-top: 1px solid var(--border-graphite); background: var(--surface-panel);
-            display: flex; align-items: center; justify-content: space-around; width: 100%; position: absolute; bottom: 0; left: 0; z-index: 30;
-        }
-        .nav-tab-btn {
-            display: flex; flex-direction: column; align-items: center; gap: 3px; background: transparent; border: none;
-            color: var(--text-muted); cursor: pointer; font-size: 11px; font-weight: 600; flex: 1; padding: 6px 0;
-        }
-        .nav-tab-btn.active { color: var(--accent-amber); }
         .stage-panel { flex: 1; display: flex; flex-direction: column; background: var(--bg-obsidian); position: relative; height: 100%; overflow: hidden; }
         .stage-header {
             padding: 8px 12px; background: var(--surface-panel); border-bottom: 1px solid var(--border-graphite);
             display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; min-height: 60px;
         }
-        .call-buttons-group { display: flex; align-items: center; gap: 6px; }
-        .btn-call-action {
-            height: 34px; padding: 0 10px; border-radius: 17px; background: var(--surface-card); border: 1px solid var(--border-graphite);
-            color: #fff; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; cursor: pointer;
-        }
-        .btn-call-action.trans-call-btn { background: var(--accent-amber-dim); border-color: rgba(245, 158, 11, 0.4); color: var(--accent-amber); }
         .messages-container { flex: 1; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
         .bubble { max-width: 82%; padding: 10px 14px; border-radius: 14px; font-size: 13px; line-height: 1.4; word-break: break-word; }
         .bubble.sent { align-self: flex-end; background: var(--accent-amber); color: #000; font-weight: 500; border-bottom-right-radius: 2px; }
@@ -182,17 +155,17 @@ def read_root():
         .main-text-input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 14px; padding: 8px; }
         .btn-send-permanent { width: 40px; height: 40px; border-radius: 50%; background: var(--accent-amber); color: #000; border: none; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .icon-btn { background: transparent; border: none; color: var(--text-secondary); font-size: 18px; cursor: pointer; padding: 4px; }
-        .contacts-overlay, .settings-overlay, .send-modal-backdrop, .call-setup-backdrop, .call-modal-overlay {
+        .contacts-overlay, .send-modal-backdrop {
             position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 9999; display: none; align-items: center; justify-content: center; padding: 20px;
         }
-        .contacts-card, .settings-card, .send-modal-card, .call-setup-card {
+        .contacts-card, .send-modal-card {
             background: var(--surface-panel); border: 1px solid var(--border-graphite); border-radius: 20px; width: 100%; max-width: 380px; padding: 22px; display: flex; flex-direction: column; gap: 12px; text-align: center;
         }
-        .btn-contact-opt, .modal-btn-choice {
+        .modal-btn-choice {
             padding: 12px; border-radius: 12px; border: 1px solid var(--border-graphite); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--surface-card); color: #fff;
         }
         .btn-choice-trans { background: var(--accent-amber); color: #000; border: none; }
-        .lang-dropdown, .settings-input, .auth-input, .voice-hint-input {
+        .lang-dropdown, .auth-input {
             width: 100%; background: var(--surface-card); border: 1px solid var(--border-graphite); padding: 10px; border-radius: 10px; color: #fff; font-size: 13px; outline: none;
         }
         @media (max-width: 768px) {
@@ -204,8 +177,6 @@ def read_root():
     </style>
 </head>
 <body>
-    <audio id="remote-audio-sink" autoplay playsinline></audio>
-
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
             <div class="auth-badge">IA</div>
@@ -291,7 +262,7 @@ def read_root():
             }
         };
 
-        async function executeDirectLogin() {
+        function executeDirectLogin() {
             const input = document.getElementById("my-phone-input").value.trim();
             if (!input) return;
             myPhone = input;
@@ -308,7 +279,7 @@ def read_root():
             socket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 if (data.action === "new_message" && data.sender === activePartner) {
-                    appendBubble(data.content, "received", data.translated, data.time);
+                    appendBubble(data.content, "received", data.translated, "now");
                 }
             };
         }
@@ -412,7 +383,7 @@ async def translate_endpoint(req: TranslationRequest):
             "translated_text": translated
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_status=500, detail=str(e))
 
 # WebSocket Endpoint
 @app.websocket("/ws/{client_id}")
