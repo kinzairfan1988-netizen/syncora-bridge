@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Complete Stable Server")
+app = FastAPI(title="Syncora Terminal - Restored Stable Server")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -39,14 +39,19 @@ class ProfileRequest(BaseModel):
     about_status: str = ""
     avatar_url: str = ""
 
-# Updated Stable Translation Engine with Force Language Mapping
+# Stable Translation Engine
 def translate_text_engine(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
         return ""
     
-    t_lang = str(target_lang).strip().lower()
-    if not t_lang:
+    target_lang = str(target_lang).strip().lower()
+    
+    if "zh" in target_lang or "chin" in target_lang:
+        t_lang = "zh-CN"
+    elif target_lang in ["ur", "ar", "de", "fr", "es"]:
+        t_lang = target_lang
+    else:
         t_lang = "en"
         
     try:
@@ -66,7 +71,7 @@ def translate_text_engine(text: str, target_lang: str) -> str:
         
     return clean
 
-# Root Route: Serves the Complete Frontend
+# Root Route: Serves the Restored Clean Frontend
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """<!DOCTYPE html>
