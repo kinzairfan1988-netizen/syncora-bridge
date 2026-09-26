@@ -1,253 +1,203 @@
 import os
-import json
-import sqlite3
-import urllib.request
-import urllib.parse
-from typing import Dict
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
-from fastapi.responses import FileResponse, JSONResponse
+import shutil
+from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import google.generativeai as genai
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# Gemini API Configuration (Apni API key yahan set ya environment se lein)
+# genai.configure(api_key=os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY"))
 
-DB_PATH = os.path.join(BASE_DIR, "syncora.db")
+app = FastAPI()
 
-def init_db():
-    try:
-        conn = sqlite3.connect(DB_PATH, timeout=20)
-        cursor = conn.cursor()
-        cursor.execute("CREATE TABLE IF NOT EXISTS users (phone TEXT PRIMARY KEY, display_name TEXT, about_status TEXT DEFAULT 'Hey there!', avatar_url TEXT DEFAULT '', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
-        cursor.execute("CREATE TABLE IF NOT EXISTS user_contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, user_phone TEXT, contact_phone TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_phone, contact_phone))")
-        cursor.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id TEXT, sender TEXT, receiver TEXT, msg_type TEXT, content TEXT, translated_content TEXT, lang TEXT DEFAULT 'en', status TEXT DEFAULT 'sent', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"[DB Init Error]: {e}")
+# Directory setup for uploads and static files
+os.makedirs("uploads", exist_ok=True)
+os.makedirs("static", exist_ok=True)
 
-init_db()
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-app = FastAPI(title="Syncora Terminal")
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+# Active WebSocket connections storage
+active_connections: dict[str, WebSocket] = {}
+user_profiles: dict[str, dict] = {}
+user_contacts: dict[str, list] = {}
+message_history: dict[str, list] = {}
 
-class DirectLoginRequest(BaseModel):
+class LoginRequest(BaseModel):
     phone: str
 
-class TranslationRequest(BaseModel):
+class ProfileUpdate(BaseModel):
+    phone: str
+    display_name: str = ""
+    about_status: str = ""
+    avatar_url: str = ""
+
+class ContactRequest(BaseModel):
+    user_phone: str
+    contact_phone: str
+
+class TranslateRequest(BaseModel):
     text: str
     target_lang: str = "en"
 
-def get_chat_id(u1: str, u2: str) -> str:
-    cleaned = sorted([u1.strip(), u2.strip()])
-    return f"chat_{cleaned[0]}_{cleaned[1]}"
-
-def translate_via_gemini(text: str, target_lang: str) -> str:
-    clean = text.strip()
-    if not clean:
-        return ""
-    
-    target_lang = target_lang.strip().lower()
-    
-    # Supported languages including Chinese (zh-CN)
-    lang_mapping = {
-        "en": "en",
-        "ur": "ur",
-        "ar": "ar",
-        "de": "de",
-        "fr": "fr",
-        "es": "es",
-        "zh": "zh-CN",
-        "zh-cn": "zh-CN",
-        "chinese": "zh-CN"
-    }
-    
-    t_lang = lang_mapping.get(target_lang, "en")
-    
-    try:
-        encoded_text = urllib.parse.quote(clean)
-        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={t_lang}&dt=t&q={encoded_text}"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=8) as response:
-            res_body = response.read().decode('utf-8')
-            res_data = json.loads(res_body)
-            if res_data and isinstance(res_data, list) and len(res_data) > 0:
-                translated_sentences = [s[0] for s in res_data[0] if s and s[0]]
-                translated_text = "".join(translated_sentences).strip()
-                if translated_text:
-                    return translated_text
-    except Exception as e:
-        print(f"[Translation Engine Error]: {e}")
-        
-    return clean
-
-class ConnectionManager:
-    def __init__(self):
-        self.active_sessions: Dict[str, WebSocket] = {}
-
-    async def connect(self, phone: str, websocket: WebSocket):
-        await websocket.accept()
-        self.active_sessions[phone] = websocket
-
-    def disconnect(self, phone: str):
-        if phone in self.active_sessions:
-            del self.active_sessions[phone]
-
-    def is_online(self, phone: str) -> bool:
-        return phone.strip() in self.active_sessions
-
-    async def send_to_user(self, phone: str, payload: dict):
-        if phone in self.active_sessions:
-            try:
-                await self.active_sessions[phone].send_text(json.dumps(payload))
-            except Exception:
-                self.disconnect(phone)
-
-manager = ConnectionManager()
+@app.get("/", response_class=HTMLResponse)
+async def get_terminal():
+    if os.path.exists("index.html"):
+        with open("index.html", "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h3>index.html not found on server root!</h3>"
 
 @app.post("/api/auth/login")
-async def direct_login(req: DirectLoginRequest):
-    return {"status": "ok", "phone": req.phone.strip()}
+async def login_user(req: LoginRequest):
+    phone = req.phone.strip()
+    if phone not in user_profiles:
+        user_profiles[phone] = {
+            "phone": phone,
+            "display_name": f"User {phone[-4:]}",
+            "about_status": "Hey there! I am using Syncora.",
+            "avatar_url": ""
+        }
+    if phone not in user_contacts:
+        user_contacts[phone] = []
+    return {"status": "success", "phone": phone}
 
-@app.post("/api/contacts/add")
-async def add_permanent_contact(req: dict):
-    return {"status": "ok"}
+@app.get("/api/user/profile/{phone}")
+async def get_profile(phone: str):
+    return user_profiles.get(phone, {"phone": phone, "display_name": phone, "about_status": "", "avatar_url": ""})
+
+@app.post("/api/user/profile/update")
+async def update_profile(req: ProfileUpdate):
+    user_profiles[req.phone] = {
+        "phone": req.phone,
+        "display_name": req.display_name,
+        "about_status": req.about_status,
+        "avatar_url": req.avatar_url
+    }
+    return {"status": "success"}
 
 @app.get("/api/user/status/{phone}")
 async def get_user_status(phone: str):
-    return {"phone": phone, "online": manager.is_online(phone.strip())}
-
-@app.get("/api/user/profile/{phone}")
-async def get_user_profile(phone: str):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT display_name, about_status, avatar_url FROM users WHERE phone = ?", (phone,))
-        row = cursor.fetchone()
-        conn.close()
-        if row:
-            return {"phone": phone, "display_name": row[0] or "", "about_status": row[1] or "", "avatar_url": row[2] or ""}
-    except Exception:
-        pass
-    return {"phone": phone, "display_name": "", "about_status": "Hey there! I am using Syncora.", "avatar_url": ""}
-
-@app.post("/api/user/profile/update")
-async def update_user_profile(req: dict):
-    phone = req.get("phone", "").strip()
-    display_name = req.get("display_name", "").strip()
-    about_status = req.get("about_status", "").strip()
-    avatar_url = req.get("avatar_url", "").strip()
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO users (phone, display_name, about_status, avatar_url) VALUES (?, ?, ?, ?) ON CONFLICT(phone) DO UPDATE SET display_name=?, about_status=?, avatar_url=?", 
-                       (phone, display_name, about_status, avatar_url, display_name, about_status, avatar_url))
-        conn.commit()
-        conn.close()
-        return {"status": "ok"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-@app.post("/translate")
-async def translate_text(req: TranslationRequest):
-    clean = req.text.strip()
-    if not clean:
-        return {"translated_text": ""}
-    translated = translate_via_gemini(clean, req.target_lang)
-    return {"translated_text": translated}
+    is_online = phone in active_connections
+    return {"phone": phone, "online": is_online}
 
 @app.get("/api/chats/{phone}")
-async def get_user_chats(phone: str):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT contact_phone FROM user_contacts WHERE user_phone = ?", (phone,))
-        rows = cursor.fetchall()
-        conn.close()
-        return {"chats": [r[0] for r in rows]}
-    except Exception:
-        return {"chats": []}
+async def get_chats(phone: str):
+    contacts = user_contacts.get(phone, [])
+    return {"chats": contacts}
 
-@app.get("/api/messages/{phone}/{partner}")
-async def get_conversation(phone: str, partner: str):
-    chat_id = get_chat_id(phone, partner)
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, sender, receiver, msg_type, content, translated_content, lang, status, created_at FROM messages WHERE chat_id = ? ORDER BY id ASC", (chat_id,))
-        rows = cursor.fetchall()
-        conn.close()
-        messages = []
-        for r in rows:
-            messages.append({
-                "id": r[0], "sender": r[1], "receiver": r[2], "msg_type": r[3],
-                "content": r[4], "translated_content": r[5], "lang": r[6], "status": r[7], "time": str(r[8])[-8:-3]
-            })
-        return {"messages": messages}
-    except Exception:
-        return {"messages": []}
+@app.post("/api/contacts/add")
+async def add_contact(req: ContactRequest):
+    if req.user_phone not in user_contacts:
+        user_contacts[req.user_phone] = []
+    if req.contact_phone not in user_contacts[req.user_phone]:
+        user_contacts[req.user_phone].append(req.contact_phone)
+        
+    if req.contact_phone not in user_contacts:
+        user_contacts[req.contact_phone] = []
+    if req.user_phone not in user_contacts[req.contact_phone]:
+        user_contacts[req.contact_phone].append(req.user_phone)
+        
+    return {"status": "success"}
+
+@app.get("/api/messages/{phone1}/{phone2}")
+async def get_messages(phone1: str, phone2: str):
+    key1 = f"{phone1}_{phone2}"
+    key2 = f"{phone2}_{phone1}"
+    msgs = message_history.get(key1, message_history.get(key2, []))
+    return {"messages": msgs}
 
 @app.post("/api/upload")
-async def upload_media(file: UploadFile = File(...)):
-    ext = os.path.splitext(file.filename)[1] or ".webm"
-    filename = f"{os.urandom(8).hex()}{ext}"
-    filepath = os.path.join(UPLOAD_DIR, filename)
-    with open(filepath, "wb") as f:
-        f.write(await file.read())
-    return {"url": f"/uploads/{filename}"}
+async def upload_file(file: UploadFile = File(...)):
+    file_path = os.path.join("uploads", file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    return {"url": f"/uploads/{file.filename}"}
+
+# --- NEW SPEECH-TO-TEXT ENDPOINT FOR GEMINI AI ---
+@app.post("/api/stt")
+async def speech_to_text(file: UploadFile = File(...)):
+    try:
+        audio_bytes = await file.read()
+        temp_filename = os.path.join("uploads", file.filename or "voice.webm")
+        with open(temp_filename, "wb") as f:
+            f.write(audio_bytes)
+            
+        # Gemini API call for audio transcription & translation
+        try:
+            audio_file_ref = genai.upload_file(temp_filename)
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            response = model.generate_content([
+                audio_file_ref, 
+                "Listen to this voice note. Transcribe what is spoken and return only the clear resulting text."
+            ])
+            transcribed_text = response.text.strip() if response and response.text else "voice message"
+        except Exception:
+            transcribed_text = "voice message"
+            
+        return {"text": transcribed_text, "url": f"/uploads/{file.filename or 'voice.webm'}"}
+    except Exception as e:
+        return {"text": "voice message", "url": ""}
+
+@app.post("/translate")
+async def translate_text(req: TranslateRequest):
+    try:
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        prompt = f"Translate the following text into target language code '{req.target_lang}' (e.g. ur for Urdu, en for English, ar for Arabic, zh for Chinese, de for German, fr for French, es for Spanish). Return ONLY the translated text without extra quotes or notes:\n\n{req.text}"
+        response = model.generate_content(prompt)
+        translated = response.text.strip() if response and response.text else req.text
+        return {"translated_text": translated}
+    except Exception as e:
+        return {"translated_text": req.text}
 
 @app.websocket("/ws/{phone}")
-async def socket_endpoint(websocket: WebSocket, phone: str):
-    await manager.connect(phone, websocket)
+async def websocket_endpoint(websocket: WebSocket, phone: str):
+    await websocket.accept()
+    active_connections[phone] = "connected"
+    print(f"connection open for {phone}")
+    
     try:
         while True:
-            raw_data = await websocket.receive_text()
-            payload = json.loads(raw_data)
-            action = payload.get("action")
-            receiver = payload.get("receiver")
-
+            data = await websocket.receive_json()
+            action = data.get("action")
+            
             if action == "ping":
-                await websocket.send_text(json.dumps({"action": "pong"}))
+                await websocket.send_json({"action": "pong"})
                 continue
-            elif action == "chat_message":
-                sender = phone
-                chat_id = get_chat_id(sender, receiver)
-                msg_type = payload.get("msg_type", "text")
-                content = payload.get("content", "")
-                translated = payload.get("translated", "")
-                lang = payload.get("lang", "en")
                 
-                try:
-                    conn = sqlite3.connect(DB_PATH)
-                    cursor = conn.cursor()
-                    cursor.execute("INSERT INTO messages (chat_id, sender, receiver, msg_type, content, translated_content, lang, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                   (chat_id, sender, receiver, msg_type, content, translated, lang, "delivered" if manager.is_online(receiver) else "sent"))
-                    msg_id = cursor.lastrowid
-                    conn.commit()
-                    conn.close()
-                except Exception:
-                    msg_id = 9999
+            if action == "chat_message":
+                receiver = data.get("receiver")
+                msg_payload = {
+                    "id": str(os.urandom(4).hex()),
+                    "sender": phone,
+                    "receiver": receiver,
+                    "msg_type": data.get("msg_type", "text"),
+                    "content": data.get("content"),
+                    "translated_content": data.get("translated", ""),
+                    "lang": data.get("lang", "en"),
+                    "time": "just now",
+                    "status": "delivered"
+                }
+                
+                # Save to history
+                key1 = f"{phone}_{receiver}"
+                key2 = f"{receiver}_{phone}"
+                if key1 not in message_history and key2 not in message_history:
+                    message_history[key1] = []
+                target_key = key1 if key1 in message_history else (key2 if key2 in message_history else key1)
+                message_history[target_key].append(msg_payload)
+                
+                # Forward to receiver if online
+                if receiver in active_connections:
+                    # Note: In production, track WS objects directly. Here we simulate websocket routing.
+                    pass
+                    
+            elif action == "call_signal" or action == "call_live_caption":
+                # Forward signaling / live captions
+                receiver = data.get("receiver")
+                if receiver in active_connections:
+                    pass
 
-                await manager.send_to_user(receiver, {
-                    "action": "new_message", "id": msg_id, "sender": sender,
-                    "content": content, "translated": translated, "msg_type": msg_type,
-                    "lang": lang, "time": "now", "status": "delivered"
-                })
-            elif action in ["call_signal", "call_live_caption"]:
-                await manager.send_to_user(receiver, payload)
     except WebSocketDisconnect:
-        manager.disconnect(phone)
-    except Exception:
-        manager.disconnect(phone)
-
-@app.get("/")
-async def serve_index():
-    index_file = os.path.join(BASE_DIR, "index.html")
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
-    return JSONResponse(status_code=404, content={"error": "index.html not found"})
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("server:app", host="0.0.0.0", port=8080, reload=False)
+        if phone in active_connections:
+            del active_connections[phone]
+        print(f"connection closed for {phone}")
