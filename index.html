@@ -610,8 +610,12 @@
             const target = (lang || 'en').toLowerCase();
             const voices = window.speechSynthesis.getVoices();
             
+            // Intelligent voice mapping for Urdu and English
             let mv = voices.find(v => v.lang.toLowerCase().startsWith(target));
             if (!mv && target === 'ur') {
+                mv = voices.find(v => v.lang.toLowerCase().includes('ur') || v.lang.toLowerCase().includes('hi'));
+            }
+            if (!mv) {
                 mv = voices.find(v => v.lang.toLowerCase().startsWith('en'));
             }
 
@@ -619,7 +623,7 @@
                 utterance.voice = mv; 
                 utterance.lang = mv.lang; 
             } else { 
-                utterance.lang = target === 'ur' ? 'en-US' : 'en-US'; 
+                utterance.lang = target === 'ur' ? 'ur-PK' : 'en-US'; 
             }
             
             utterance.rate = 0.95;
@@ -1137,9 +1141,9 @@
                         voiceRecInstance.continuous = true;
                         voiceRecInstance.interimResults = true;
                         
-                        // Target language ke mutabiq Mic ki zaban set hogi:
-                        // Agar target Urdu ('ur') hai, toh mic English ('en-US') sune ga taake aap English bol kar Urdu mein translate kar sakein.
-                        // Agar target English ('en') ya koi aur hai, toh mic Urdu ('ur-PK') sune ga taake aap Urdu bol kar English mein translate kar sakein.
+                        // Intelligent Mic Language Switcher:
+                        // Jab target language Urdu ('ur') select hogi, toh mic English ('en-US') sune ga taake aap English bol sakein.
+                        // Jab target language English ('en') ya koi aur hogi, toh mic Urdu ('ur-PK') sune ga taake aap Urdu bol sakein.
                         const targetLangSelect = document.getElementById("modal-target-lang");
                         const selectedTarget = targetLangSelect ? targetLangSelect.value : "en";
                         if (selectedTarget === 'ur') {
