@@ -13,6 +13,8 @@ app = FastAPI(title="Syncora - Stable Main Server")
 os.makedirs("uploads", exist_ok=True)
 os.makedirs("static", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Agar aapki static files (HTML/CSS/JS) 'static' folder mein hain toh yeh line enable karein:
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Application State Dictionaries
 active_connections = {}
@@ -57,9 +59,14 @@ def translate_text_engine(text: str, target_lang: str) -> str:
         
     return clean
 
-@app.get("/")
+# Root route ab aapka frontend/HTML page load karega
+@app.get("/", response_class=HTMLResponse)
 def read_root():
-    return {"status": "Server is running perfectly", "module": "Text Translation Stable"}
+    # Agar aapki main file static folder mein index.html hai
+    if os.path.exists("static/index.html"):
+        with open("static/index.html", "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h3>Syncora Server is Running! Please check your static frontend path.</h3>"
 
 # Working Translation Endpoint
 @app.post("/translate")
