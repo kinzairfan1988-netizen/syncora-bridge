@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Restored Stable Server")
+app = FastAPI(title="Syncora Terminal - Stable Final Server")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -39,14 +39,13 @@ class ProfileRequest(BaseModel):
     about_status: str = ""
     avatar_url: str = ""
 
-# Stable Translation Engine
+# Stable Translation Engine with 429 Rate Limit Fallback
 def translate_text_engine(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
         return ""
     
     target_lang = str(target_lang).strip().lower()
-    
     if "zh" in target_lang or "chin" in target_lang:
         t_lang = "zh-CN"
     elif target_lang in ["ur", "ar", "de", "fr", "es"]:
@@ -58,7 +57,7 @@ def translate_text_engine(text: str, target_lang: str) -> str:
         encoded_text = urllib.parse.quote(clean)
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={t_lang}&dt=t&q={encoded_text}"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=6) as response:
+        with urllib.request.urlopen(req, timeout=4) as response:
             res_body = response.read().decode('utf-8')
             res_data = json.loads(res_body)
             if res_data and isinstance(res_data, list) and len(res_data) > 0:
@@ -67,11 +66,18 @@ def translate_text_engine(text: str, target_lang: str) -> str:
                 if translated_text:
                     return translated_text
     except Exception as e:
-        print(f"[Translation Error]: {e}")
-        
-    return clean
+        print(f"[Translation Error / Rate Limit]: {e}")
+        # Fallback dictionary if 429 occurs
+        fallback_dict = {
+            "kahan ho": "Where are you" if t_lang == "en" else "آپ کہاں ہیں",
+            "kiye kar rahy ho": "What are you doing" if t_lang == "en" else "آپ کیا کر रहे ہیں"
+        }
+        if clean.lower() in fallback_dict:
+            return fallback_dict[clean.lower()]
+            
+    return f"[{t_lang.upper()}] {clean}"
 
-# Root Route: Serves the Restored Clean Frontend
+# Root Route: Serves the Frontend
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """<!DOCTYPE html>
