@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Final Stable Server")
+app = FastAPI(title="Syncora Terminal - Final Lock Server")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -71,7 +71,7 @@ def translate_text_engine(text: str, target_lang: str) -> str:
         
     return clean
 
-# Root Route: Serves the Final Clean Frontend
+# Root Route: Serves the Final Locked Frontend
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """<!DOCTYPE html>
@@ -494,10 +494,6 @@ def read_root():
         <div class="send-modal-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);" id="send-modal-title">Confirm Dispatch</h3>
             <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Review message text</p>
-            <div id="voice-edit-block" style="display:block; text-align:left;">
-                <label style="font-size: 11px; color: var(--text-muted);">Message / Content:</label>
-                <input type="text" id="voice-hint-field" class="voice-hint-input" placeholder="Edit text if needed...">
-            </div>
             <div class="lang-options-drawer" id="lang-drawer">
                 <label style="font-size: 11px; color: var(--text-muted);">Select Target Language:</label>
                 <select class="lang-dropdown" id="modal-target-lang">
