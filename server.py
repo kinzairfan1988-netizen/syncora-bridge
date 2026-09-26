@@ -4,7 +4,13 @@ from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import google.generativeai as genai
+
+# Safe import for Gemini
+try:
+    import google.generativeai as genai
+    HAS_GEMINI = True
+except ImportError:
+    HAS_GEMINI = False
 
 app = FastAPI()
 
@@ -99,9 +105,12 @@ async def speech_to_text(file: UploadFile = File(...)):
 @app.post("/translate")
 async def translate_text(req: TranslateRequest):
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(f"Translate to {req.target_lang} (return only translated text):\n\n{req.text}")
-        return {"translated_text": response.text.strip() if response and response.text else req.text}
+        if HAS_GEMINI:
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            response = model.generate_content(f"Translate to {req.target_lang} (return only translated text):\n\n{req.text}")
+            return {"translated_text": response.text.strip() if response and response.text else req.text}
+        else:
+            return {"translated_text": req.text}
     except Exception:
         return {"translated_text": req.text}
 
