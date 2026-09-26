@@ -609,9 +609,18 @@
             const utterance = new SpeechSynthesisUtterance(clean);
             const target = (lang || 'en').toLowerCase();
             const voices = window.speechSynthesis.getVoices();
-            const mv = voices.find(v => v.lang.toLowerCase().startsWith(target));
-            if (mv) { utterance.voice = mv; utterance.lang = mv.lang; }
-            else { utterance.lang = target === 'ur' ? 'ur-PK' : (target === 'zh' ? 'zh-CN' : 'en-US'); }
+            
+            let mv = voices.find(v => v.lang.toLowerCase().startsWith(target));
+            if (!mv && target === 'ur') {
+                mv = voices.find(v => v.lang.toLowerCase().startsWith('en'));
+            }
+
+            if (mv) { 
+                utterance.voice = mv; 
+                utterance.lang = mv.lang; 
+            } else { 
+                utterance.lang = target === 'ur' ? 'en-US' : 'en-US'; 
+            }
             
             utterance.rate = 0.95;
             utterance.pitch = 1.0;
@@ -1128,15 +1137,15 @@
                         voiceRecInstance.continuous = true;
                         voiceRecInstance.interimResults = true;
                         
-                        // Language Selection for Voice Note:
-                        // Jab target language Urdu ('ur') select hogi, toh mic Urdu ('ur-PK') sunega.
-                        // Jab English ('en') ya koi aur zaban hogi, toh mic English ('en-US') sunega.
+                        // Target language ke mutabiq Mic ki zaban set hogi:
+                        // Agar target Urdu ('ur') hai, toh mic English ('en-US') sune ga taake aap English bol kar Urdu mein translate kar sakein.
+                        // Agar target English ('en') ya koi aur hai, toh mic Urdu ('ur-PK') sune ga taake aap Urdu bol kar English mein translate kar sakein.
                         const targetLangSelect = document.getElementById("modal-target-lang");
                         const selectedTarget = targetLangSelect ? targetLangSelect.value : "en";
                         if (selectedTarget === 'ur') {
-                            voiceRecInstance.lang = 'ur-PK';
-                        } else {
                             voiceRecInstance.lang = 'en-US';
+                        } else {
+                            voiceRecInstance.lang = 'ur-PK';
                         }
                         
                         voiceRecInstance.onresult = (event) => {
