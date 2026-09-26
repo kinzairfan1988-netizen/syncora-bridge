@@ -1128,13 +1128,15 @@
                         voiceRecInstance.continuous = true;
                         voiceRecInstance.interimResults = true;
                         
-                        // Smart Language Selection: Agar target language Urdu (ur) hai, toh mic English (en-US) sunega, warna Urdu (ur-PK) sunega
+                        // Corrected Language Logic:
+                        // Jab target language Urdu ('ur') select hogi, toh mic Urdu ('ur-PK') sunega.
+                        // Jab koi aur target language (jaise English) hogi, toh mic English ('en-US') sunega.
                         const targetLangSelect = document.getElementById("modal-target-lang");
                         const selectedTarget = targetLangSelect ? targetLangSelect.value : "en";
                         if (selectedTarget === 'ur') {
-                            voiceRecInstance.lang = 'en-US';
-                        } else {
                             voiceRecInstance.lang = 'ur-PK';
+                        } else {
+                            voiceRecInstance.lang = 'en-US';
                         }
                         
                         voiceRecInstance.onresult = (event) => {
@@ -1309,6 +1311,7 @@
             executeDispatch(data.url, "", type);
         }
 
+        Language support...
         function shareLocation() {
             document.getElementById("attach-menu").style.display = "none";
             if (!navigator.geolocation || !activePartner) return;
