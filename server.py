@@ -8,18 +8,12 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-# Audio module import
-from audio_module import audio_router
-
-app = FastAPI(title="Syncora Terminal - Modular Stable Server")
+app = FastAPI(title="Syncora Terminal - Final Audio Stable Server")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
 os.makedirs("static", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
-# Include isolated audio router safely
-app.include_router(audio_router)
 
 # Application State Dictionaries
 active_connections = {}
@@ -77,7 +71,7 @@ def translate_text_engine(text: str, target_lang: str) -> str:
         
     return clean
 
-# Root Route: Serves the Complete Frontend Interface
+# Root Route: Serves the Final Complete Frontend with Native Voice Notes & WhatsApp UX
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """<!DOCTYPE html>
@@ -692,7 +686,7 @@ def read_root():
             
             let mv = voices.find(v => v.lang.toLowerCase().startsWith(target));
             if (!mv && target === 'ur') {
-                mv = voices.find(v => v.lang.toLowerCase().includes('ur') || v.lang.toLowerCase().includes('hi'));
+                mv = voices.find(v => v.lang.toLowerCase().includes('ur') || v.lang.toLowerCase().includes('hi') || v.lang.toLowerCase().includes('ar'));
             }
             if (!mv) {
                 mv = voices.find(v => v.lang.toLowerCase().startsWith('en'));
@@ -1226,21 +1220,16 @@ def read_root():
                     const form = new FormData(); 
                     form.append("file", blob, "voice.webm");
                     
-                    document.getElementById("voice-hint-field").value = "Transcribing audio via AI...";
-                    document.getElementById("send-modal-preview").innerText = "Processing Voice Audio...";
+                    document.getElementById("voice-hint-field").value = "Voice note recorded";
+                    document.getElementById("send-modal-preview").innerText = "Voice Note Ready to Send";
                     document.getElementById("send-modal").style.display = "flex";
 
                     try {
-                        const res = await fetch("/api/stt", { method: "POST", body: form });
+                        const res = await fetch("/api/upload", { method: "POST", body: form });
                         const data = await res.json();
-                        const transcribedText = data.text || "voice message";
-
                         pendingPayload = { type: "voice", content: data.url || "" };
-                        document.getElementById("voice-hint-field").value = transcribedText;
-                        document.getElementById("send-modal-preview").innerText = "Voice Note Ready to Send";
                     } catch (err) {
-                        document.getElementById("voice-hint-field").value = "voice message";
-                        document.getElementById("send-modal-preview").innerText = "Audio uploaded successfully";
+                        alert("Audio upload failed");
                     }
                 };
 
@@ -1284,7 +1273,7 @@ def read_root():
         function confirmDispatchOriginal() {
             if (!pendingPayload) return;
             let finalContent = pendingPayload.content;
-            if (pendingPayload.type === "text" || pendingPayload.type === "voice") {
+            if (pendingPayload.type === "text") {
                 finalContent = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
             }
             executeDispatch(pendingPayload.content, finalContent, pendingPayload.type);
@@ -1293,6 +1282,10 @@ def read_root():
 
         async function confirmDispatchTranslation() {
             if (!pendingPayload) return;
+            if (pendingPayload.type === "voice") {
+                confirmDispatchOriginal();
+                return;
+            }
             const targetLang = document.getElementById("modal-target-lang").value || "en";
             let textToTranslate = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
 
@@ -1329,26 +1322,17 @@ def read_root():
 
             let body = `<div>${content}</div>`;
             if (type === "voice") {
-                const uniqueBtnId = "voice_btn_" + Math.random().toString(36).substring(2, 9);
+                const uniquePlayerId = "audio_player_" + Math.random().toString(36).substring(2, 9);
                 body = `
                     <div class="voice-card-private">
-                        <button id="${uniqueBtnId}" class="btn-play-voice-circle" title="Play Voice Note">▶</button>
+                        <audio id="${uniquePlayerId}" src="${content}"></audio>
+                        <button class="btn-play-voice-circle" onclick="document.getElementById('${uniquePlayerId}').play()">▶</button>
                         <div class="voice-info-wrap">
-                            <span class="voice-title-label">🎙️ Voice Note (${lang.toUpperCase()})</span>
-                            <span class="voice-sub-label">Click ▶ to listen speech</span>
+                            <span class="voice-title-label">🎙️ Voice Note</span>
+                            <span class="voice-sub-label">Click ▶ to listen audio</span>
                         </div>
                     </div>
                 `;
-                setTimeout(() => {
-                    const btnEl = document.getElementById(uniqueBtnId);
-                    if (btnEl) {
-                        btnEl.onclick = () => {
-                            unlockMobileAudio();
-                            const textToSpeak = (translated && translated.trim() !== "") ? translated : content;
-                            playSpokenVoice(textToSpeak, lang);
-                        };
-                    }
-                }, 50);
             }
 
             if (translated && translated.trim() !== "" && type !== "voice") {
@@ -1434,7 +1418,7 @@ async def get_messages(user1: str, user2: str):
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
-    file_path = os.path.join("uploads", file.filename or "file.bin")
+    file_path = os.path.join("uploads", file.filename or "voice.webm")
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     return {"status": "success", "url": f"/uploads/{file.filename}"}
