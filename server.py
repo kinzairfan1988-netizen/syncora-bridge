@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Stable Text Fix")
+app = FastAPI(title="Syncora Terminal - Complete Stable Server")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -39,19 +39,14 @@ class ProfileRequest(BaseModel):
     about_status: str = ""
     avatar_url: str = ""
 
-# Stable Translation Engine
+# Updated Stable Translation Engine with Force Language Mapping
 def translate_text_engine(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
         return ""
     
-    target_lang = str(target_lang).strip().lower()
-    
-    if "zh" in target_lang or "chin" in target_lang:
-        t_lang = "zh-CN"
-    elif target_lang in ["ur", "ar", "de", "fr", "es"]:
-        t_lang = target_lang
-    else:
+    t_lang = str(target_lang).strip().lower()
+    if not t_lang:
         t_lang = "en"
         
     try:
@@ -71,7 +66,7 @@ def translate_text_engine(text: str, target_lang: str) -> str:
         
     return clean
 
-# Root Route: Serves the Frontend with Fixed Text Translation Modal
+# Root Route: Serves the Complete Frontend
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """<!DOCTYPE html>
@@ -178,13 +173,6 @@ def read_root():
         .chat-title { font-size: 15px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
         .chat-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
 
-        .fab-btn {
-            position: absolute; bottom: 70px; right: 20px;
-            width: 54px; height: 54px; border-radius: 50%; background: var(--accent-amber);
-            color: #000; border: none; font-size: 22px; display: flex; align-items: center;
-            justify-content: center; cursor: pointer; box-shadow: 0 4px 20px var(--accent-amber-glow);
-            z-index: 40;
-        }
         .bottom-nav-bar {
             height: 56px; border-top: 1px solid var(--border-graphite); background: var(--surface-panel);
             display: flex; align-items: center; justify-content: space-around; width: 100%;
@@ -207,15 +195,6 @@ def read_root():
             border-bottom: 1px solid var(--border-graphite);
             display: flex; align-items: center; justify-content: space-between;
             flex-shrink: 0; z-index: 10; min-height: 60px; gap: 6px;
-        }
-        .call-buttons-group { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-        .btn-call-action {
-            height: 34px; padding: 0 10px; border-radius: 17px; background: var(--surface-card);
-            border: 1px solid var(--border-graphite); color: #fff; display: flex;
-            align-items: center; gap: 5px; font-size: 12px; font-weight: 600; cursor: pointer;
-        }
-        .btn-call-action.trans-call-btn {
-            background: var(--accent-amber-dim); border-color: rgba(245, 158, 11, 0.4); color: var(--accent-amber);
         }
 
         .messages-container {
@@ -296,6 +275,13 @@ def read_root():
             width: 100%; background: var(--surface-card); border: 1px solid var(--border-graphite);
             padding: 10px; border-radius: 10px; color: #fff; font-size: 13px; outline: none;
         }
+
+        @media (max-width: 768px) {
+            .sidebar-panel { width: 100%; height: 100dvh; display: flex; }
+            .stage-panel { display: none; width: 100%; height: 100dvh; }
+            body.in-chat .sidebar-panel { display: none !important; }
+            body.in-chat .stage-panel { display: flex !important; flex-direction: column; height: 100dvh; }
+        }
     </style>
 </head>
 <body onclick="unlockMobileAudio()">
@@ -347,7 +333,6 @@ def read_root():
             <div class="chat-list" id="chat-list"></div>
             <nav class="bottom-nav-bar">
                 <button class="nav-tab-btn active" onclick="switchTab('chats')"><span class="tab-icon">💬</span><span>Chats</span></button>
-                <button class="nav-tab-btn" onclick="openSettingsModal()"><span class="tab-icon">⚙️</span><span>Settings</span></button>
             </nav>
         </aside>
 
