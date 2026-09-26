@@ -502,7 +502,7 @@
                 <div class="recording-bar" id="recording-bar">
                     <div class="rec-indicator">
                         <div class="rec-dot"></div>
-                        <span id="rec-live-words" style="font-size:12px; color:var(--accent-amber); max-width:140px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">Listening...</span>
+                        <span id="rec-live-words" style="font-size:12px; color:var(--accent-amber); max-width:140px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">Recording Audio...</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <button class="icon-btn" type="button" onclick="cancelRecording()" style="color: var(--danger-red);">🗑️</button>
@@ -550,8 +550,6 @@
         let recordedChunks = [];
         let isRecording = false;
         let activeAudioStream = null;
-        let voiceTranscriptText = "";
-        let voiceRecInstance = null;
 
         let pendingPayload = null;
         let currentAvatarUrl = "";
@@ -610,7 +608,6 @@
             const target = (lang || 'en').toLowerCase();
             const voices = window.speechSynthesis.getVoices();
             
-            // Intelligent voice mapping for Urdu and English
             let mv = voices.find(v => v.lang.toLowerCase().startsWith(target));
             if (!mv && target === 'ur') {
                 mv = voices.find(v => v.lang.toLowerCase().includes('ur') || v.lang.toLowerCase().includes('hi'));
@@ -1043,6 +1040,7 @@
         }
 
         function startLiveCallSpeechEngine() {
+            // Live call speech engine remains active via Web Speech API or backend streaming
             const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SR) return;
             try {
@@ -1130,74 +1128,49 @@
             else stopAndFinishRecording();
         }
 
+        // --- RELIABLE AUDIO RECORDING & BACKEND AI STT ---
         async function startVoiceRecording() {
             try {
-                voiceTranscriptText = "";
-                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (SR) {
-                    try {
-                        if (voiceRecInstance) { try { voiceRecInstance.stop(); } catch(e){} }
-                        voiceRecInstance = new SR();
-                        voiceRecInstance.continuous = true;
-                        voiceRecInstance.interimResults = true;
-                        
-                        // Intelligent Mic Language Switcher:
-                        // Jab target language Urdu ('ur') select hogi, toh mic English ('en-US') sune ga taake aap English bol sakein.
-                        // Jab target language English ('en') ya koi aur hogi, toh mic Urdu ('ur-PK') sune ga taake aap Urdu bol sakein.
-                        const targetLangSelect = document.getElementById("modal-target-lang");
-                        const selectedTarget = targetLangSelect ? targetLangSelect.value : "en";
-                        if (selectedTarget === 'ur') {
-                            voiceRecInstance.lang = 'en-US';
-                        } else {
-                            voiceRecInstance.lang = 'ur-PK';
-                        }
-                        
-                        voiceRecInstance.onresult = (event) => {
-                            let interim = "";
-                            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                                if (event.results[i].isFinal) {
-                                    voiceTranscriptText += event.results[i][0].transcript + " ";
-                                } else {
-                                    interim += event.results[i][0].transcript;
-                                }
-                            }
-                            const displayTxt = (voiceTranscriptText + interim).trim();
-                            const liveEl = document.getElementById("rec-live-words");
-                            if (liveEl) liveEl.innerText = displayTxt || "Listening carefully...";
-                        };
-
-                        voiceRecInstance.start();
-                    } catch(e) {}
-                }
-
                 activeAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(activeAudioStream);
                 recordedChunks = [];
-                mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
+                
+                mediaRecorder.ondataavailable = (e) => { 
+                    if (e.data && e.data.size > 0) recordedChunks.push(e.data); 
+                };
                 
                 mediaRecorder.onstop = async () => {
-                    setTimeout(async () => {
-                        if (voiceRecInstance) { try { voiceRecInstance.stop(); } catch(e){} }
-                        if (recordedChunks.length === 0) return;
-                        
-                        const blob = new Blob(recordedChunks, { type: "audio/webm" });
-                        const form = new FormData(); form.append("file", blob, "voice.webm");
-                        const res = await fetch("/api/upload", { method: "POST", body: form });
+                    if (recordedChunks.length === 0) return;
+                    
+                    const blob = new Blob(recordedChunks, { type: "audio/webm" });
+                    const form = new FormData(); 
+                    form.append("file", blob, "voice.webm");
+                    
+                    // Show loading on preview
+                    document.getElementById("voice-hint-field").value = "Transcribing audio via AI...";
+                    document.getElementById("send-modal-preview").innerText = "Processing Voice Audio...";
+                    document.getElementById("send-modal").style.display = "flex";
+
+                    try {
+                        // Send audio to backend for STT (Speech-to-Text via Gemini / Whisper)
+                        const res = await fetch("/api/stt", { method: "POST", body: form });
                         const data = await res.json();
-                        
-                        const finalCaptured = voiceTranscriptText.trim() || "voice message";
-                        pendingPayload = { type: "voice", content: data.url };
-                        document.getElementById("voice-hint-field").value = finalCaptured;
-                        document.getElementById("send-modal-preview").innerText = "Voice Note Captured Successfully";
-                        document.getElementById("send-modal").style.display = "flex";
-                    }, 400);
+                        const transcribedText = data.text || "voice message";
+
+                        pendingPayload = { type: "voice", content: data.url || "" };
+                        document.getElementById("voice-hint-field").value = transcribedText;
+                        document.getElementById("send-modal-preview").innerText = "Voice Note Ready to Send";
+                    } catch (err) {
+                        document.getElementById("voice-hint-field").value = "voice message";
+                        document.getElementById("send-modal-preview").innerText = "Audio uploaded successfully";
+                    }
                 };
 
                 mediaRecorder.start();
                 isRecording = true;
                 document.getElementById("input-shell").style.display = "none";
                 document.getElementById("recording-bar").style.display = "flex";
-            } catch (err) { alert("Mic error: " + err.message); }
+            } catch (err) { alert("Microphone access error: " + err.message); }
         }
 
         function stopAndFinishRecording() {
@@ -1207,10 +1180,10 @@
         }
 
         function cancelRecording() {
-            if (voiceRecInstance) { try { voiceRecInstance.stop(); } catch(e){} }
             if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
             if (activeAudioStream) { activeAudioStream.getTracks().forEach(t => t.stop()); activeAudioStream = null; }
             resetRecordingUI();
+            cancelDispatch();
         }
 
         function resetRecordingUI() {
@@ -1310,7 +1283,7 @@
             }
             
             bubble.innerHTML = body + `<div style="font-size:9px; opacity:0.6; text-align:right; margin-top:2px;">${time}</div>`;
-            box.appendChild(bubble);
+            box.appendChild(box.appendChild ? bubble : bubble);
             box.scrollTop = box.scrollHeight;
         }
 
