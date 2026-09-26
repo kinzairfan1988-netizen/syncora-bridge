@@ -1,122 +1,94 @@
 import os
-import shutil
-from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect
+import json
+import urllib.request
+import urllib.parse
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI()
+app = FastAPI(title="Syncora - Stable Main Server")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
 os.makedirs("static", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
+# Application State Dictionaries
 active_connections = {}
 user_profiles = {}
 user_contacts = {}
 message_history = {}
 
-class LoginRequest(BaseModel):
-    phone: str
-
-class ProfileUpdate(BaseModel):
-    phone: str
-    display_name: str = ""
-    about_status: str = ""
-    avatar_url: str = ""
-
-class ContactRequest(BaseModel):
-    user_phone: str
-    contact_phone: str
-
-class TranslateRequest(BaseModel):
+# Pydantic model for text translation
+class TranslationRequest(BaseModel):
     text: str
     target_lang: str = "en"
 
-@app.get("/", response_class=HTMLResponse)
-async def get_terminal():
-    if os.path.exists("index.html"):
-        with open("index.html", "r", encoding="utf-8") as f:
-            return f.read()
-    return "<h3>index.html not found!</h3>"
-
-@app.post("/api/auth/login")
-async def login_user(req: LoginRequest):
-    phone = req.phone.strip()
-    if phone not in user_profiles:
-        user_profiles[phone] = {"phone": phone, "display_name": f"User {phone[-4:]}", "about_status": "Hey there! I am using Syncora.", "avatar_url": ""}
-    if phone not in user_contacts:
-        user_contacts[phone] = []
-    return {"status": "success", "phone": phone}
-
-@app.get("/api/user/profile/{phone}")
-async def get_profile(phone: str):
-    return user_profiles.get(phone, {"phone": phone, "display_name": phone, "about_status": "", "avatar_url": ""})
-
-@app.post("/api/user/profile/update")
-async def update_profile(req: ProfileUpdate):
-    user_profiles[req.phone] = {"phone": req.phone, "display_name": req.display_name, "about_status": req.about_status, "avatar_url": req.avatar_url}
-    return {"status": "success"}
-
-@app.get("/api/user/status/{phone}")
-async def get_user_status(phone: str):
-    return {"phone": phone, "online": phone in active_connections}
-
-@app.get("/api/chats/{phone}")
-async def get_chats(phone: str):
-    return {"chats": user_contacts.get(phone, [])}
-
-@app.post("/api/contacts/add")
-async def add_contact(req: ContactRequest):
-    if req.user_phone not in user_contacts: user_contacts[req.user_phone] = []
-    if req.contact_phone not in user_contacts[req.user_phone]: user_contacts[req.user_phone].append(req.contact_phone)
-    return {"status": "success"}
-
-@app.get("/api/messages/{phone1}/{phone2}")
-async def get_messages(phone1: str, phone2: str):
-    key = f"{phone1}_{phone2}"
-    return {"messages": message_history.get(key, [])}
-
-@app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
-    file_path = os.path.join("uploads", file.filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    return {"url": f"/uploads/{file.filename}"}
-
-# --- STABLE AUDIO MESSAGE ENDPOINT (WhatsApp Style) ---
-@app.post("/api/stt")
-async def speech_to_text(file: UploadFile = File(...)):
+# Stable Translation Engine
+def translate_text_engine(text: str, target_lang: str) -> str:
+    clean = text.strip()
+    if not clean:
+        return ""
+    
+    target_lang = str(target_lang).strip().lower()
+    
+    if "zh" in target_lang or "chin" in target_lang:
+        t_lang = "zh-CN"
+    elif target_lang in ["ur", "ar", "de", "fr", "es"]:
+        t_lang = target_lang
+    else:
+        t_lang = "en"
+        
     try:
-        file_path = os.path.join("uploads", file.filename or "voice.webm")
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        # Server kabhi crash nahi hoga, audio direct playable URL ke sath return ho gi
-        return {"text": "🎤 Voice Message", "url": f"/uploads/{file.filename or 'voice.webm'}"}
+        encoded_text = urllib.parse.quote(clean)
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={t_lang}&dt=t&q={encoded_text}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=6) as response:
+            res_body = response.read().decode('utf-8')
+            res_data = json.loads(res_body)
+            if res_data and isinstance(res_data, list) and len(res_data) > 0:
+                translated_sentences = [s[0] for s in res_data[0] if s and s[0]]
+                translated_text = "".join(translated_sentences).strip()
+                if translated_text:
+                    return translated_text
     except Exception as e:
-        print("Audio Upload Error:", e)
-        return {"text": "🎤 Voice Message", "url": ""}
+        print(f"[Translation Error]: {e}")
+        
+    return clean
 
-# --- STABLE TRANSLATION ENDPOINT ---
+@app.get("/")
+def read_root():
+    return {"status": "Server is running perfectly", "module": "Text Translation Stable"}
+
+# Working Translation Endpoint
 @app.post("/translate")
-async def translate_text(req: TranslateRequest):
+async def translate_endpoint(req: TranslationRequest):
     try:
-        # Fallback / Safe translation handling so it never crashes
-        return {"translated_text": req.text}
+        translated = translate_text_engine(req.text, req.target_lang)
+        return {
+            "status": "success",
+            "original": req.text,
+            "target_lang": req.target_lang,
+            "translated_text": translated
+        }
     except Exception as e:
-        print("Translation Error:", e)
-        return {"translated_text": req.text}
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.websocket("/ws/{phone}")
-async def websocket_endpoint(websocket: WebSocket, phone: str):
+# WebSocket for real-time chat
+@app.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await websocket.accept()
-    active_connections[phone] = websocket
+    active_connections[client_id] = websocket
     try:
         while True:
-            data = await websocket.receive_json()
-            if data.get("action") == "ping":
-                await websocket.send_json({"action": "pong"})
+            data = await websocket.receive_text()
+            for cid, conn in active_connections.items():
+                if cid != client_id:
+                    await conn.send_text(data)
     except WebSocketDisconnect:
-        if phone in active_connections:
-            del active_connections[phone]
+        del active_connections[client_id]
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
