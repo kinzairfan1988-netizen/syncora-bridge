@@ -4,14 +4,14 @@ from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from audio_module import audio_router
+
 app = FastAPI()
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
 os.makedirs("static", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-app.include_router(audio_router)
+
 active_connections = {}
 user_profiles = {}
 user_contacts = {}
