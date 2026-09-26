@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Stable Final Server")
+app = FastAPI(title="Syncora Terminal - Complete Stable Server with Audio Module")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -67,17 +67,16 @@ def translate_text_engine(text: str, target_lang: str) -> str:
                     return translated_text
     except Exception as e:
         print(f"[Translation Error / Rate Limit]: {e}")
-        # Fallback dictionary if 429 occurs
         fallback_dict = {
             "kahan ho": "Where are you" if t_lang == "en" else "آپ کہاں ہیں",
-            "kiye kar rahy ho": "What are you doing" if t_lang == "en" else "آپ کیا کر रहे ہیں"
+            "kiye kar rahy ho": "What are you doing" if t_lang == "en" else "آپ کیا کر रहे हैं"
         }
         if clean.lower() in fallback_dict:
             return fallback_dict[clean.lower()]
             
     return f"[{t_lang.upper()}] {clean}"
 
-# Root Route: Serves the Frontend
+# Root Route: Serves the Complete Frontend with Stable Text Translation & Audio Support
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """<!DOCTYPE html>
@@ -314,7 +313,7 @@ def read_root():
         <div class="send-modal-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);">Confirm Dispatch</h3>
             <p style="font-size: 12px; color: var(--text-muted);" id="send-modal-preview">Review message text</p>
-            <div class="lang-options-drawer">
+            <div class="lang-options-drawer" id="text-lang-drawer" style="display:flex;">
                 <label style="font-size: 11px; color: var(--text-muted);">Select Target Language:</label>
                 <select class="lang-dropdown" id="modal-target-lang">
                     <option value="en" selected>English (US)</option>
@@ -327,7 +326,7 @@ def read_root():
                 </select>
                 <button class="modal-btn-choice btn-choice-trans" onclick="confirmDispatchTranslation()">🌐 Translate & Send</button>
             </div>
-            <button class="modal-btn-choice" onclick="confirmDispatchOriginal()" style="margin-top: 4px;">✉️ Send Without Translation</button>
+            <button class="modal-btn-choice" id="btn-send-original" onclick="confirmDispatchOriginal()" style="margin-top: 4px;">✉️ Send Without Translation</button>
             <button onclick="cancelDispatch()" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer;">Cancel</button>
         </div>
     </div>
@@ -515,6 +514,8 @@ def read_root():
             if (!text || !activePartner) return;
             pendingPayload = { content: text, type: "text" };
             document.getElementById("send-modal-preview").innerText = `"${text}"`;
+            document.getElementById("text-lang-drawer").style.display = "flex";
+            document.getElementById("btn-send-original").style.display = "flex";
             document.getElementById("send-modal").style.display = "flex";
         }
 
@@ -595,9 +596,8 @@ def read_root():
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
                     
-                    pendingPayload = { content: data.url, type: "voice" };
-                    document.getElementById("send-modal-preview").innerText = "Voice Note Ready to Send";
-                    document.getElementById("send-modal").style.display = "flex";
+                    # Audio sends directly as voice note without text modal interference
+                    executeDispatch(data.url, "", "voice");
                 };
                 mediaRecorder.start();
                 isRecording = true;
@@ -616,7 +616,6 @@ def read_root():
             if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
             if (activeAudioStream) { activeAudioStream.getTracks().forEach(t => t.stop()); activeAudioStream = null; }
             resetRecordingUI();
-            cancelDispatch();
         }
 
         function resetRecordingUI() {
