@@ -5,10 +5,11 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-# Safe import for Gemini
 try:
     import google.generativeai as genai
     HAS_GEMINI = True
+    # Agar aapki API key environment variable mein nahi hai, toh aap yahan direct bhi set kar sakte hain:
+    # genai.configure(api_key="YOUR_GEMINI_API_KEY")
 except ImportError:
     HAS_GEMINI = False
 
@@ -91,23 +92,40 @@ async def upload_file(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
     return {"url": f"/uploads/{file.filename}"}
 
+# --- ASAL GEMINI AUDIO TRANSCRIPTION (STT) ENDPOINT ---
 @app.post("/api/stt")
 async def speech_to_text(file: UploadFile = File(...)):
+    file_path = os.path.join("uploads", file.filename or "voice.webm")
     try:
         audio_bytes = await file.read()
-        file_path = os.path.join("uploads", file.filename or "voice.webm")
         with open(file_path, "wb") as f:
             f.write(audio_bytes)
+        
+        transcribed_text = "voice message"
+        if HAS_GEMINI:
+            try:
+                audio_file = genai.upload_file(file_path)
+                model = genai.GenerativeModel("gemini-1.5-flash")
+                response = model.generate_content([
+                    audio_file, 
+                    "Listen to this audio recording. Accurately transcribe what is spoken. Return ONLY the transcribed text without extra quotes or formatting."
+                ])
+                if response and response.text:
+                    transcribed_text = response.text.strip()
+            except Exception as ex:
+                print("Gemini STT processing error:", ex)
+                
+        return {"text": transcribed_text, "url": f"/uploads/{file.filename or 'voice.webm'}"}
+    except Exception as e:
+        print("STT Error:", e)
         return {"text": "voice message", "url": f"/uploads/{file.filename or 'voice.webm'}"}
-    except Exception:
-        return {"text": "voice message", "url": ""}
 
 @app.post("/translate")
 async def translate_text(req: TranslateRequest):
     try:
         if HAS_GEMINI:
             model = genai.GenerativeModel("gemini-1.5-flash")
-            response = model.generate_content(f"Translate to {req.target_lang} (return only translated text):\n\n{req.text}")
+            response = model.generate_content(f"Translate the following text into target language '{req.target_lang}' (e.g. ur for Urdu, en for English). Return ONLY the translated text without extra formatting:\n\n{req.text}")
             return {"translated_text": response.text.strip() if response and response.text else req.text}
         else:
             return {"translated_text": req.text}
