@@ -8,12 +8,18 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Complete Stable Server")
+# Audio module import
+from audio_module import audio_router
+
+app = FastAPI(title="Syncora Terminal - Modular Stable Server")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
 os.makedirs("static", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# Include isolated audio router safely
+app.include_router(audio_router)
 
 # Application State Dictionaries
 active_connections = {}
@@ -71,7 +77,7 @@ def translate_text_engine(text: str, target_lang: str) -> str:
         
     return clean
 
-# Root Route: Serves the Complete Frontend with ALL Language Options restored
+# Root Route: Serves the Complete Frontend Interface
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """<!DOCTYPE html>
@@ -1432,13 +1438,6 @@ async def upload_file(file: UploadFile = File(...)):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     return {"status": "success", "url": f"/uploads/{file.filename}"}
-
-@app.post("/api/stt")
-async def speech_to_text(file: UploadFile = File(...)):
-    file_path = os.path.join("uploads", file.filename or "voice.webm")
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    return {"status": "success", "text": "voice message note", "url": f"/uploads/{file.filename}"}
 
 # WebSocket for real-time messaging & WebRTC signaling
 @app.websocket("/ws/{client_id}")
