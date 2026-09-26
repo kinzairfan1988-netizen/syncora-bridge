@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Final Audio Stable Server")
+app = FastAPI(title="Syncora Terminal - Final Stable Server")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -71,7 +71,7 @@ def translate_text_engine(text: str, target_lang: str) -> str:
         
     return clean
 
-# Root Route: Serves the Final Complete Frontend with Native Voice Notes & WhatsApp UX
+# Root Route: Serves the Final Clean Frontend
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """<!DOCTYPE html>
@@ -1219,15 +1219,11 @@ def read_root():
                     const blob = new Blob(recordedChunks, { type: "audio/webm" });
                     const form = new FormData(); 
                     form.append("file", blob, "voice.webm");
-                    
-                    document.getElementById("voice-hint-field").value = "Voice note recorded";
-                    document.getElementById("send-modal-preview").innerText = "Voice Note Ready to Send";
-                    document.getElementById("send-modal").style.display = "flex";
 
                     try {
                         const res = await fetch("/api/upload", { method: "POST", body: form });
                         const data = await res.json();
-                        pendingPayload = { type: "voice", content: data.url || "" };
+                        executeDispatch(data.url, "", "voice");
                     } catch (err) {
                         alert("Audio upload failed");
                     }
@@ -1262,9 +1258,8 @@ def read_root():
         function stageMessageForDispatch() {
             const text = document.getElementById("text-input").value.trim();
             if (!text || !activePartner) return;
-            pendingPayload = { type: "text", content: text };
-            document.getElementById("voice-hint-field").value = text;
-            document.getElementById("send-modal-preview").innerText = `"${text.substring(0, 30)}"`;
+            pendingPayload = { content: text };
+            document.getElementById("send-modal-preview").innerText = `"${text}"`;
             document.getElementById("send-modal").style.display = "flex";
         }
 
@@ -1272,34 +1267,23 @@ def read_root():
 
         function confirmDispatchOriginal() {
             if (!pendingPayload) return;
-            let finalContent = pendingPayload.content;
-            if (pendingPayload.type === "text") {
-                finalContent = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
-            }
-            executeDispatch(pendingPayload.content, finalContent, pendingPayload.type);
+            executeDispatch(pendingPayload.content, "", "text");
             cancelDispatch();
         }
 
         async function confirmDispatchTranslation() {
             if (!pendingPayload) return;
-            if (pendingPayload.type === "voice") {
-                confirmDispatchOriginal();
-                return;
-            }
-            const targetLang = document.getElementById("modal-target-lang").value || "en";
-            let textToTranslate = document.getElementById("voice-hint-field").value.trim() || pendingPayload.content;
-
-            let translatedText = textToTranslate;
+            const targetLang = document.getElementById("modal-target-lang").value;
+            let translatedText = pendingPayload.content;
             try {
                 const res = await fetch("/translate", {
                     method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
+                    body: JSON.stringify({ text: pendingPayload.content, target_lang: targetLang })
                 });
                 const data = await res.json();
-                translatedText = data.translated_text || textToTranslate;
-            } catch (e) {}
-
-            executeDispatch(pendingPayload.content, translatedText, pendingPayload.type, targetLang);
+                translatedText = data.translated_text || pendingPayload.content;
+            } catch(e){}
+            executeDispatch(pendingPayload.content, translatedText, "text", targetLang);
             cancelDispatch();
         }
 
