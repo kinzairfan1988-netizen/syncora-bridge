@@ -1040,7 +1040,6 @@
         }
 
         function startLiveCallSpeechEngine() {
-            // Live call speech engine remains active via Web Speech API or backend streaming
             const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SR) return;
             try {
@@ -1128,7 +1127,6 @@
             else stopAndFinishRecording();
         }
 
-        // --- RELIABLE AUDIO RECORDING & BACKEND AI STT ---
         async function startVoiceRecording() {
             try {
                 activeAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1146,13 +1144,11 @@
                     const form = new FormData(); 
                     form.append("file", blob, "voice.webm");
                     
-                    // Show loading on preview
                     document.getElementById("voice-hint-field").value = "Transcribing audio via AI...";
                     document.getElementById("send-modal-preview").innerText = "Processing Voice Audio...";
                     document.getElementById("send-modal").style.display = "flex";
 
                     try {
-                        // Send audio to backend for STT (Speech-to-Text via Gemini / Whisper)
                         const res = await fetch("/api/stt", { method: "POST", body: form });
                         const data = await res.json();
                         const transcribedText = data.text || "voice message";
@@ -1267,12 +1263,9 @@
                     if (btnEl) {
                         btnEl.onclick = () => {
                             unlockMobileAudio();
-                            if (translated && translated.trim() !== "") {
-                                playSpokenVoice(translated, lang);
-                            } else {
-                                const audio = new Audio(audioFileUrl);
-                                audio.play().catch(err => alert("Audio play error: " + err.message));
-                            }
+                            // Strict Playback Logic: Hamesha translated text ya content ko bolayga
+                            const textToSpeak = (translated && translated.trim() !== "") ? translated : content;
+                            playSpokenVoice(textToSpeak, lang);
                         };
                     }
                 }, 50);
@@ -1283,7 +1276,7 @@
             }
             
             bubble.innerHTML = body + `<div style="font-size:9px; opacity:0.6; text-align:right; margin-top:2px;">${time}</div>`;
-            box.appendChild(box.appendChild ? bubble : bubble);
+            box.appendChild(bubble);
             box.scrollTop = box.scrollHeight;
         }
 
