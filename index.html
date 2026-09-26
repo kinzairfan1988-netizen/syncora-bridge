@@ -1127,7 +1127,15 @@
                         voiceRecInstance = new SR();
                         voiceRecInstance.continuous = true;
                         voiceRecInstance.interimResults = true;
-                        voiceRecInstance.lang = 'ur-PK';
+                        
+                        // Smart Language Selection: Agar target language Urdu (ur) hai, toh mic English (en-US) sunega, warna Urdu (ur-PK) sunega
+                        const targetLangSelect = document.getElementById("modal-target-lang");
+                        const selectedTarget = targetLangSelect ? targetLangSelect.value : "en";
+                        if (selectedTarget === 'ur') {
+                            voiceRecInstance.lang = 'en-US';
+                        } else {
+                            voiceRecInstance.lang = 'ur-PK';
+                        }
                         
                         voiceRecInstance.onresult = (event) => {
                             let interim = "";
