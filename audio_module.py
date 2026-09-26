@@ -1,25 +1,24 @@
-from fastapi import APIRouter, File, UploadFile
 import os
 import shutil
+from fastapi import APIRouter, File, UploadFile, HTTPException
 
-# Ek bilkul alag router taake audio ka code main code mein mix na ho
-audio_router = APIRouter(prefix="/audio", tags=["Audio Module"])
+audio_router = APIRouter(prefix="/api", tags=["Audio Module"])
 
-AUDIO_DIR = "isolated_audio"
-os.makedirs(AUDIO_DIR, exist_ok=True)
+# Ensure uploads directory exists
+os.makedirs("uploads", exist_ok=True)
 
-@audio_router.post("/upload")
-async def handle_isolated_audio(file: UploadFile = File(...)):
+@audio_router.post("/stt")
+async def speech_to_text_module(file: UploadFile = File(...)):
     try:
-        file_path = os.path.join(AUDIO_DIR, file.filename or "voice_note.webm")
+        file_path = os.path.join("uploads", file.filename or "voice.webm")
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        
-        # Yeh bilkul clean response dega bina server crash kiye
+            
+        # Yahan aap apna future STT ya Gemini audio processing logic add kar sakte hain
         return {
             "status": "success",
-            "message": "Audio safely stored in isolated module",
-            "audio_url": f"/{AUDIO_DIR}/{file.filename or 'voice_note.webm'}"
+            "text": "voice message note",
+            "url": f"/uploads/{file.filename}"
         }
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
