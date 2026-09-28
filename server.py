@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Complete Features Build")
+app = FastAPI(title="Syncora Terminal - Final Production Build")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -16,6 +16,7 @@ os.makedirs("static", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 active_connections = {}
+user_contacts = {}
 message_history = {}
 
 class TranslationRequest(BaseModel):
@@ -25,7 +26,7 @@ class TranslationRequest(BaseModel):
 class LoginRequest(BaseModel):
     phone: str
 
-# Translation Engine
+# Stable Translation Engine with Fallback
 def translate_text_engine(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
@@ -44,7 +45,7 @@ def translate_text_engine(text: str, target_lang: str) -> str:
         pass
     return f"[{t_lang.upper()}] {clean}"
 
-# Root Frontend Route with Full UI & Features
+# Root Frontend Route
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """<!DOCTYPE html>
@@ -66,7 +67,7 @@ def read_root():
         .btn-auth { width: 100%; background: var(--accent); color: #000; font-weight: 700; border: none; padding: 14px; border-radius: 12px; cursor: pointer; font-size: 15px; }
         .workspace { display: flex; width: 100%; height: 100%; }
         .sidebar { width: 360px; border-right: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; }
-        .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); color: var(--accent); font-size: 18px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); color: var(--accent); font-size: 18px; font-weight: bold; display: flex; justify-content: space-between; }
         .chat-list { flex: 1; overflow-y: auto; }
         .chat-item { padding: 14px 18px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; gap: 12px; align-items: center; }
         .chat-item:hover { background: #232b3b; }
@@ -78,8 +79,7 @@ def read_root():
         .bubble.received { align-self: flex-start; background: var(--card); border: 1px solid var(--border); }
         .input-bar { padding: 12px; background: var(--panel); border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
         .main-input { flex: 1; background: var(--card); border: 1px solid var(--border); padding: 10px 14px; border-radius: 20px; color: #fff; outline: none; font-size: 14px; }
-        .btn-action { width: 40px; height: 40px; border-radius: 50%; background: var(--card); color: var(--accent); border: 1px solid var(--border); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .btn-send { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: #000; border: none; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .btn-action { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: #000; border: none; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; display: none; align-items: center; justify-content: center; padding: 20px; }
         .modal-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 10px; }
     </style>
@@ -115,7 +115,7 @@ def read_root():
     <div class="workspace">
         <aside class="sidebar">
             <div class="sidebar-header">
-                <span>CHATS</span>
+                <span>SYNCORA</span>
                 <span id="my-phone-display" style="font-size: 12px; color: var(--green);"></span>
             </div>
             <div class="chat-list" id="chat-list">
@@ -133,9 +133,9 @@ def read_root():
             <header class="stage-header" id="active-chat-title">Select a chat</header>
             <div class="messages" id="messages-container"></div>
             <footer class="input-bar">
-                <input type="text" id="text-input" class="main-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter') stageMessage()">
-                <button class="btn-action" onclick="toggleVoiceRecording()" title="Voice Note">🎙️</button>
-                <button class="btn-send" onclick="stageMessage()">➤</button>
+                <input type="text" id="text-input" class="main-input" placeholder="Type message..." onkeydown="if(event.key==='Enter') stageMessage()">
+                <button class="btn-action" onclick="toggleVoiceRecording()" title="Voice Note" style="background:var(--card); color:var(--accent); border:1px solid var(--border);">🎙️</button>
+                <button class="btn-action" onclick="stageMessage()">➤</button>
             </footer>
         </main>
     </div>
