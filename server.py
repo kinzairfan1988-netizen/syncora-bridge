@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Complete Integrated Build")
+app = FastAPI(title="Syncora Terminal - Full Build with WhatsApp Direct")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -67,8 +67,9 @@ def read_root():
         .workspace { display: flex; width: 100%; height: 100%; }
         .sidebar { width: 360px; border-right: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; }
         .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); color: var(--accent); font-size: 18px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
-        .search-box-container { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+        .search-box-container { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; }
         .search-input { width: 100%; background: var(--card); border: 1px solid var(--border); padding: 10px 14px; border-radius: 8px; color: #fff; outline: none; font-size: 13px; }
+        .wa-direct-btn { background: #25D366; color: #fff; border: none; padding: 0 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 12px; }
         .chat-list { flex: 1; overflow-y: auto; }
         .chat-item { padding: 14px 18px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; gap: 12px; align-items: center; }
         .chat-item:hover { background: #232b3b; }
@@ -137,7 +138,8 @@ def read_root():
                 <span id="my-phone-display" style="font-size: 12px; color: var(--green);"></span>
             </div>
             <div class="search-box-container">
-                <input type="text" class="search-input" placeholder="Search chats..." id="search-chats">
+                <input type="text" class="search-input" placeholder="Enter phone for direct WA..." id="wa-phone-input">
+                <button class="wa-direct-btn" onclick="openWhatsAppDirect()" title="Open WhatsApp Chat">WA</button>
             </div>
             <div class="chat-list" id="chat-list">
                 <div class="chat-item" onclick="selectChat('03111111111')">
@@ -266,6 +268,18 @@ def read_root():
                 const status = document.getElementById("active-chat-status");
                 if (status) status.innerText = "Offline";
             };
+        }
+
+        function openWhatsAppDirect() {
+            const phoneInput = document.getElementById("wa-phone-input").value.trim();
+            if (!phoneInput) {
+                alert("Please enter a phone number for WhatsApp direct chat!");
+                return;
+            }
+            // Clean phone number (remove spaces, plus signs, dashes)
+            const cleanNum = phoneInput.replace(/[^0-9]/g, '');
+            const waUrl = `https://wa.me/${cleanNum}`;
+            window.open(waUrl, '_blank');
         }
 
         function selectChat(partner) {
