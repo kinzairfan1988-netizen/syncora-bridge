@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - WhatsApp Desktop App Integration")
+app = FastAPI(title="Syncora Terminal - WhatsApp Desktop App with Message")
 
 # Directories and Database setup
 os.makedirs("uploads", exist_ok=True)
@@ -514,8 +514,11 @@ def read_root():
             if (!phoneInput) { alert("Enter WhatsApp number!"); return; }
             const cleanNum = phoneInput.replace(/[^0-9]/g, '');
             
-            // Shifted directly to desktop WhatsApp application protocol
-            const waDesktopUrl = `whatsapp://send?phone=${cleanNum}`;
+            // Generate invite link to send directly via WhatsApp desktop app
+            const inviteUrl = `${window.location.origin}/?invite=${myInviteToken}`;
+            const messageText = encodeURIComponent(`Hi! Let's connect on Syncora Bridge: ${inviteUrl}`);
+            
+            const waDesktopUrl = `whatsapp://send?phone=${cleanNum}&text=${messageText}`;
             window.location.href = waDesktopUrl;
         }
 
@@ -658,7 +661,7 @@ def read_root():
                 html = `<div style="display:flex; align-items:center; gap:10px;"><audio id="${aid}" src="${text}"></audio><button onclick="document.getElementById('${aid}').play()" style="background:#000; color:var(--accent); border:none; width:34px; height:34px; border-radius:50%; cursor:pointer;">▶</button><span style="font-size:12px; font-weight:600;">Voice Note</span></div>`;
             } else if (type === "media") {
                 html = `<img src="${text}" style="max-width:200px; border-radius:8px;" /><div style="font-size:11px; margin-top:4px;">Photo / Video</div>`;
-            } else if (type === "document") {
+            } else if (type ===="document") {
                 html = `<a href="${text}" target="_blank" style="color:var(--accent); text-decoration:underline; font-weight:600;">📄 Download Document</a>`;
             } else if (type === "location") {
                 html = `<a href="${text}" target="_blank" style="color:var(--accent); text-decoration:underline; font-weight:600;">📍 View Shared Location</a>`;
