@@ -4,11 +4,11 @@ import json
 import urllib.request
 import urllib.parse
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, File, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Full Live Build")
+app = FastAPI(title="Syncora Terminal - Complete Integrated Build")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -40,6 +40,10 @@ def translate_text_engine(text: str, target_lang: str) -> str:
     except Exception:
         pass
     return f"[{t_lang.upper()}] {clean}"
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(status_code=204)
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
@@ -215,13 +219,52 @@ def read_root():
 
         function initSocket() {
             if (!myPhone) return;
+
             const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
-            socket = new WebSocket(proto + window.location.host + "/ws/" + myPhone);
+            const wsUrl = proto + window.location.host + "/ws/" + encodeURIComponent(myPhone);
+
+            console.log("SYNCORA WebSocket connecting:", wsUrl);
+
+            socket = new WebSocket(wsUrl);
+
+            socket.onopen = function() {
+                console.log("SYNCORA WebSocket connected:", myPhone);
+                const status = document.getElementById("active-chat-status");
+                if (status) status.innerText = "Online";
+            };
+
             socket.onmessage = function(e) {
-                const data = JSON.parse(e.data);
-                if (data.action === "new_message" && data.sender === activePartner) {
-                    appendBubble(data.content, "received", data.translated, data.msg_type);
+                console.log("SYNCORA WebSocket message:", e.data);
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.action === "new_message" && data.sender === activePartner) {
+                        appendBubble(
+                            data.content,
+                            "received",
+                            data.translated,
+                            data.msg_type
+                        );
+                    }
+                } catch (err) {
+                    console.error("SYNCORA WebSocket message error:", err);
                 }
+            };
+
+            socket.onerror = function(error) {
+                console.error("SYNCORA WebSocket error:", error);
+                const status = document.getElementById("active-chat-status");
+                if (status) status.innerText = "Connection Error";
+            };
+
+            socket.onclose = function(event) {
+                console.warn(
+                    "SYNCORA WebSocket closed. code:",
+                    event.code,
+                    "reason:",
+                    event.reason
+                );
+                const status = document.getElementById("active-chat-status");
+                if (status) status.innerText = "Offline";
             };
         }
 
