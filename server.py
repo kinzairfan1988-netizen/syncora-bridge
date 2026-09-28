@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Final Auto-Select Build")
+app = FastAPI(title="Syncora Terminal - Original Stable Build")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -119,7 +119,7 @@ def read_root():
                 <span id="my-phone-display" style="font-size: 12px; color: var(--green);"></span>
             </div>
             <div class="chat-list" id="chat-list">
-                <div class="chat-item" id="default-chat-item" onclick="selectChat('03111111111')">
+                <div class="chat-item" onclick="selectChat('03111111111')">
                     <div style="width:36px; height:36px; background:#2d3748; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--accent); font-weight:700;">11</div>
                     <div>
                         <div style="font-weight:600; font-size:14px;">Test Contact (03111111111)</div>
@@ -155,8 +155,6 @@ def read_root():
                 document.getElementById("auth-overlay").style.display = "none";
                 document.getElementById("my-phone-display").innerText = myPhone;
                 initSocket();
-                // Automatically select the test contact on load
-                selectChat('03111111111');
             }
         };
 
@@ -168,8 +166,6 @@ def read_root():
             document.getElementById("auth-overlay").style.display = "none";
             document.getElementById("my-phone-display").innerText = myPhone;
             initSocket();
-            // Automatically select the test contact after login
-            selectChat('03111111111');
         }
 
         function initSocket() {
