@@ -327,7 +327,6 @@
         </div>
     </div>
 
-    <!-- Caller Language Setup Modal -->
     <div class="call-setup-backdrop" id="call-setup-modal">
         <div class="call-setup-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);">🌐 Select Translation Language</h3>
@@ -1263,7 +1262,6 @@
                     if (btnEl) {
                         btnEl.onclick = () => {
                             unlockMobileAudio();
-                            // Strict Playback Logic: Hamesha translated text ya content ko bolayga
                             const textToSpeak = (translated && translated.trim() !== "") ? translated : content;
                             playSpokenVoice(textToSpeak, lang);
                         };
