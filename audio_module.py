@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Final Clean Boot")
+app = FastAPI(title="Syncora Terminal - Clean Production Server")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -137,7 +137,7 @@ def read_root():
             <div class="messages" id="messages-container"></div>
             <footer class="input-bar">
                 <input type="text" id="text-input" class="main-input" placeholder="Type message..." onkeydown="if(event.key==='Enter') stageMessage()">
-                <button class="btn-inside-mic" onclick="toggleVoice()" title="Voice Note" style="background:transparent; border:none; color:var(--accent); font-size:20px; cursor:pointer;">🎙️</button>
+                <button onclick="toggleVoice()" title="Voice Note" style="background:transparent; border:none; color:var(--accent); font-size:20px; cursor:pointer;">🎙️</button>
                 <button class="btn-send" onclick="stageMessage()">➤</button>
             </footer>
         </main>
