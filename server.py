@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Full Layout & Features Build")
+app = FastAPI(title="Syncora Terminal - WhatsApp Style Features")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -71,7 +71,7 @@ def read_root():
         .sidebar-footer { padding: 12px; border-top: 1px solid var(--border); display: flex; justify-content: space-around; background: var(--panel); }
         .nav-tab { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-weight: 600; }
         .nav-tab.active { color: var(--accent); }
-        .stage { flex: 1; display: flex; flex-direction: column; background: var(--bg); }
+        .stage { flex: 1; display: flex; flex-direction: column; background: var(--bg); position: relative; }
         .stage-header { padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
         .stage-header-left { display: flex; align-items: center; gap: 12px; }
         .stage-header-actions { display: flex; gap: 10px; align-items: center; }
@@ -81,10 +81,16 @@ def read_root():
         .bubble { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 14px; word-break: break-word; }
         .bubble.sent { align-self: flex-end; background: var(--accent); color: #000; font-weight: 600; }
         .bubble.received { align-self: flex-start; background: var(--card); border: 1px solid var(--border); }
-        .input-bar { padding: 12px; background: var(--panel); border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
+        .input-bar { padding: 12px; background: var(--panel); border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; position: relative; }
         .main-input { flex: 1; background: var(--card); border: 1px solid var(--border); padding: 10px 14px; border-radius: 20px; color: #fff; outline: none; font-size: 14px; }
         .btn-action { width: 40px; height: 40px; border-radius: 50%; background: var(--card); color: var(--accent); border: 1px solid var(--border); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .btn-send { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: #000; border: none; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        
+        /* WhatsApp Style Attachment Menu */
+        .attach-menu { position: absolute; bottom: 65px; left: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 8px; display: none; flex-direction: column; gap: 6px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        .attach-item { background: var(--card); border: none; color: #fff; padding: 8px 14px; border-radius: 8px; cursor: pointer; text-align: left; font-size: 13px; display: flex; gap: 8px; align-items: center; }
+        .attach-item:hover { background: #232b3b; color: var(--accent); }
+
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; display: none; align-items: center; justify-content: center; padding: 20px; }
         .modal-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 10px; }
     </style>
@@ -117,8 +123,9 @@ def read_root():
         </div>
     </div>
 
-    <!-- File Attachment Hidden Input -->
-    <input type="file" id="file-upload-input" style="display:none" onchange="uploadAttachment(this)">
+    <!-- Hidden File Inputs -->
+    <input type="file" id="media-upload-input" accept="image/*,video/*" style="display:none" onchange="uploadFile(this, 'media')">
+    <input type="file" id="doc-upload-input" style="display:none" onchange="uploadFile(this, 'document')">
 
     <div class="workspace">
         <aside class="sidebar">
@@ -163,7 +170,14 @@ def read_root():
             <div class="messages" id="messages-container"></div>
 
             <footer class="input-bar">
-                <button class="btn-action" onclick="document.getElementById('file-upload-input').click()" title="Attach File">📎</button>
+                <!-- Attachment Menu Popup -->
+                <div class="attach-menu" id="attach-menu">
+                    <button class="attach-item" onclick="triggerMediaUpload()">📷 Photos & Videos</button>
+                    <button class="attach-item" onclick="triggerDocUpload()">📄 Document</button>
+                    <button class="attach-item" onclick="sendLocation()">📍 Location</button>
+                </div>
+
+                <button class="btn-action" onclick="toggleAttachMenu()" title="Attach">📎</button>
                 <input type="text" id="text-input" class="main-input" placeholder="Message..." onkeydown="if(event.key==='Enter') stageMessage()">
                 <button class="btn-action" onclick="toggleVoiceRecording()" title="Voice Note">🎙️</button>
                 <button class="btn-send" onclick="stageMessage()">➤</button>
@@ -229,6 +243,55 @@ def read_root():
             }
         }
 
+        function toggleAttachMenu() {
+            const menu = document.getElementById("attach-menu");
+            menu.style.display = menu.style.display === "flex" ? "none" : "flex";
+        }
+
+        function triggerMediaUpload() {
+            document.getElementById("attach-menu").style.display = "none";
+            document.getElementById("media-upload-input").click();
+        }
+
+        function triggerDocUpload() {
+            document.getElementById("attach-menu").style.display = "none";
+            document.getElementById("doc-upload-input").click();
+        }
+
+        async function uploadFile(input, fileType) {
+            if(!activePartner) { alert("Pehle contact select karein!"); return; }
+            if(input.files && input.files[0]) {
+                const form = new FormData();
+                form.append("file", input.files[0]);
+                try {
+                    const res = await fetch("/api/upload", { method: "POST", body: form });
+                    const data = await res.json();
+                    if(data.url) {
+                        dispatchMsg(data.url, "", fileType);
+                    }
+                } catch(e) {
+                    alert("Upload failed");
+                }
+            }
+        }
+
+        function sendLocation() {
+            document.getElementById("attach-menu").style.display = "none";
+            if(!activePartner) { alert("Pehle contact select karein!"); return; }
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    const mapUrl = `https://maps.google.com/?q=${lat},${lon}`;
+                    dispatchMsg(mapUrl, "Shared Location", "location");
+                }, () => {
+                    alert("Unable to retrieve your location");
+                });
+            } else {
+                alert("Geolocation is not supported by your browser");
+            }
+        }
+
         function startAudioCall() {
             if(!activePartner) { alert("Pehle contact select karein!"); return; }
             alert("Audio calling initiated with " + activePartner);
@@ -269,23 +332,6 @@ def read_root():
         function sendOriginal() {
             document.getElementById("send-modal").style.display = "none";
             dispatchMsg(pendingText, "", "text");
-        }
-
-        async function uploadAttachment(input) {
-            if(!activePartner) { alert("Pehle contact select karein!"); return; }
-            if(input.files && input.files[0]) {
-                const form = new FormData();
-                form.append("file", input.files[0]);
-                try {
-                    const res = await fetch("/api/upload", { method: "POST", body: form });
-                    const data = await res.json();
-                    if(data.url) {
-                        dispatchMsg(data.url, "", "file");
-                    }
-                } catch(e) {
-                    alert("File upload failed");
-                }
-            }
         }
 
         async function toggleVoiceRecording() {
@@ -353,8 +399,12 @@ def read_root():
                         <span style="font-size:12px; font-weight:600;">Voice Note</span>
                     </div>
                 `;
-            } else if (type === "file") {
-                html = `<a href="${text}" target="_blank" style="color:var(--accent); text-decoration:underline;">📁 Download Attached File</a>`;
+            } else if (type === "media") {
+                html = `<img src="${text}" style="max-width:200px; border-radius:8px;" /><div style="font-size:11px; margin-top:4px;">Photo / Video</div>`;
+            } else if (type === "document") {
+                html = `<a href="${text}" target="_blank" style="color:var(--accent); text-decoration:underline; font-weight:600;">📄 Download Document</a>`;
+            } else if (type === "location") {
+                html = `<a href="${text}" target="_blank" style="color:var(--accent); text-decoration:underline; font-weight:600;">📍 View Shared Location</a>`;
             } else {
                 html = "<div>" + text + "</div>";
                 if (translated && translated.trim()) {
