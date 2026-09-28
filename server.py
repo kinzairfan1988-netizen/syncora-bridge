@@ -8,11 +8,17 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-# Direct Audio Translation Handler inside server to completely avoid import errors
-from google import genai
-from google.genai import types
+# Safe Gemini import fallback to prevent deployment crashes
+try:
+    from google import genai
+    from google.genai import types
+    GENAI_AVAILABLE = True
+except ImportError:
+    GENAI_AVAILABLE = False
 
 def handle_audio_stream(audio_data: bytes, target_lang: str = "Urdu") -> str:
+    if not GENAI_AVAILABLE:
+        return "Audio translation module unavailable (google-genai not installed)."
     try:
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
