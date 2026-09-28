@@ -1,71 +1,329 @@
 import os
-import asyncio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import shutil
+import json
+import urllib.request
+import urllib.parse
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, File, UploadFile
 from fastapi.responses import HTMLResponse
-from google import genai
-from google.genai import types
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
-app = FastAPI()
+app = FastAPI(title="Syncora Terminal - Complete Features Build")
 
-# Initialize Gemini Client
-# Make sure GEMINI_API_KEY is set in your environment variables
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+# Directories setup
+os.makedirs("uploads", exist_ok=True)
+os.makedirs("static", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# Store active connections
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
+active_connections = {}
+message_history = {}
 
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
+class TranslationRequest(BaseModel):
+    text: str
+    target_lang: str = "en"
 
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections in self.active_connections and self.active_connections.remove(websocket)
+class LoginRequest(BaseModel):
+    phone: str
 
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
+# Translation Engine
+def translate_text_engine(text: str, target_lang: str) -> str:
+    clean = text.strip()
+    if not clean:
+        return ""
+    target_lang = str(target_lang).strip().lower()
+    t_lang = target_lang if target_lang in ["ur", "ar", "de", "fr", "es", "zh-cn"] else "en"
+    try:
+        encoded_text = urllib.parse.quote(clean)
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={t_lang}&dt=t&q={encoded_text}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=3) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            if res_data and isinstance(res_data, list):
+                return "".join([s[0] for s in res_data[0] if s and s[0]]).strip()
+    except Exception:
+        pass
+    return f"[{t_lang.upper()}] {clean}"
 
-manager = ConnectionManager()
+# Root Frontend Route with Full UI & Features
+@app.get("/", response_class=HTMLResponse)
+def read_root():
+    return """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Syncora Terminal</title>
+    <style>
+        :root {
+            --bg: #0b0e14; --panel: #121721; --card: #1a202c; --border: #2d3748;
+            --accent: #f59e0b; --text: #f7fafc; --muted: #718096; --green: #10b981; --red: #ef4444;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100vh; width: 100vw; overflow: hidden; font-family: sans-serif; background: var(--bg); color: var(--text); }
+        .auth-overlay { position: fixed; inset: 0; background: #0b0e14; z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .auth-card { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: 32px; width: 100%; max-width: 380px; text-align: center; }
+        .auth-input { width: 100%; background: var(--card); border: 1px solid var(--border); padding: 14px; border-radius: 12px; color: #fff; font-size: 15px; margin-bottom: 14px; outline: none; }
+        .btn-auth { width: 100%; background: var(--accent); color: #000; font-weight: 700; border: none; padding: 14px; border-radius: 12px; cursor: pointer; font-size: 15px; }
+        .workspace { display: flex; width: 100%; height: 100%; }
+        .sidebar { width: 360px; border-right: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; }
+        .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); color: var(--accent); font-size: 18px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .chat-list { flex: 1; overflow-y: auto; }
+        .chat-item { padding: 14px 18px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; gap: 12px; align-items: center; }
+        .chat-item:hover { background: #232b3b; }
+        .stage { flex: 1; display: flex; flex-direction: column; background: var(--bg); }
+        .stage-header { padding: 14px; background: var(--panel); border-bottom: 1px solid var(--border); font-weight: 700; }
+        .messages { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .bubble { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 14px; word-break: break-word; }
+        .bubble.sent { align-self: flex-end; background: var(--accent); color: #000; font-weight: 600; }
+        .bubble.received { align-self: flex-start; background: var(--card); border: 1px solid var(--border); }
+        .input-bar { padding: 12px; background: var(--panel); border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
+        .main-input { flex: 1; background: var(--card); border: 1px solid var(--border); padding: 10px 14px; border-radius: 20px; color: #fff; outline: none; font-size: 14px; }
+        .btn-action { width: 40px; height: 40px; border-radius: 50%; background: var(--card); color: var(--accent); border: 1px solid var(--border); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .btn-send { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: #000; border: none; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .modal-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 10px; }
+    </style>
+</head>
+<body>
 
-@app.get("/")
-async def get():
-    return HTMLResponse("<h3>Real-time Audio Translation Calling App is Running</h3>")
+    <div class="auth-overlay" id="auth-overlay">
+        <div class="auth-card">
+            <h2 style="color: var(--accent); margin-bottom: 6px;">Syncora Terminal</h2>
+            <p style="font-size: 12px; color: var(--muted); margin-bottom: 20px;">Enter your phone to start</p>
+            <input type="tel" id="my-phone-input" class="auth-input" placeholder="e.g. 03001234567">
+            <button class="btn-auth" onclick="forceLogin()">Enter Terminal →</button>
+        </div>
+    </div>
 
-@app.websocket("/ws/audio")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
+    <!-- Text Translation Modal -->
+    <div class="modal" id="send-modal">
+        <div class="modal-card">
+            <h3 style="color: var(--accent); font-size: 16px;">Send Message</h3>
+            <p style="font-size: 12px; color: var(--muted);" id="modal-text-preview"></p>
+            <select id="target-lang" style="padding: 10px; background: var(--card); color: #fff; border: 1px solid var(--border); border-radius: 8px;">
+                <option value="en">English</option>
+                <option value="ur">Urdu</option>
+                <option value="ar">Arabic</option>
+                <option value="zh-CN">Chinese</option>
+            </select>
+            <button class="btn-auth" onclick="sendTranslated()">🌐 Translate & Send</button>
+            <button onclick="sendOriginal()" style="background: var(--card); color: #fff; border: 1px solid var(--border); padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600;">✉️ Send Original</button>
+            <button onclick="document.getElementById('send-modal').style.display='none'" style="background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 12px;">Cancel</button>
+        </div>
+    </div>
+
+    <div class="workspace">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span>CHATS</span>
+                <span id="my-phone-display" style="font-size: 12px; color: var(--green);"></span>
+            </div>
+            <div class="chat-list" id="chat-list">
+                <div class="chat-item" onclick="selectChat('03111111111')">
+                    <div style="width:36px; height:36px; background:#2d3748; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--accent); font-weight:700;">11</div>
+                    <div>
+                        <div style="font-weight:600; font-size:14px;">Test Contact (03111111111)</div>
+                        <div style="font-size:11px; color:var(--muted);">Click to open chat</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="stage">
+            <header class="stage-header" id="active-chat-title">Select a chat</header>
+            <div class="messages" id="messages-container"></div>
+            <footer class="input-bar">
+                <input type="text" id="text-input" class="main-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter') stageMessage()">
+                <button class="btn-action" onclick="toggleVoiceRecording()" title="Voice Note">🎙️</button>
+                <button class="btn-send" onclick="stageMessage()">➤</button>
+            </footer>
+        </main>
+    </div>
+
+    <script>
+        let myPhone = localStorage.getItem("syncora_phone") || "";
+        let activePartner = "";
+        let socket = null;
+        let pendingText = "";
+        
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+
+        window.onload = function() {
+            if (myPhone) {
+                document.getElementById("auth-overlay").style.display = "none";
+                document.getElementById("my-phone-display").innerText = myPhone;
+                initSocket();
+            }
+        };
+
+        function forceLogin() {
+            const val = document.getElementById("my-phone-input").value;
+            if (!val) { alert("Number enter karein!"); return; }
+            myPhone = val.trim();
+            localStorage.setItem("syncora_phone", myPhone);
+            document.getElementById("auth-overlay").style.display = "none";
+            document.getElementById("my-phone-display").innerText = myPhone;
+            initSocket();
+        }
+
+        function initSocket() {
+            if (!myPhone) return;
+            const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
+            socket = new WebSocket(proto + window.location.host + "/ws/" + myPhone);
+            socket.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                if (data.action === "new_message" && data.sender === activePartner) {
+                    appendBubble(data.content, "received", data.translated, data.msg_type);
+                }
+            };
+        }
+
+        function selectChat(partner) {
+            activePartner = partner;
+            document.getElementById("active-chat-title").innerText = "Chat with " + partner;
+            document.getElementById("messages-container").innerHTML = "";
+        }
+
+        function stageMessage() {
+            const txt = document.getElementById("text-input").value;
+            if (!txt || !activePartner) { alert("Pehle contact select karein aur message likhein!"); return; }
+            pendingText = txt.trim();
+            document.getElementById("modal-text-preview").innerText = '"' + pendingText + '"';
+            document.getElementById("send-modal").style.display = "flex";
+        }
+
+        async function sendTranslated() {
+            document.getElementById("send-modal").style.display = "none";
+            const lang = document.getElementById("target-lang").value;
+            let translated = pendingText;
+            try {
+                const res = await fetch("/translate", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text: pendingText, target_lang: lang })
+                });
+                const data = await res.json();
+                translated = data.translated_text || pendingText;
+            } catch(e) {}
+            dispatchMsg(pendingText, translated, "text");
+        }
+
+        function sendOriginal() {
+            document.getElementById("send-modal").style.display = "none";
+            dispatchMsg(pendingText, "", "text");
+        }
+
+        async function toggleVoiceRecording() {
+            if (!activePartner) { alert("Pehle contact select karein!"); return; }
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                    mediaRecorder.onstop = async () => {
+                        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const form = new FormData();
+                        form.append("file", blob, "voice_" + Date.now() + ".webm");
+                        try {
+                            const res = await fetch("/api/upload", { method: "POST", body: form });
+                            const data = await res.json();
+                            if (data.url) {
+                                dispatchMsg(data.url, "", "voice");
+                            }
+                        } catch(err) {
+                            alert("Audio upload failed");
+                        }
+                        stream.getTracks().forEach(t => t.stop());
+                    };
+                    mediaRecorder.start();
+                    isRecording = true;
+                    event.target.style.background = "var(--red)";
+                } catch(e) {
+                    alert("Microphone permission denied or error.");
+                }
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                event.target.style.background = "var(--card)";
+            }
+        }
+
+        function dispatchMsg(content, translated, type) {
+            appendBubble(content, "sent", translated, type);
+            document.getElementById("text-input").value = "";
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    action: "chat_message",
+                    receiver: activePartner,
+                    content: content,
+                    translated: translated,
+                    msg_type: type
+                }));
+            }
+        }
+
+        function appendBubble(text, dir, translated, type) {
+            const box = document.getElementById("messages-container");
+            const div = document.createElement("div");
+            div.className = "bubble " + dir;
+            
+            let html = "";
+            if (type === "voice") {
+                const aid = "audio_" + Math.random().toString(36).substring(2, 9);
+                html = `
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <audio id="${aid}" src="${text}"></audio>
+                        <button onclick="document.getElementById('${aid}').play()" style="background:#000; color:var(--accent); border:none; width:34px; height:34px; border-radius:50%; cursor:pointer;">▶</button>
+                        <span style="font-size:12px; font-weight:600;">Voice Note</span>
+                    </div>
+                `;
+            } else {
+                html = "<div>" + text + "</div>";
+                if (translated && translated.trim()) {
+                    html += "<div style='font-size:11px; margin-top:4px; padding-top:4px; border-top:1px dashed rgba(0,0,0,0.2); font-weight:700;'>Translation: " + translated + "</div>";
+                }
+            }
+            div.innerHTML = html;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+    </script>
+</body>
+</html>"""
+
+@app.post("/translate")
+async def translate_endpoint(req: TranslationRequest):
+    return {"status": "success", "translated_text": translate_text_engine(req.text, req.target_lang)}
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    path = os.path.join("uploads", file.filename or "voice.webm")
+    with open(path, "wb") as b:
+        shutil.copyfileobj(file.file, b)
+    return {"status": "success", "url": f"/uploads/{file.filename}"}
+
+@app.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    await websocket.accept()
+    active_connections[client_id] = websocket
     try:
         while True:
-            # Receive audio data or text packet from client
-            data = await websocket.receive_bytes()
-            
-            # Example: Processing audio chunks or text with Gemini API for translation
-            # You can adjust the prompt based on whether you are sending raw audio or transcribed text
-            response = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=[
-                    "Translate the incoming audio/text context to English/Urdu/Roman Urdu as configured:",
-                    types.Part.from_bytes(
-                        data=data,
-                        mime_type="audio/webm", # Update mime_type according to your frontend recording format (e.g., audio/wav, audio/webm)
-                    ),
-                ]
-            )
-            
-            translated_text = response.text if response and response.text else "Translation pending..."
-            
-            # Send back the translated result to the client
-            await websocket.send_text(translated_text)
-            
+            data = json.loads(await websocket.receive_text())
+            if data.get("action") == "chat_message":
+                recv = data.get("receiver")
+                if recv in active_connections:
+                    await active_connections[recv].send_text(json.dumps({
+                        "action": "new_message",
+                        "sender": client_id,
+                        "content": data.get("content"),
+                        "translated": data.get("translated"),
+                        "msg_type": data.get("msg_type", "text")
+                    }))
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
-        await manager.broadcast("A user disconnected.")
-    except Exception as e:
-        print(f"Error occurred: {e}")
-        manager.disconnect(websocket)
+        active_connections.pop(client_id, None)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
