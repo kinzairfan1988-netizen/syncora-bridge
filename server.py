@@ -69,7 +69,7 @@ def translate_text_engine(text: str, target_lang: str) -> str:
         print(f"[Translation Error / Rate Limit]: {e}")
         fallback_dict = {
             "kahan ho": "Where are you" if t_lang == "en" else "آپ کہاں ہیں",
-            "kiye kar rahy ho": "What are you doing" if t_lang == "en" else "آپ کیا کر रहे हैं"
+            "kiye kar rahy ho": "What are you doing" if t_lang == "en" else "آپ کیا کر رہے ہیں"
         }
         if clean.lower() in fallback_dict:
             return fallback_dict[clean.lower()]
@@ -596,7 +596,7 @@ def read_root():
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
                     
-                    # Audio sends directly as voice note without text modal interference
+                    // Audio sends directly as voice note without text modal interference
                     executeDispatch(data.url, "", "voice");
                 };
                 mediaRecorder.start();
