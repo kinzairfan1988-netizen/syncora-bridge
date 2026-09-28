@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - WhatsApp Direct Feature Restored")
+app = FastAPI(title="Syncora Terminal - Final Fix")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -106,7 +106,7 @@ def read_root():
         <div class="auth-card">
             <h2 style="color: var(--accent); margin-bottom: 6px;">Syncora Terminal</h2>
             <p style="font-size: 12px; color: var(--muted); margin-bottom: 20px;">Enter your phone to connect</p>
-            <input type="tel" id="my-phone-input" class="auth-input" placeholder="e.g. 03001234567">
+            <input type="tel" id="my-phone-input" class="auth-input" placeholder="e.g. 03001234567" onkeydown="if(event.key==='Enter') forceLogin()">
             <button class="btn-auth" onclick="forceLogin()">Enter Terminal →</button>
         </div>
     </div>
@@ -205,9 +205,11 @@ def read_root():
         let isRecording = false;
 
         window.onload = function() {
-            if (myPhone) {
-                document.getElementById("auth-overlay").style.display = "none";
-                document.getElementById("my-phone-display").innerText = myPhone;
+            if (myPhone && myPhone.trim() !== "") {
+                const overlay = document.getElementById("auth-overlay");
+                if (overlay) overlay.style.display = "none";
+                const display = document.getElementById("my-phone-display");
+                if (display) display.innerText = myPhone;
                 initSocket();
                 selectChat('03111111111');
             }
@@ -215,11 +217,19 @@ def read_root():
 
         function forceLogin() {
             const val = document.getElementById("my-phone-input").value;
-            if (!val) { alert("Phone number enter karein!"); return; }
+            if (!val || val.trim() === "") { 
+                alert("Phone number enter karein!"); 
+                return; 
+            }
             myPhone = val.trim();
             localStorage.setItem("syncora_phone", myPhone);
-            document.getElementById("auth-overlay").style.display = "none";
-            document.getElementById("my-phone-display").innerText = myPhone;
+            
+            const overlay = document.getElementById("auth-overlay");
+            if (overlay) overlay.style.display = "none";
+            
+            const display = document.getElementById("my-phone-display");
+            if (display) display.innerText = myPhone;
+            
             initSocket();
             selectChat('03111111111');
         }
@@ -241,7 +251,7 @@ def read_root():
             };
 
             socket.onmessage = function(e) {
-                console.log("SYNCORS WebSocket message:", e.data);
+                console.log("SYNCORA WebSocket message:", e.data);
                 try {
                     const data = JSON.parse(e.data);
                     if (data.action === "new_message" && data.sender === activePartner) {
@@ -477,7 +487,7 @@ def read_root():
             } else {
                 html = "<div>" + text + "</div>";
                 if (translated && translated.trim()) {
-                    html += "<div style='font-size:11px; margin-top:4px; padding-top:4px; border-top:1px dashed rgba(0,0,0,0.2); font-weight:700;">Translation: " + translated + "</div>";
+                    html += "<div style='font-size:11px; margin-top:4px; padding-top:4px; border-top:1px dashed rgba(0,0,0,0.2); font-weight:700;'>Translation: " + translated + "</div>";
                 }
             }
             div.innerHTML = html;
