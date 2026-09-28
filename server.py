@@ -18,11 +18,11 @@ except ImportError:
 
 def handle_audio_stream(audio_data: bytes, target_lang: str = "Urdu") -> str:
     if not GENAI_AVAILABLE:
-        return "Audio translation module unavailable (google-genai not installed)."
+        return "Audio translation error: google-genai library not installed on server."
     try:
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            return "Gemini API Key missing in environment."
+            return "Audio translation error: GEMINI_API_KEY missing in environment variables."
         
         client = genai.Client(api_key=api_key)
         response = client.models.generate_content(
@@ -37,6 +37,7 @@ def handle_audio_stream(audio_data: bytes, target_lang: str = "Urdu") -> str:
         )
         return response.text
     except Exception as e:
+        print(f"[Gemini Audio Error Details]: {e}")
         return f"Audio translation error: {str(e)}"
 
 app = FastAPI(title="Syncora Terminal - Complete Stable Server")
@@ -559,14 +560,18 @@ def read_root():
                 } catch(e){}
             } else if (pendingPayload.type === "voice") {
                 try {
+                    const formDataToSend = new FormData();
+                    formDataToSend.append("file", pendingPayload.audioBlob, "voice.webm");
+                    formDataToSend.append("target_lang", targetLang);
+
                     const res = await fetch("/api/translate-audio", {
                         method: "POST",
-                        body: pendingPayload.audioFormData
+                        body: formDataToSend
                     });
                     const data = await res.json();
                     translatedText = data.translated_text || "Voice Note Translation";
                 } catch(e) {
-                    translatedText = "Voice Translation Done";
+                    translatedText = "Voice Translation Error";
                 }
             }
             
@@ -644,7 +649,7 @@ def read_root():
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
                     
-                    pendingPayload = { content: data.url, type: "voice", audioFormData: form };
+                    pendingPayload = { content: data.url, type: "voice", audioBlob: blob };
                     document.getElementById("send-modal-preview").innerText = "Voice Note Recorded. Choose target language:";
                     document.getElementById("text-lang-drawer").style.display = "flex";
                     document.getElementById("btn-send-original").style.display = "flex";
@@ -684,10 +689,10 @@ async def translate_endpoint(req: TranslationRequest):
     return {"status": "success", "translated_text": translate_text_engine(req.text, req.target_lang)}
 
 @app.post("/api/translate-audio")
-async def translate_audio_endpoint(file: UploadFile = File(...)):
+async def translate_audio_endpoint(file: UploadFile = File(...), target_lang: str = "Urdu"):
     try:
         audio_bytes = await file.read()
-        translated_text = handle_audio_stream(audio_bytes, target_lang="Urdu")
+        translated_text = handle_audio_stream(audio_bytes, target_lang=target_lang)
         return {"status": "success", "translated_text": translated_text}
     except Exception as e:
         return {"status": "error", "translated_text": f"Audio translation error: {str(e)}"}
