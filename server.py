@@ -3,17 +3,18 @@ import shutil
 import json
 import urllib.request
 import urllib.parse
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, File, UploadFile, Form
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, File, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-# Audio module ko import karte hain jo aap ne alag banaya hai
+# Safe import from audio_module.py
 try:
     from audio_module import handle_audio_stream
-except ImportError:
+except Exception as e:
+    print(f"[Import Warning]: Could not import audio_module -> {e}")
     def handle_audio_stream(audio_data: bytes, target_lang: str = "Urdu") -> str:
-        return "Audio module not connected properly."
+        return "Audio module import failed. Check file placement."
 
 app = FastAPI(title="Syncora Terminal - Complete Stable Server with Audio Module")
 
@@ -534,7 +535,6 @@ def read_root():
                     translatedText = data.translated_text || pendingPayload.content;
                 } catch(e){}
             } else if (pendingPayload.type === "voice") {
-                // Voice ke liye audio module se translate karwayenge
                 try {
                     const res = await fetch("/api/translate-audio", {
                         method: "POST",
@@ -618,7 +618,6 @@ def read_root():
                     const blob = new Blob(recordedChunks, { type: "audio/webm" });
                     const form = new FormData(); form.append("file", blob, "voice.webm");
                     
-                    // Pehle file upload karein taake link mil jaye
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
                     
@@ -661,7 +660,6 @@ def read_root():
 async def translate_endpoint(req: TranslationRequest):
     return {"status": "success", "translated_text": translate_text_engine(req.text, req.target_lang)}
 
-# Naya route jo audio ko aap ke azaad audio_module.py par bhej kar translate karwaye ga
 @app.post("/api/translate-audio")
 async def translate_audio_endpoint(file: UploadFile = File(...)):
     try:
