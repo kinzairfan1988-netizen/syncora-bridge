@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Login Fix")
+app = FastAPI(title="Syncora Terminal - Final Stable Build")
 
 # Directories and Database setup
 os.makedirs("uploads", exist_ok=True)
@@ -707,7 +707,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                     c = conn.cursor()
                     c.execute("INSERT INTO messages (conv_id, sender_id, content, translated, msg_type) VALUES (?, ?, ?, ?, ?)",
                               (conv_id, client_id, content, translated, msg_type))
-conn.commit()
+                    conn.commit()
                     conn.close()
                 
                 if receiver in active_connections:
