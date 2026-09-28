@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Final Stable Build")
+app = FastAPI(title="Syncora Terminal - Pre-filled WhatsApp Invite Fix")
 
 # Directories and Database setup
 os.makedirs("uploads", exist_ok=True)
@@ -509,13 +509,19 @@ def read_root():
         }
 
         function openWhatsAppDirect() {
+            if (!myInviteToken) { alert("Please wait, generating invite token..."); return; }
             const phoneInput = document.getElementById("wa-phone-input").value.trim();
-            if (!phoneInput) { alert("Enter WhatsApp number!"); return; }
-            const cleanNum = phoneInput.replace(/[^0-9]/g, '');
             const inviteUrl = `${window.location.origin}/?invite=${myInviteToken}`;
-            const messageText = encodeURIComponent(`Hi! Let's connect on Syncora Bridge: ${inviteUrl}`);
-            const waDesktopUrl = `whatsapp://send?phone=${cleanNum}&text=${messageText}`;
-            window.location.href = waDesktopUrl;
+            const messageText = `Join me on Syncora:\n${inviteUrl}`;
+            
+            let waUrl = "";
+            if (phoneInput) {
+                const cleanNum = phoneInput.replace(/[^0-9]/g, '');
+                waUrl = `https://wa.me/${cleanNum}?text=${encodeURIComponent(messageText)}`;
+            } else {
+                waUrl = `https://wa.me/?text=${encodeURIComponent(messageText)}`;
+            }
+            window.open(waUrl, '_blank');
         }
 
         function sendWhatsAppLinkOption() {
@@ -666,7 +672,7 @@ def read_root():
             } else {
                 html = "<div>" + text + "</div>";
                 if (translated && translated.trim()) {
-                    html += "<div style='font-size:11px; margin-top:4px; padding-top:4px; border-top:1px dashed rgba(0,0,0,0.2); font-weight:700;'>Translation: " + translated + "</div>";
+                    html += "<div style='font-size:11px; margin-top:4px; padding-top:4px; border-top:1px dashed rgba(0,0,0,0.2); font-weight:700;'>" + translated + "</div>";
                 }
             }
             div.innerHTML = html;
