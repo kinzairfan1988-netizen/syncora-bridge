@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Final Fix")
+app = FastAPI(title="Syncora Terminal - Restored UI & Stable WS")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -141,7 +141,7 @@ def read_root():
             <div class="search-box-container">
                 <input type="text" class="search-input" placeholder="Search chats..." id="search-chats">
                 <div class="wa-direct-box">
-                    <input type="text" class="search-input" placeholder="Enter number for WhatsApp direct..." id="wa-phone-input">
+                    <input type="text" class="search-input" placeholder="Enter WhatsApp number..." id="wa-phone-input">
                     <button class="wa-direct-btn" onclick="openWhatsAppDirect()">Open WA</button>
                 </div>
             </div>
@@ -247,7 +247,10 @@ def read_root():
             socket.onopen = function() {
                 console.log("SYNCORA WebSocket connected:", myPhone);
                 const status = document.getElementById("active-chat-status");
-                if (status) status.innerText = "Online";
+                if (status) {
+                    status.innerText = "Online";
+                    status.style.color = "var(--green)";
+                }
             };
 
             socket.onmessage = function(e) {
@@ -270,7 +273,10 @@ def read_root():
             socket.onerror = function(error) {
                 console.error("SYNCORA WebSocket error:", error);
                 const status = document.getElementById("active-chat-status");
-                if (status) status.innerText = "Connection Error";
+                if (status) {
+                    status.innerText = "Connection Error";
+                    status.style.color = "var(--red)";
+                }
             };
 
             socket.onclose = function(event) {
@@ -281,7 +287,10 @@ def read_root():
                     event.reason
                 );
                 const status = document.getElementById("active-chat-status");
-                if (status) status.innerText = "Offline";
+                if (status) {
+                    status.innerText = "Offline";
+                    status.style.color = "var(--muted)";
+                }
             };
         }
 
@@ -307,9 +316,9 @@ def read_root():
         function selectChat(partner) {
             activePartner = partner;
             document.getElementById("active-chat-title").innerText = partner;
-            document.getElementById("active-chat-status").innerText = "Online";
             document.getElementById("header-avatar").innerText = partner.slice(-2);
             document.getElementById("messages-container").innerHTML = "";
+            // Status is purely governed by WebSocket connection state now
         }
 
         function switchTab(tab) {
