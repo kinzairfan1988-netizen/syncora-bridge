@@ -8,15 +8,32 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-# Safe import from audio_module.py
-try:
-    from audio_module import handle_audio_stream
-except Exception as e:
-    print(f"[Import Warning]: Could not import audio_module -> {e}")
-    def handle_audio_stream(audio_data: bytes, target_lang: str = "Urdu") -> str:
-        return "Audio module import failed. Check file placement."
+# Direct Audio Translation Handler inside server to completely avoid import errors
+from google import genai
+from google.genai import types
 
-app = FastAPI(title="Syncora Terminal - Complete Stable Server with Audio Module")
+def handle_audio_stream(audio_data: bytes, target_lang: str = "Urdu") -> str:
+    try:
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            return "Gemini API Key missing in environment."
+        
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=[
+                types.Part.from_bytes(
+                    data=audio_data,
+                    mime_type='audio/webm',
+                ),
+                f"Listen to this audio carefully. Transcribe it and translate it accurately into {target_lang}."
+            ]
+        )
+        return response.text
+    except Exception as e:
+        return f"Audio translation error: {str(e)}"
+
+app = FastAPI(title="Syncora Terminal - Complete Stable Server")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
