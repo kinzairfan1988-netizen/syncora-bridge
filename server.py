@@ -3,7 +3,6 @@ import shutil
 import json
 import sqlite3
 import secrets
-import uuid
 import urllib.request
 import urllib.parse
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, File, UploadFile, HTTPException
@@ -11,7 +10,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Phase 1 Persistent Contacts & Invites")
+app = FastAPI(title="Syncora Terminal - Seamless WhatsApp Link")
 
 # Directories and Database setup
 os.makedirs("uploads", exist_ok=True)
@@ -257,7 +256,7 @@ def read_root():
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
             <h2 style="color: var(--accent); margin-bottom: 6px;">Syncora Terminal</h2>
-            <p style="font-size: 12px; color: var(--muted); margin-bottom: 20px;">Enter your name / phone to start</p>
+            <p style="font-size: 12px; color: var(--muted); margin-bottom: 20px;">Enter your name to start</p>
             <input type="text" id="my-name-input" class="auth-input" placeholder="e.g. Ali Khan" onkeydown="if(event.key==='Enter') forceLogin()">
             <button class="btn-auth" onclick="forceLogin()">Enter Terminal →</button>
         </div>
@@ -293,14 +292,12 @@ def read_root():
             <div class="search-box-container">
                 <input type="text" class="search-input" placeholder="Search chats..." id="search-chats" onkeyup="filterChats()">
                 <div class="action-row">
-                    <button class="btn-invite" onclick="generateInviteLink()">🔗 Generate Invite Link</button>
-                    <input type="text" class="search-input" placeholder="WA direct number..." id="wa-phone-input" style="flex:1;">
+                    <button class="btn-invite" onclick="generateInviteLink()">🔗 Invite Link</button>
+                    <input type="text" class="search-input" placeholder="WA number..." id="wa-phone-input" style="flex:1;">
                     <button class="wa-direct-btn" onclick="openWhatsAppDirect()">WA</button>
                 </div>
             </div>
-            <div class="chat-list" id="chat-list">
-                <!-- Dynamically populated persistent contacts -->
-            </div>
+            <div class="chat-list" id="chat-list"></div>
             <footer class="sidebar-footer">
                 <button class="nav-tab active" onclick="switchTab('chats')">💬 Chats</button>
                 <button class="nav-tab" onclick="switchTab('contacts')">👥 Contacts</button>
@@ -360,8 +357,6 @@ def read_root():
                 myUserId = 'user_' + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
                 localStorage.setItem("syncora_user_id", myUserId);
             }
-            
-            // Check invite in URL
             const urlParams = new URLSearchParams(window.location.search);
             const inviteToken = urlParams.get('invite');
             
@@ -400,7 +395,6 @@ def read_root():
                 myInviteToken = data.invite_token;
 
                 if (inviteToken) {
-                    // Fetch invite info and accept
                     const invRes = await fetch(`/api/invite-info/${inviteToken}`);
                     if (invRes.ok) {
                         const invData = await invRes.json();
@@ -410,14 +404,11 @@ def read_root():
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ user_id: myUserId, inviter_id: invData.inviter_id, name: myName })
                             });
-                            // Clean URL
                             window.history.replaceState({}, document.title, window.location.pathname);
                         }
                     }
                 }
-            } catch(e) {
-                console.error("Registration error:", e);
-            }
+            } catch(e) {}
 
             initSocket();
             loadContacts();
@@ -426,38 +417,29 @@ def read_root():
         function initSocket() {
             if (!myUserId) return;
             const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
-            const wsUrl = proto + window.location.host + "/ws/" + encodeURIComponent(myUserId);
-            console.log("SYNCORA WebSocket connecting:", wsUrl);
-
-            socket = new WebSocket(wsUrl);
+            socket = new WebSocket(proto + window.location.host + "/ws/" + encodeURIComponent(myUserId));
 
             socket.onopen = function() {
-                console.log("SYNCORA WebSocket connected");
                 const status = document.getElementById("active-chat-status");
                 if (status) { status.innerText = "Online"; status.style.color = "var(--green)"; }
             };
 
             socket.onmessage = function(e) {
-                console.log("SYNCORA WebSocket message:", e.data);
                 try {
                     const data = JSON.parse(e.data);
                     if (data.action === "new_message" && data.conv_id === activeConvId) {
                         appendBubble(data.content, "received", data.translated, data.msg_type);
                     }
-                    loadContacts(); // Refresh last message in list
-                } catch (err) {
-                    console.error("WS message error:", err);
-                }
+                    loadContacts();
+                } catch (err) {}
             };
 
             socket.onerror = function(error) {
-                console.error("SYNCORA WebSocket error:", error);
                 const status = document.getElementById("active-chat-status");
                 if (status) { status.innerText = "Connection Error"; status.style.color = "var(--red)"; }
             };
 
             socket.onclose = function(event) {
-                console.warn("SYNCORA WebSocket closed:", event.code);
                 const status = document.getElementById("active-chat-status");
                 if (status) { status.innerText = "Offline"; status.style.color = "var(--muted)"; }
             };
@@ -469,16 +451,14 @@ def read_root():
                 const data = await res.json();
                 contactsList = data.contacts || [];
                 renderContacts(contactsList);
-            } catch(e) {
-                console.error("Failed to load contacts:", e);
-            }
+            } catch(e) {}
         }
 
         function renderContacts(list) {
             const listEl = document.getElementById("chat-list");
             listEl.innerHTML = "";
             if (list.length === 0) {
-                listEl.innerHTML = `<div style="padding:20px; text-align:center; color:var(--muted); font-size:13px;">No contacts yet.<br>Click 'Generate Invite Link' to invite someone!</div>`;
+                listEl.innerHTML = `<div style="padding:20px; text-align:center; color:var(--muted); font-size:13px;">No contacts yet.<br>Click 'Invite Link' to add friends!</div>`;
                 return;
             }
             list.forEach(c => {
@@ -502,10 +482,10 @@ def read_root():
             renderContacts(filtered);
         }
 
-        async function generateInviteLink() {
+        function generateInviteLink() {
             if (!myInviteToken) { alert("Not registered yet!"); return; }
             const inviteUrl = `${window.location.origin}/?invite=${myInviteToken}`;
-            prompt("Copy your permanent invite link:", inviteUrl);
+            prompt("Copy your invite link:", inviteUrl);
         }
 
         async function selectContact(c) {
@@ -525,9 +505,7 @@ def read_root():
                         const dir = m.sender_id === myUserId ? "sent" : "received";
                         appendBubble(m.content, dir, m.translated, m.msg_type);
                     });
-                } catch(e) {
-                    console.error("Failed to load messages", e);
-                }
+                } catch(e) {}
             }
         }
 
@@ -535,7 +513,12 @@ def read_root():
             const phoneInput = document.getElementById("wa-phone-input").value.trim();
             if (!phoneInput) { alert("Enter WhatsApp number!"); return; }
             const cleanNum = phoneInput.replace(/[^0-9]/g, '');
-            window.open(`https://wa.me/${cleanNum}`, '_blank');
+            const waUrl = `https://wa.me/${cleanNum}`;
+            
+            // Seamless handling: Instead of forcing background tab issues, ask user or open smoothly
+            if (confirm("Open WhatsApp chat with +" + cleanNum + "?")) {
+                window.location.href = waUrl;
+            }
         }
 
         function sendWhatsAppLinkOption() {
@@ -548,9 +531,6 @@ def read_root():
         function switchTab(tab) {
             document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
             event.currentTarget.classList.add('active');
-            if(tab === 'contacts') {
-                alert("Contacts view: All persistent contacts are listed in the chat sidebar.");
-            }
         }
 
         function toggleAttachMenu() {
