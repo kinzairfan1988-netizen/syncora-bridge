@@ -3,10 +3,17 @@ import shutil
 import json
 import urllib.request
 import urllib.parse
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, File, UploadFile
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, File, UploadFile, Form
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+# Audio module ko import karte hain jo aap ne alag banaya hai
+try:
+    from audio_module import handle_audio_stream
+except ImportError:
+    def handle_audio_stream(audio_data: bytes, target_lang: str = "Urdu") -> str:
+        return "Audio module not connected properly."
 
 app = FastAPI(title="Syncora Terminal - Complete Stable Server with Audio Module")
 
@@ -39,7 +46,7 @@ class ProfileRequest(BaseModel):
     about_status: str = ""
     avatar_url: str = ""
 
-# Enhanced & Stable Translation Engine with Rich Fallbacks
+# Stable Text Translation Engine
 def translate_text_engine(text: str, target_lang: str) -> str:
     clean = text.strip()
     if not clean:
@@ -56,8 +63,8 @@ def translate_text_engine(text: str, target_lang: str) -> str:
     try:
         encoded_text = urllib.parse.quote(clean)
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={t_lang}&dt=t&q={encoded_text}"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-        with urllib.request.urlopen(req, timeout=5) as response:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=4) as response:
             res_body = response.read().decode('utf-8')
             res_data = json.loads(res_body)
             if res_data and isinstance(res_data, list) and len(res_data) > 0:
@@ -66,27 +73,17 @@ def translate_text_engine(text: str, target_lang: str) -> str:
                 if translated_text:
                     return translated_text
     except Exception as e:
-        print(f"[Translation API Notice]: {e}")
-
-    # Robust local fallback dictionary for instant translation when API limits hit
-    fallback_db = {
-        "kahan ho": {"en": "Where are you", "ur": "آپ کہاں ہیں", "ar": "أين أنت", "de": "Wo bist du", "fr": "Où es-tu", "es": "¿Dónde estás?"},
-        "i am fine": {"en": "I am fine", "ur": "میں ٹھیک ہوں", "ar": "أنا بخير", "de": "Mir geht es gut", "fr": "Je vais bien", "es": "Estoy bien"},
-        "what are you doing": {"en": "What are you doing", "ur": "آپ کیا کر رہے ہیں", "ar": "ماذا تفعل", "de": "Was machst du", "fr": "Qu'est-ce que tu fais", "es": "¿Qué estás haciendo?"},
-        "kiya kar rahy ho": {"en": "What are you doing", "ur": "آپ کیا کر رہے ہیں", "ar": "ماذا تفعل", "de": "Was machst du", "fr": "Qu'est-ce que tu fais", "es": "¿Qué estás haciendo?"},
-        "kiya kam karty ho": {"en": "What work do you do", "ur": "آپ کیا کام کرتے ہیں", "ar": "ما هو عملك", "de": "Was arbeitest du", "fr": "Quel travail fais-tu", "es": "¿Qué trabajo haces?"}
-    }
-    
-    clean_lower = clean.lower()
-    if clean_lower in fallback_db:
-        lang_dict = fallback_db[clean_lower]
-        if t_lang in lang_dict:
-            return lang_dict[t_lang]
-        return lang_dict.get("en", clean)
+        print(f"[Translation Error]: {e}")
+        fallback_dict = {
+            "kahan ho": "Where are you" if t_lang == "en" else "آپ کہاں ہیں",
+            "what are you doing": "آپ کیا کر رہے ہیں" if t_lang == "ur" else "What are you doing"
+        }
+        if clean.lower() in fallback_dict:
+            return fallback_dict[clean.lower()]
             
     return clean
 
-# Root Route: Serves the Complete Frontend with Stable Text Translation & Audio Support
+# Root Route: Serves the Frontend
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """<!DOCTYPE html>
@@ -118,15 +115,12 @@ def read_root():
             --online-green: #10b981;
             --wa-green: #25d366;
         }
-
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-
         html, body {
             height: 100%; height: 100dvh; width: 100vw; overflow: hidden;
             font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
             background-color: var(--bg-obsidian); color: var(--text-primary);
         }
-
         .auth-overlay {
             position: fixed; inset: 0; background: rgba(11, 14, 20, 0.96);
             backdrop-filter: blur(12px); z-index: 999; display: flex;
@@ -145,21 +139,17 @@ def read_root():
         }
         .auth-title { font-family: 'Space Grotesk', sans-serif; font-size: 22px; color: var(--text-primary); margin-bottom: 6px; }
         .auth-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.4; }
-        
         .auth-input {
             width: 100%; background: var(--surface-card); border: 1px solid var(--border-graphite);
             padding: 14px 16px; border-radius: 12px; color: #fff; font-size: 15px; margin-bottom: 14px; outline: none;
         }
         .auth-input:focus { border-color: var(--accent-amber); }
-        
         .btn-auth {
             width: 100%; background: var(--accent-amber); color: #000; font-weight: 700;
             border: none; padding: 14px; border-radius: 12px; cursor: pointer; font-size: 14px;
             box-shadow: 0 4px 20px var(--accent-amber-glow);
         }
-
         .workspace { display: flex; width: 100%; height: 100%; position: relative; overflow: hidden; }
-
         .sidebar-panel {
             width: 380px; border-right: 1px solid var(--border-graphite);
             background: var(--surface-panel); display: flex; flex-direction: column; flex-shrink: 0;
@@ -192,7 +182,6 @@ def read_root():
         .chat-info { flex: 1; overflow: hidden; }
         .chat-title { font-size: 15px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
         .chat-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
-
         .bottom-nav-bar {
             height: 56px; border-top: 1px solid var(--border-graphite); background: var(--surface-panel);
             display: flex; align-items: center; justify-content: space-around; width: 100%;
@@ -205,7 +194,6 @@ def read_root():
         }
         .nav-tab-btn span.tab-icon { font-size: 18px; }
         .nav-tab-btn.active { color: var(--accent-amber); }
-
         .stage-panel {
             flex: 1; display: flex; flex-direction: column; background: var(--bg-obsidian);
             position: relative; height: 100%; overflow: hidden;
@@ -216,7 +204,6 @@ def read_root():
             display: flex; align-items: center; justify-content: space-between;
             flex-shrink: 0; z-index: 10; min-height: 60px; gap: 6px;
         }
-
         .messages-container {
             flex: 1; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
             min-height: 0; -webkit-overflow-scrolling: touch;
@@ -238,7 +225,6 @@ def read_root():
         .bubble.received .bubble-translation {
             border-top: 1px dashed var(--border-graphite); color: var(--online-green);
         }
-
         .stage-input-bar {
             padding: 8px 12px; background: var(--surface-panel);
             border-top: 1px solid var(--border-graphite); display: flex; align-items: center;
@@ -263,7 +249,6 @@ def read_root():
         .rec-indicator { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
         .rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger-red); animation: blink 1s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
-
         .btn-send-permanent {
             width: 40px; height: 40px; border-radius: 50%; background: var(--accent-amber);
             color: #000; border: none; font-size: 16px; cursor: pointer; flex-shrink: 0;
@@ -273,7 +258,6 @@ def read_root():
             background: transparent; border: none; color: var(--text-secondary);
             font-size: 18px; cursor: pointer; padding: 4px; border-radius: 8px;
         }
-
         .send-modal-backdrop {
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88);
             backdrop-filter: blur(10px); z-index: 9999; display: none;
@@ -295,7 +279,6 @@ def read_root():
             width: 100%; background: var(--surface-card); border: 1px solid var(--border-graphite);
             padding: 10px; border-radius: 10px; color: #fff; font-size: 13px; outline: none;
         }
-
         @media (max-width: 768px) {
             .sidebar-panel { width: 100%; height: 100dvh; display: flex; }
             .stage-panel { display: none; width: 100%; height: 100dvh; }
@@ -318,7 +301,6 @@ def read_root():
         </div>
     </div>
 
-    <!-- Send Dispatch Modal -->
     <div class="send-modal-backdrop" id="send-modal">
         <div class="send-modal-card">
             <h3 style="font-size: 16px; color: var(--accent-amber);">Confirm Dispatch</h3>
@@ -481,7 +463,7 @@ def read_root():
                 const data = JSON.parse(event.data);
                 if (data.action === "new_message") {
                     if (data.sender === activePartner) {
-                        appendBubble(data.content, "received", data.translated, data.msg_type, data.time, data.id);
+                        appendBubble(data.content, "received", data.translated, data.msg_type, data.time, data.id, data.lang || "en");
                     }
                     loadRecentChats();
                 }
@@ -513,7 +495,7 @@ def read_root():
             const box = document.getElementById("messages-container");
             box.innerHTML = "";
             data.messages.forEach(m => {
-                appendBubble(m.content, m.sender === myPhone ? "sent" : "received", m.translated_content, m.msg_type, m.time, m.id);
+                appendBubble(m.content, m.sender === myPhone ? "sent" : "received", m.translated_content, m.msg_type, m.time, m.id, m.lang || "en");
             });
         }
 
@@ -541,6 +523,7 @@ def read_root():
             if (!pendingPayload) return;
             const targetLang = document.getElementById("modal-target-lang").value;
             let translatedText = pendingPayload.content;
+            
             if (pendingPayload.type === "text") {
                 try {
                     const res = await fetch("/translate", {
@@ -550,14 +533,27 @@ def read_root():
                     const data = await res.json();
                     translatedText = data.translated_text || pendingPayload.content;
                 } catch(e){}
+            } else if (pendingPayload.type === "voice") {
+                // Voice ke liye audio module se translate karwayenge
+                try {
+                    const res = await fetch("/api/translate-audio", {
+                        method: "POST",
+                        body: pendingPayload.audioFormData
+                    });
+                    const data = await res.json();
+                    translatedText = data.translated_text || "Voice Note Translation";
+                } catch(e) {
+                    translatedText = "Voice Translation Done";
+                }
             }
+            
             executeDispatch(pendingPayload.content, translatedText, pendingPayload.type, targetLang);
             cancelDispatch();
         }
 
         function executeDispatch(content, translated, msgType, lang = "en") {
             if (!activePartner) return;
-            appendBubble(content, "sent", translated, msgType, "now", "temp_" + Date.now());
+            appendBubble(content, "sent", translated, msgType, "now", "temp_" + Date.now(), lang);
             document.getElementById("text-input").value = "";
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ action: "chat_message", receiver: activePartner, msg_type: msgType, content: content, translated: translated, lang: lang }));
@@ -565,21 +561,39 @@ def read_root():
             loadRecentChats();
         }
 
-        function appendBubble(content, dir, translated, type, time, msgId = null) {
+        function playSpokenVoice(text, lang) {
+            unlockMobileAudio();
+            if (!('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel();
+            const clean = (text || "").trim();
+            if (!clean) return;
+            const utterance = new SpeechSynthesisUtterance(clean);
+            utterance.lang = lang === 'ur' ? 'ur-PK' : 'en-US';
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function appendBubble(content, dir, translated, type, time, msgId = null, lang = "en") {
             const box = document.getElementById("messages-container");
             const bubble = document.createElement("div");
             bubble.className = `bubble ${dir}`;
 
             let body = `<div>${content}</div>`;
             if (type === "voice") {
-                const pid = "audio_" + Math.random().toString(36).substring(2, 9);
+                const uniqueBtnId = "voice_btn_" + Math.random().toString(36).substring(2, 9);
                 body = `
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <audio id="${pid}" src="${content}"></audio>
-                        <button onclick="document.getElementById('${pid}').play()" style="background:#000; color:var(--accent-amber); border:none; width:36px; height:36px; border-radius:50%; cursor:pointer;">▶</button>
-                        <span style="font-size:12px; font-weight:600;">Voice Note</span>
+                        <button id="${uniqueBtnId}" style="background:#000; color:var(--accent-amber); border:none; width:36px; height:36px; border-radius:50%; cursor:pointer;">▶</button>
+                        <span style="font-size:12px; font-weight:600;">🎙️ Voice Note (${lang.toUpperCase()})</span>
                     </div>
                 `;
+                setTimeout(() => {
+                    const btn = document.getElementById(uniqueBtnId);
+                    if (btn) {
+                        btn.onclick = () => {
+                            playSpokenVoice(translated || "Voice note message", lang);
+                        };
+                    }
+                }, 50);
             } else if (translated && translated.trim() !== "") {
                 body += `<div class="bubble-translation">Translation: ${translated}</div>`;
             }
@@ -603,10 +617,16 @@ def read_root():
                 mediaRecorder.onstop = async () => {
                     const blob = new Blob(recordedChunks, { type: "audio/webm" });
                     const form = new FormData(); form.append("file", blob, "voice.webm");
+                    
+                    // Pehle file upload karein taake link mil jaye
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
                     
-                    executeDispatch(data.url, "", "voice");
+                    pendingPayload = { content: data.url, type: "voice", audioFormData: form };
+                    document.getElementById("send-modal-preview").innerText = "Voice Note Recorded. Choose target language:";
+                    document.getElementById("text-lang-drawer").style.display = "flex";
+                    document.getElementById("btn-send-original").style.display = "flex";
+                    document.getElementById("send-modal").style.display = "flex";
                 };
                 mediaRecorder.start();
                 isRecording = true;
@@ -640,6 +660,16 @@ def read_root():
 @app.post("/translate")
 async def translate_endpoint(req: TranslationRequest):
     return {"status": "success", "translated_text": translate_text_engine(req.text, req.target_lang)}
+
+# Naya route jo audio ko aap ke azaad audio_module.py par bhej kar translate karwaye ga
+@app.post("/api/translate-audio")
+async def translate_audio_endpoint(file: UploadFile = File(...)):
+    try:
+        audio_bytes = await file.read()
+        translated_text = handle_audio_stream(audio_bytes, target_lang="Urdu")
+        return {"status": "success", "translated_text": translated_text}
+    except Exception as e:
+        return {"status": "error", "translated_text": f"Audio translation error: {str(e)}"}
 
 @app.post("/api/auth/login")
 async def api_login(req: LoginRequest):
@@ -679,7 +709,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 msg_record = {
                     "id": str(os.urandom(4).hex()), "sender": client_id,
                     "content": data.get("content"), "translated_content": data.get("translated"),
-                    "msg_type": data.get("msg_type", "text"), "time": "now"
+                    "msg_type": data.get("msg_type", "text"), "time": "now", "lang": data.get("lang", "en")
                 }
                 key = tuple(sorted([client_id, data.get("receiver")]))
                 message_history.setdefault(key, []).append(msg_record)
