@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - WhatsApp Desktop App with Message")
+app = FastAPI(title="Syncora Terminal - Login Fix")
 
 # Directories and Database setup
 os.makedirs("uploads", exist_ok=True)
@@ -340,7 +340,7 @@ def read_root():
 
     <script>
         let myUserId = localStorage.getItem("syncora_user_id");
-        let myName = localStorage.getItem("syncora_user_name") || "User";
+        let myName = localStorage.getItem("syncora_user_name") || "";
         let myInviteToken = "";
         let activePartner = null;
         let activeConvId = null;
@@ -357,31 +357,30 @@ def read_root():
                 myUserId = 'user_' + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
                 localStorage.setItem("syncora_user_id", myUserId);
             }
-            const urlParams = new URLSearchParams(window.location.search);
-            const inviteToken = urlParams.get('invite');
             
-            if (myUserNameIsSet()) {
+            if (myName && myName.trim() !== "") {
+                document.getElementById("my-name-input").value = myName;
                 document.getElementById("auth-overlay").style.display = "none";
                 document.getElementById("my-name-display").innerText = myName;
-                await registerAndInit(inviteToken);
+                const urlParams = new URLSearchParams(window.location.search);
+                await registerAndInit(urlParams.get('invite'));
             }
         };
-
-        function myUserNameIsSet() {
-            return localStorage.getItem("syncora_user_name") !== null;
-        }
 
         async function forceLogin() {
             const val = document.getElementById("my-name-input").value.trim();
             if (!val) { alert("Naam enter karein!"); return; }
             myName = val;
             localStorage.setItem("syncora_user_name", myName);
-            document.getElementById("auth-overlay").style.display = "none";
-            document.getElementById("my-name-display").innerText = myName;
+            
+            const overlay = document.getElementById("auth-overlay");
+            if (overlay) overlay.style.display = "none";
+            
+            const display = document.getElementById("my-name-display");
+            if (display) display.innerText = myName;
             
             const urlParams = new URLSearchParams(window.location.search);
-            const inviteToken = urlParams.get('invite');
-            await registerAndInit(inviteToken);
+            await registerAndInit(urlParams.get('invite'));
         }
 
         async function registerAndInit(inviteToken) {
@@ -513,11 +512,8 @@ def read_root():
             const phoneInput = document.getElementById("wa-phone-input").value.trim();
             if (!phoneInput) { alert("Enter WhatsApp number!"); return; }
             const cleanNum = phoneInput.replace(/[^0-9]/g, '');
-            
-            // Generate invite link to send directly via WhatsApp desktop app
             const inviteUrl = `${window.location.origin}/?invite=${myInviteToken}`;
             const messageText = encodeURIComponent(`Hi! Let's connect on Syncora Bridge: ${inviteUrl}`);
-            
             const waDesktopUrl = `whatsapp://send?phone=${cleanNum}&text=${messageText}`;
             window.location.href = waDesktopUrl;
         }
@@ -661,7 +657,7 @@ def read_root():
                 html = `<div style="display:flex; align-items:center; gap:10px;"><audio id="${aid}" src="${text}"></audio><button onclick="document.getElementById('${aid}').play()" style="background:#000; color:var(--accent); border:none; width:34px; height:34px; border-radius:50%; cursor:pointer;">▶</button><span style="font-size:12px; font-weight:600;">Voice Note</span></div>`;
             } else if (type === "media") {
                 html = `<img src="${text}" style="max-width:200px; border-radius:8px;" /><div style="font-size:11px; margin-top:4px;">Photo / Video</div>`;
-            } else if (type ===="document") {
+            } else if (type === "document") {
                 html = `<a href="${text}" target="_blank" style="color:var(--accent); text-decoration:underline; font-weight:600;">📄 Download Document</a>`;
             } else if (type === "location") {
                 html = `<a href="${text}" target="_blank" style="color:var(--accent); text-decoration:underline; font-weight:600;">📍 View Shared Location</a>`;
@@ -711,7 +707,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                     c = conn.cursor()
                     c.execute("INSERT INTO messages (conv_id, sender_id, content, translated, msg_type) VALUES (?, ?, ?, ?, ?)",
                               (conv_id, client_id, content, translated, msg_type))
-                    conn.commit()
+conn.commit()
                     conn.close()
                 
                 if receiver in active_connections:
