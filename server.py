@@ -1,26 +1,74 @@
 import os
 import shutil
 import json
+import sqlite3
+import secrets
+import uuid
 import urllib.request
 import urllib.parse
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, File, UploadFile
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, File, UploadFile, HTTPException
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Restored UI & Stable WS")
+app = FastAPI(title="Syncora Terminal - Phase 1 Persistent Contacts & Invites")
 
-# Directories setup
+# Directories and Database setup
 os.makedirs("uploads", exist_ok=True)
 os.makedirs("static", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
+DB_FILE = "syncora.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users (
+                    user_id TEXT PRIMARY KEY,
+                    name TEXT,
+                    invite_token TEXT UNIQUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS contacts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT,
+                    contact_id TEXT,
+                    UNIQUE(user_id, contact_id)
+                )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS conversations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user1 TEXT,
+                    user2 TEXT,
+                    UNIQUE(user1, user2)
+                )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    conv_id INTEGER,
+                    sender_id TEXT,
+                    content TEXT,
+                    translated TEXT,
+                    msg_type TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
 active_connections = {}
-message_history = {}
 
 class TranslationRequest(BaseModel):
     text: str
     target_lang: str = "en"
+
+class RegisterUserRequest(BaseModel):
+    user_id: str
+    name: str = "User"
+
+class AcceptInviteRequest(BaseModel):
+    user_id: str
+    inviter_id: str
+    name: str = "User"
 
 # Translation Engine
 def translate_text_engine(text: str, target_lang: str) -> str:
@@ -44,6 +92,111 @@ def translate_text_engine(text: str, target_lang: str) -> str:
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     return Response(status_code=204)
+
+@app.post("/api/register")
+async def register_user(req: RegisterUserRequest):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT invite_token FROM users WHERE user_id = ?", (req.user_id,))
+    row = c.fetchone()
+    if row:
+        token = row[0]
+    else:
+        token = secrets.token_urlsafe(12)
+        c.execute("INSERT OR REPLACE INTO users (user_id, name, invite_token) VALUES (?, ?, ?)", (req.user_id, req.name, token))
+        conn.commit()
+    conn.close()
+    return {"status": "success", "invite_token": token}
+
+@app.get("/api/invite-info/{token}")
+async def invite_info(token: str):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT user_id, name FROM users WHERE invite_token = ?", (token,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Invalid invite link")
+    return {"inviter_id": row[0], "inviter_name": row[1]}
+
+@app.post("/api/accept-invite")
+async def accept_invite(req: AcceptInviteRequest):
+    if req.user_id == req.inviter_id:
+        return {"status": "self"}
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    for uid in [req.user_id, req.inviter_id]:
+        c.execute("SELECT user_id FROM users WHERE user_id = ?", (uid,))
+        if not c.fetchone():
+            c.execute("INSERT OR IGNORE INTO users (user_id, name, invite_token) VALUES (?, ?, ?)", (uid, req.name if uid == req.user_id else "User", secrets.token_urlsafe(12)))
+    
+    c.execute("INSERT OR IGNORE INTO contacts (user_id, contact_id) VALUES (?, ?)", (req.user_id, req.inviter_id))
+    c.execute("INSERT OR IGNORE INTO contacts (user_id, contact_id) VALUES (?, ?)", (req.inviter_id, req.user_id))
+    
+    u1, u2 = sorted([req.user_id, req.inviter_id])
+    c.execute("SELECT id FROM conversations WHERE user1 = ? AND user2 = ?", (u1, u2))
+    conv = c.fetchone()
+    if not conv:
+        c.execute("INSERT INTO conversations (user1, user2) VALUES (?, ?)", (u1, u2))
+        conv_id = c.lastrowid
+    else:
+        conv_id = conv[0]
+    conn.commit()
+    conn.close()
+    return {"status": "success", "conv_id": conv_id}
+
+@app.get("/api/contacts/{user_id}")
+async def get_contacts(user_id: str):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("""
+        SELECT u.user_id, u.name 
+        FROM contacts c 
+        JOIN users u ON c.contact_id = u.user_id 
+        WHERE c.user_id = ?
+    """, (user_id,))
+    rows = c.fetchall()
+    contacts = []
+    for r in rows:
+        c_id, c_name = r[0], r[1]
+        u1, u2 = sorted([user_id, c_id])
+        c.execute("SELECT id FROM conversations WHERE user1 = ? AND user2 = ?", (u1, u2))
+        conv = c.fetchone()
+        conv_id = conv[0] if conv else None
+        
+        last_msg = ""
+        if conv_id:
+            c.execute("SELECT content FROM messages WHERE conv_id = ? ORDER BY id DESC LIMIT 1", (conv_id,))
+            msg_row = c.fetchone()
+            if msg_row:
+                last_msg = msg_row[0]
+        
+        contacts.append({
+            "user_id": c_id,
+            "name": c_name or c_id[:6],
+            "conv_id": conv_id,
+            "last_message": last_msg
+        })
+    conn.close()
+    return {"contacts": contacts}
+
+@app.get("/api/messages/{conv_id}")
+async def get_messages(conv_id: int):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT sender_id, content, translated, msg_type, timestamp FROM messages WHERE conv_id = ? ORDER BY id ASC", (conv_id,))
+    rows = c.fetchall()
+    messages = []
+    for r in rows:
+        messages.append({
+            "sender_id": r[0],
+            "content": r[1],
+            "translated": r[2],
+            "msg_type": r[3],
+            "timestamp": r[4]
+        })
+    conn.close()
+    return {"messages": messages}
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
@@ -69,7 +222,8 @@ def read_root():
         .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); color: var(--accent); font-size: 18px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         .search-box-container { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
         .search-input { width: 100%; background: var(--card); border: 1px solid var(--border); padding: 10px 14px; border-radius: 8px; color: #fff; outline: none; font-size: 13px; }
-        .wa-direct-box { display: flex; gap: 6px; }
+        .action-row { display: flex; gap: 6px; }
+        .btn-invite { background: var(--accent); color: #000; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 12px; flex: 1; }
         .wa-direct-btn { background: #25D366; color: #fff; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 12px; flex-shrink: 0; }
         .chat-list { flex: 1; overflow-y: auto; }
         .chat-item { padding: 14px 18px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; gap: 12px; align-items: center; }
@@ -91,11 +245,9 @@ def read_root():
         .main-input { flex: 1; background: var(--card); border: 1px solid var(--border); padding: 10px 14px; border-radius: 20px; color: #fff; outline: none; font-size: 14px; }
         .btn-action { width: 40px; height: 40px; border-radius: 50%; background: var(--card); color: var(--accent); border: 1px solid var(--border); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .btn-send { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: #000; border: none; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        
         .attach-menu { position: absolute; bottom: 65px; left: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 8px; display: none; flex-direction: column; gap: 6px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
         .attach-item { background: var(--card); border: none; color: #fff; padding: 8px 14px; border-radius: 8px; cursor: pointer; text-align: left; font-size: 13px; display: flex; gap: 8px; align-items: center; }
         .attach-item:hover { background: #232b3b; color: var(--accent); }
-
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; display: none; align-items: center; justify-content: center; padding: 20px; }
         .modal-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 10px; }
     </style>
@@ -105,8 +257,8 @@ def read_root():
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
             <h2 style="color: var(--accent); margin-bottom: 6px;">Syncora Terminal</h2>
-            <p style="font-size: 12px; color: var(--muted); margin-bottom: 20px;">Enter your phone to connect</p>
-            <input type="tel" id="my-phone-input" class="auth-input" placeholder="e.g. 03001234567" onkeydown="if(event.key==='Enter') forceLogin()">
+            <p style="font-size: 12px; color: var(--muted); margin-bottom: 20px;">Enter your name / phone to start</p>
+            <input type="text" id="my-name-input" class="auth-input" placeholder="e.g. Ali Khan" onkeydown="if(event.key==='Enter') forceLogin()">
             <button class="btn-auth" onclick="forceLogin()">Enter Terminal →</button>
         </div>
     </div>
@@ -136,23 +288,18 @@ def read_root():
         <aside class="sidebar">
             <div class="sidebar-header">
                 <span>SYNCORA</span>
-                <span id="my-phone-display" style="font-size: 12px; color: var(--green);"></span>
+                <span id="my-name-display" style="font-size: 12px; color: var(--green);"></span>
             </div>
             <div class="search-box-container">
-                <input type="text" class="search-input" placeholder="Search chats..." id="search-chats">
-                <div class="wa-direct-box">
-                    <input type="text" class="search-input" placeholder="Enter WhatsApp number..." id="wa-phone-input">
-                    <button class="wa-direct-btn" onclick="openWhatsAppDirect()">Open WA</button>
+                <input type="text" class="search-input" placeholder="Search chats..." id="search-chats" onkeyup="filterChats()">
+                <div class="action-row">
+                    <button class="btn-invite" onclick="generateInviteLink()">🔗 Generate Invite Link</button>
+                    <input type="text" class="search-input" placeholder="WA direct number..." id="wa-phone-input" style="flex:1;">
+                    <button class="wa-direct-btn" onclick="openWhatsAppDirect()">WA</button>
                 </div>
             </div>
             <div class="chat-list" id="chat-list">
-                <div class="chat-item" onclick="selectChat('03111111111')">
-                    <div style="width:36px; height:36px; background:#2d3748; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--accent); font-weight:700;">11</div>
-                    <div>
-                        <div style="font-weight:600; font-size:14px;">Test Contact (03111111111)</div>
-                        <div style="font-size:11px; color:var(--green);">Direct line active</div>
-                    </div>
-                </div>
+                <!-- Dynamically populated persistent contacts -->
             </div>
             <footer class="sidebar-footer">
                 <button class="nav-tab active" onclick="switchTab('chats')">💬 Chats</button>
@@ -195,137 +342,214 @@ def read_root():
     </div>
 
     <script>
-        let myPhone = localStorage.getItem("syncora_phone") || "";
-        let activePartner = "";
+        let myUserId = localStorage.getItem("syncora_user_id");
+        let myName = localStorage.getItem("syncora_user_name") || "User";
+        let myInviteToken = "";
+        let activePartner = null;
+        let activeConvId = null;
         let socket = null;
         let pendingText = "";
+        let contactsList = [];
         
         let mediaRecorder = null;
         let audioChunks = [];
         let isRecording = false;
 
-        window.onload = function() {
-            if (myPhone && myPhone.trim() !== "") {
-                const overlay = document.getElementById("auth-overlay");
-                if (overlay) overlay.style.display = "none";
-                const display = document.getElementById("my-phone-display");
-                if (display) display.innerText = myPhone;
-                initSocket();
-                selectChat('03111111111');
+        window.onload = async function() {
+            if (!myUserId) {
+                myUserId = 'user_' + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+                localStorage.setItem("syncora_user_id", myUserId);
+            }
+            
+            // Check invite in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const inviteToken = urlParams.get('invite');
+            
+            if (myUserNameIsSet()) {
+                document.getElementById("auth-overlay").style.display = "none";
+                document.getElementById("my-name-display").innerText = myName;
+                await registerAndInit(inviteToken);
             }
         };
 
-        function forceLogin() {
-            const val = document.getElementById("my-phone-input").value;
-            if (!val || val.trim() === "") { 
-                alert("Phone number enter karein!"); 
-                return; 
+        function myUserNameIsSet() {
+            return localStorage.getItem("syncora_user_name") !== null;
+        }
+
+        async function forceLogin() {
+            const val = document.getElementById("my-name-input").value.trim();
+            if (!val) { alert("Naam enter karein!"); return; }
+            myName = val;
+            localStorage.setItem("syncora_user_name", myName);
+            document.getElementById("auth-overlay").style.display = "none";
+            document.getElementById("my-name-display").innerText = myName;
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const inviteToken = urlParams.get('invite');
+            await registerAndInit(inviteToken);
+        }
+
+        async function registerAndInit(inviteToken) {
+            try {
+                const res = await fetch("/api/register", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ user_id: myUserId, name: myName })
+                });
+                const data = await res.json();
+                myInviteToken = data.invite_token;
+
+                if (inviteToken) {
+                    // Fetch invite info and accept
+                    const invRes = await fetch(`/api/invite-info/${inviteToken}`);
+                    if (invRes.ok) {
+                        const invData = await invRes.json();
+                        if (invData.inviter_id !== myUserId) {
+                            await fetch("/api/accept-invite", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ user_id: myUserId, inviter_id: invData.inviter_id, name: myName })
+                            });
+                            // Clean URL
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                        }
+                    }
+                }
+            } catch(e) {
+                console.error("Registration error:", e);
             }
-            myPhone = val.trim();
-            localStorage.setItem("syncora_phone", myPhone);
-            
-            const overlay = document.getElementById("auth-overlay");
-            if (overlay) overlay.style.display = "none";
-            
-            const display = document.getElementById("my-phone-display");
-            if (display) display.innerText = myPhone;
-            
+
             initSocket();
-            selectChat('03111111111');
+            loadContacts();
         }
 
         function initSocket() {
-            if (!myPhone) return;
-
+            if (!myUserId) return;
             const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
-            const wsUrl = proto + window.location.host + "/ws/" + encodeURIComponent(myPhone);
-
+            const wsUrl = proto + window.location.host + "/ws/" + encodeURIComponent(myUserId);
             console.log("SYNCORA WebSocket connecting:", wsUrl);
 
             socket = new WebSocket(wsUrl);
 
             socket.onopen = function() {
-                console.log("SYNCORA WebSocket connected:", myPhone);
+                console.log("SYNCORA WebSocket connected");
                 const status = document.getElementById("active-chat-status");
-                if (status) {
-                    status.innerText = "Online";
-                    status.style.color = "var(--green)";
-                }
+                if (status) { status.innerText = "Online"; status.style.color = "var(--green)"; }
             };
 
             socket.onmessage = function(e) {
                 console.log("SYNCORA WebSocket message:", e.data);
                 try {
                     const data = JSON.parse(e.data);
-                    if (data.action === "new_message" && data.sender === activePartner) {
-                        appendBubble(
-                            data.content,
-                            "received",
-                            data.translated,
-                            data.msg_type
-                        );
+                    if (data.action === "new_message" && data.conv_id === activeConvId) {
+                        appendBubble(data.content, "received", data.translated, data.msg_type);
                     }
+                    loadContacts(); // Refresh last message in list
                 } catch (err) {
-                    console.error("SYNCORA WebSocket message error:", err);
+                    console.error("WS message error:", err);
                 }
             };
 
             socket.onerror = function(error) {
                 console.error("SYNCORA WebSocket error:", error);
                 const status = document.getElementById("active-chat-status");
-                if (status) {
-                    status.innerText = "Connection Error";
-                    status.style.color = "var(--red)";
-                }
+                if (status) { status.innerText = "Connection Error"; status.style.color = "var(--red)"; }
             };
 
             socket.onclose = function(event) {
-                console.warn(
-                    "SYNCORA WebSocket closed. code:",
-                    event.code,
-                    "reason:",
-                    event.reason
-                );
+                console.warn("SYNCORA WebSocket closed:", event.code);
                 const status = document.getElementById("active-chat-status");
-                if (status) {
-                    status.innerText = "Offline";
-                    status.style.color = "var(--muted)";
-                }
+                if (status) { status.innerText = "Offline"; status.style.color = "var(--muted)"; }
             };
+        }
+
+        async function loadContacts() {
+            try {
+                const res = await fetch(`/api/contacts/${myUserId}`);
+                const data = await res.json();
+                contactsList = data.contacts || [];
+                renderContacts(contactsList);
+            } catch(e) {
+                console.error("Failed to load contacts:", e);
+            }
+        }
+
+        function renderContacts(list) {
+            const listEl = document.getElementById("chat-list");
+            listEl.innerHTML = "";
+            if (list.length === 0) {
+                listEl.innerHTML = `<div style="padding:20px; text-align:center; color:var(--muted); font-size:13px;">No contacts yet.<br>Click 'Generate Invite Link' to invite someone!</div>`;
+                return;
+            }
+            list.forEach(c => {
+                const div = document.createElement("div");
+                div.className = "chat-item";
+                div.onclick = () => selectContact(c);
+                div.innerHTML = `
+                    <div style="width:36px; height:36px; background:#2d3748; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--accent); font-weight:700;">${c.name.slice(0,2).toUpperCase()}</div>
+                    <div style="flex:1; overflow:hidden;">
+                        <div style="font-weight:600; font-size:14px;">${c.name}</div>
+                        <div style="font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.last_message || 'Tap to chat'}</div>
+                    </div>
+                `;
+                listEl.appendChild(div);
+            });
+        }
+
+        function filterChats() {
+            const query = document.getElementById("search-chats").value.toLowerCase();
+            const filtered = contactsList.filter(c => c.name.toLowerCase().includes(query));
+            renderContacts(filtered);
+        }
+
+        async function generateInviteLink() {
+            if (!myInviteToken) { alert("Not registered yet!"); return; }
+            const inviteUrl = `${window.location.origin}/?invite=${myInviteToken}`;
+            prompt("Copy your permanent invite link:", inviteUrl);
+        }
+
+        async function selectContact(c) {
+            activePartner = c.user_id;
+            activeConvId = c.conv_id;
+            document.getElementById("active-chat-title").innerText = c.name;
+            document.getElementById("header-avatar").innerText = c.name.slice(0,2).toUpperCase();
+            
+            const msgContainer = document.getElementById("messages-container");
+            msgContainer.innerHTML = "";
+            
+            if (activeConvId) {
+                try {
+                    const res = await fetch(`/api/messages/${activeConvId}`);
+                    const data = await res.json();
+                    (data.messages || []).forEach(m => {
+                        const dir = m.sender_id === myUserId ? "sent" : "received";
+                        appendBubble(m.content, dir, m.translated, m.msg_type);
+                    });
+                } catch(e) {
+                    console.error("Failed to load messages", e);
+                }
+            }
         }
 
         function openWhatsAppDirect() {
             const phoneInput = document.getElementById("wa-phone-input").value.trim();
-            if (!phoneInput) {
-                alert("Please enter a phone number for WhatsApp direct chat!");
-                return;
-            }
+            if (!phoneInput) { alert("Enter WhatsApp number!"); return; }
             const cleanNum = phoneInput.replace(/[^0-9]/g, '');
-            const waUrl = `https://wa.me/${cleanNum}`;
-            window.open(waUrl, '_blank');
+            window.open(`https://wa.me/${cleanNum}`, '_blank');
         }
 
         function sendWhatsAppLinkOption() {
             document.getElementById("attach-menu").style.display = "none";
-            if(!activePartner) { alert("Pehle contact select karein!"); return; }
-            const cleanNum = activePartner.replace(/[^0-9]/g, '');
-            const waLink = `https://wa.me/${cleanNum}`;
-            dispatchMsg(waLink, "WhatsApp Chat Link", "whatsapp_link");
-        }
-
-        function selectChat(partner) {
-            activePartner = partner;
-            document.getElementById("active-chat-title").innerText = partner;
-            document.getElementById("header-avatar").innerText = partner.slice(-2);
-            document.getElementById("messages-container").innerHTML = "";
-            // Status is purely governed by WebSocket connection state now
+            if(!activePartner) { alert("Select contact first!"); return; }
+            const inviteUrl = `${window.location.origin}/?invite=${myInviteToken}`;
+            dispatchMsg(inviteUrl, "Syncora Invite Link", "whatsapp_link");
         }
 
         function switchTab(tab) {
             document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
             event.currentTarget.classList.add('active');
             if(tab === 'contacts') {
-                alert("Contacts view activated.");
+                alert("Contacts view: All persistent contacts are listed in the chat sidebar.");
             }
         }
 
@@ -345,56 +569,36 @@ def read_root():
         }
 
         async function uploadFile(input, fileType) {
-            if(!activePartner) { alert("Pehle contact select karein!"); return; }
+            if(!activePartner) { alert("Select contact first!"); return; }
             if(input.files && input.files[0]) {
                 const form = new FormData();
                 form.append("file", input.files[0]);
                 try {
                     const res = await fetch("/api/upload", { method: "POST", body: form });
                     const data = await res.json();
-                    if(data.url) {
-                        dispatchMsg(data.url, "", fileType);
-                    }
-                } catch(e) {
-                    alert("Upload failed");
-                }
+                    if(data.url) { dispatchMsg(data.url, "", fileType); }
+                } catch(e) { alert("Upload failed"); }
             }
         }
 
         function sendLocation() {
             document.getElementById("attach-menu").style.display = "none";
-            if(!activePartner) { alert("Pehle contact select karein!"); return; }
+            if(!activePartner) { alert("Select contact first!"); return; }
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(position => {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    const mapUrl = `https://maps.google.com/?q=${lat},${lon}`;
+                    const mapUrl = `https://maps.google.com/?q=${position.coords.latitude},${position.coords.longitude}`;
                     dispatchMsg(mapUrl, "Shared Location", "location");
-                }, () => {
-                    alert("Unable to retrieve your location");
-                });
-            } else {
-                alert("Geolocation is not supported");
+                }, () => alert("Unable to retrieve location"));
             }
         }
 
-        function startAudioCall() {
-            if(!activePartner) { alert("Pehle contact select karein!"); return; }
-            alert("Audio calling initiated with " + activePartner);
-        }
-
-        function startVideoCall() {
-            if(!activePartner) { alert("Pehle contact select karein!"); return; }
-            alert("Video calling initiated with " + activePartner);
-        }
-
-        function openTranslationSettings() {
-            alert("Translation options active via send prompt.");
-        }
+        function startAudioCall() { alert("Audio calling initiated"); }
+        function startVideoCall() { alert("Video calling initiated"); }
+        function openTranslationSettings() { alert("Translation options active"); }
 
         function stageMessage() {
             const txt = document.getElementById("text-input").value;
-            if (!txt || !activePartner) { alert("Pehle contact select karein aur message likhein!"); return; }
+            if (!txt || !activePartner) { alert("Select contact and enter message!"); return; }
             pendingText = txt.trim();
             document.getElementById("modal-text-preview").innerText = '"' + pendingText + '"';
             document.getElementById("send-modal").style.display = "flex";
@@ -421,7 +625,7 @@ def read_root():
         }
 
         async function toggleVoiceRecording() {
-            if (!activePartner) { alert("Pehle contact select karein!"); return; }
+            if (!activePartner) { alert("Select contact first!"); return; }
             if (!isRecording) {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -435,20 +639,14 @@ def read_root():
                         try {
                             const res = await fetch("/api/upload", { method: "POST", body: form });
                             const data = await res.json();
-                            if (data.url) {
-                                dispatchMsg(data.url, "", "voice");
-                            }
-                        } catch(err) {
-                            alert("Audio upload failed");
-                        }
+                            if (data.url) { dispatchMsg(data.url, "", "voice"); }
+                        } catch(err) { alert("Audio upload failed"); }
                         stream.getTracks().forEach(t => t.stop());
                     };
                     mediaRecorder.start();
                     isRecording = true;
                     event.target.style.background = "var(--red)";
-                } catch(e) {
-                    alert("Microphone permission denied.");
-                }
+                } catch(e) { alert("Mic permission denied"); }
             } else {
                 mediaRecorder.stop();
                 isRecording = false;
@@ -459,9 +657,10 @@ def read_root():
         function dispatchMsg(content, translated, type) {
             appendBubble(content, "sent", translated, type);
             document.getElementById("text-input").value = "";
-            if (socket && socket.readyState === WebSocket.OPEN) {
+            if (socket && socket.readyState === WebSocket.OPEN && activeConvId) {
                 socket.send(JSON.stringify({
                     action: "chat_message",
+                    conv_id: activeConvId,
                     receiver: activePartner,
                     content: content,
                     translated: translated,
@@ -478,13 +677,7 @@ def read_root():
             let html = "";
             if (type === "voice") {
                 const aid = "audio_" + Math.random().toString(36).substring(2, 9);
-                html = `
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <audio id="${aid}" src="${text}"></audio>
-                        <button onclick="document.getElementById('${aid}').play()" style="background:#000; color:var(--accent); border:none; width:34px; height:34px; border-radius:50%; cursor:pointer;">▶</button>
-                        <span style="font-size:12px; font-weight:600;">Voice Note</span>
-                    </div>
-                `;
+                html = `<div style="display:flex; align-items:center; gap:10px;"><audio id="${aid}" src="${text}"></audio><button onclick="document.getElementById('${aid}').play()" style="background:#000; color:var(--accent); border:none; width:34px; height:34px; border-radius:50%; cursor:pointer;">▶</button><span style="font-size:12px; font-weight:600;">Voice Note</span></div>`;
             } else if (type === "media") {
                 html = `<img src="${text}" style="max-width:200px; border-radius:8px;" /><div style="font-size:11px; margin-top:4px;">Photo / Video</div>`;
             } else if (type === "document") {
@@ -492,7 +685,7 @@ def read_root():
             } else if (type === "location") {
                 html = `<a href="${text}" target="_blank" style="color:var(--accent); text-decoration:underline; font-weight:600;">📍 View Shared Location</a>`;
             } else if (type === "whatsapp_link") {
-                html = `<a href="${text}" target="_blank" style="color:#25D366; text-decoration:underline; font-weight:600;">💬 Open WhatsApp Chat Link</a>`;
+                html = `<a href="${text}" target="_blank" style="color:#25D366; text-decoration:underline; font-weight:600;">💬 Open Invite Link</a>`;
             } else {
                 html = "<div>" + text + "</div>";
                 if (translated && translated.trim()) {
@@ -526,14 +719,28 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
         while True:
             data = json.loads(await websocket.receive_text())
             if data.get("action") == "chat_message":
-                recv = data.get("receiver")
-                if recv in active_connections:
-                    await active_connections[recv].send_text(json.dumps({
+                conv_id = data.get("conv_id")
+                receiver = data.get("receiver")
+                content = data.get("content")
+                translated = data.get("translated")
+                msg_type = data.get("msg_type", "text")
+                
+                if conv_id:
+                    conn = sqlite3.connect(DB_FILE)
+                    c = conn.cursor()
+                    c.execute("INSERT INTO messages (conv_id, sender_id, content, translated, msg_type) VALUES (?, ?, ?, ?, ?)",
+                              (conv_id, client_id, content, translated, msg_type))
+                    conn.commit()
+                    conn.close()
+                
+                if receiver in active_connections:
+                    await active_connections[receiver].send_text(json.dumps({
                         "action": "new_message",
                         "sender": client_id,
-                        "content": data.get("content"),
-                        "translated": data.get("translated"),
-                        "msg_type": data.get("msg_type", "text")
+                        "conv_id": conv_id,
+                        "content": content,
+                        "translated": translated,
+                        "msg_type": msg_type
                     }))
     except WebSocketDisconnect:
         active_connections.pop(client_id, None)
