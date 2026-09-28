@@ -24,7 +24,7 @@ class AudioTranslationModule:
         Processes audio input bytes and translates them using Gemini model.
         """
         if not self.client:
-            return "Gemini client is not initialized. Please check your API key."
+            return "Gemini client is not initialized. Please check your GEMINI_API_KEY."
 
         try:
             logger.info(f"Processing audio stream for translation to {target_language} via Gemini...")
