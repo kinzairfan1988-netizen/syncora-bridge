@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Pre-filled WhatsApp Invite Fix")
+app = FastAPI(title="Syncora Terminal - Reliable WhatsApp Desktop & Web Pre-fill")
 
 # Directories and Database setup
 os.makedirs("uploads", exist_ok=True)
@@ -294,7 +294,7 @@ def read_root():
                 <div class="action-row">
                     <button class="btn-invite" onclick="generateInviteLink()">🔗 Invite Link</button>
                     <input type="text" class="search-input" placeholder="WA number..." id="wa-phone-input" style="flex:1;">
-                    <button class="wa-direct-btn" onclick="openWhatsAppDirect()">WA</button>
+                    <button class="wa-direct-btn" onclick="openWhatsAppDirect()" title="Invite on WhatsApp">WA</button>
                 </div>
             </div>
             <div class="chat-list" id="chat-list"></div>
