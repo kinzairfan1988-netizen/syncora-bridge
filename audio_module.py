@@ -1,6 +1,5 @@
 import os
 import logging
-import io
 from google import genai
 from google.genai import types
 
@@ -17,7 +16,7 @@ class AudioTranslationModule:
         if not self.api_key:
             logger.warning("GEMINI_API_KEY environment variable not set. Please configure it.")
         
-        # Initialize Gemini client
+        # Initialize Gemini client safely
         self.client = genai.Client(api_key=self.api_key) if self.api_key else None
 
     def process_and_translate_audio(self, audio_bytes: bytes, target_language: str = "Urdu") -> str:
@@ -38,7 +37,7 @@ class AudioTranslationModule:
                         data=audio_bytes,
                         mime_type='audio/wav',
                     ),
-                    f"Listen to this audio carefully. Translate or transcribe it accurately into {target_language} (Roman Urdu/Urdu/Hindi as appropriate based on context)."
+                    f"Listen to this audio carefully. Translate or transcribe it accurately into {target_language}."
                 ]
             )
             
@@ -50,11 +49,9 @@ class AudioTranslationModule:
             logger.error(f"Error during audio processing: {str(e)}")
             raise RuntimeError(f"Audio processing failed: {str(e)}")
 
-# Standalone helper function for external import by server.py or other modules
 def handle_audio_stream(audio_data: bytes, target_lang: str = "Urdu") -> str:
     module = AudioTranslationModule()
     return module.process_and_translate_audio(audio_data, target_lang)
 
 if __name__ == "__main__":
-    # Test block for standalone verification
-    print("Audio Module initialized successfully and ready for integration.")
+    print("Audio Module initialized successfully.")
