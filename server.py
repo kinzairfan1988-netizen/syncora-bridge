@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Full Build with WhatsApp Direct")
+app = FastAPI(title="Syncora Terminal - WhatsApp Direct Feature Restored")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -67,9 +67,10 @@ def read_root():
         .workspace { display: flex; width: 100%; height: 100%; }
         .sidebar { width: 360px; border-right: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; }
         .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); color: var(--accent); font-size: 18px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
-        .search-box-container { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; }
+        .search-box-container { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
         .search-input { width: 100%; background: var(--card); border: 1px solid var(--border); padding: 10px 14px; border-radius: 8px; color: #fff; outline: none; font-size: 13px; }
-        .wa-direct-btn { background: #25D366; color: #fff; border: none; padding: 0 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 12px; }
+        .wa-direct-box { display: flex; gap: 6px; }
+        .wa-direct-btn { background: #25D366; color: #fff; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 12px; flex-shrink: 0; }
         .chat-list { flex: 1; overflow-y: auto; }
         .chat-item { padding: 14px 18px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; gap: 12px; align-items: center; }
         .chat-item:hover { background: #232b3b; }
@@ -138,8 +139,11 @@ def read_root():
                 <span id="my-phone-display" style="font-size: 12px; color: var(--green);"></span>
             </div>
             <div class="search-box-container">
-                <input type="text" class="search-input" placeholder="Enter phone for direct WA..." id="wa-phone-input">
-                <button class="wa-direct-btn" onclick="openWhatsAppDirect()" title="Open WhatsApp Chat">WA</button>
+                <input type="text" class="search-input" placeholder="Search chats..." id="search-chats">
+                <div class="wa-direct-box">
+                    <input type="text" class="search-input" placeholder="Enter number for WhatsApp direct..." id="wa-phone-input">
+                    <button class="wa-direct-btn" onclick="openWhatsAppDirect()">Open WA</button>
+                </div>
             </div>
             <div class="chat-list" id="chat-list">
                 <div class="chat-item" onclick="selectChat('03111111111')">
@@ -179,6 +183,7 @@ def read_root():
                     <button class="attach-item" onclick="triggerMediaUpload()">📷 Photos & Videos</button>
                     <button class="attach-item" onclick="triggerDocUpload()">📄 Document</button>
                     <button class="attach-item" onclick="sendLocation()">📍 Location</button>
+                    <button class="attach-item" onclick="sendWhatsAppLinkOption()">💬 Send WhatsApp Link</button>
                 </div>
 
                 <button class="btn-action" onclick="toggleAttachMenu()" title="Attach">📎</button>
@@ -236,7 +241,7 @@ def read_root():
             };
 
             socket.onmessage = function(e) {
-                console.log("SYNCORA WebSocket message:", e.data);
+                console.log("SYNCORS WebSocket message:", e.data);
                 try {
                     const data = JSON.parse(e.data);
                     if (data.action === "new_message" && data.sender === activePartner) {
@@ -276,10 +281,17 @@ def read_root():
                 alert("Please enter a phone number for WhatsApp direct chat!");
                 return;
             }
-            // Clean phone number (remove spaces, plus signs, dashes)
             const cleanNum = phoneInput.replace(/[^0-9]/g, '');
             const waUrl = `https://wa.me/${cleanNum}`;
             window.open(waUrl, '_blank');
+        }
+
+        function sendWhatsAppLinkOption() {
+            document.getElementById("attach-menu").style.display = "none";
+            if(!activePartner) { alert("Pehle contact select karein!"); return; }
+            const cleanNum = activePartner.replace(/[^0-9]/g, '');
+            const waLink = `https://wa.me/${cleanNum}`;
+            dispatchMsg(waLink, "WhatsApp Chat Link", "whatsapp_link");
         }
 
         function selectChat(partner) {
@@ -460,10 +472,12 @@ def read_root():
                 html = `<a href="${text}" target="_blank" style="color:var(--accent); text-decoration:underline; font-weight:600;">📄 Download Document</a>`;
             } else if (type === "location") {
                 html = `<a href="${text}" target="_blank" style="color:var(--accent); text-decoration:underline; font-weight:600;">📍 View Shared Location</a>`;
+            } else if (type === "whatsapp_link") {
+                html = `<a href="${text}" target="_blank" style="color:#25D366; text-decoration:underline; font-weight:600;">💬 Open WhatsApp Chat Link</a>`;
             } else {
                 html = "<div>" + text + "</div>";
                 if (translated && translated.trim()) {
-                    html += "<div style='font-size:11px; margin-top:4px; padding-top:4px; border-top:1px dashed rgba(0,0,0,0.2); font-weight:700;'>Translation: " + translated + "</div>";
+                    html += "<div style='font-size:11px; margin-top:4px; padding-top:4px; border-top:1px dashed rgba(0,0,0,0.2); font-weight:700;">Translation: " + translated + "</div>";
                 }
             }
             div.innerHTML = html;
