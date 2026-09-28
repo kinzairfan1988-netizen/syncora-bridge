@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Complete Stable Version")
+app = FastAPI(title="Syncora Terminal - Final Stable Version")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -115,7 +115,7 @@ def handle_audio_stream(audio_bytes: bytes, target_lang: str = "Urdu") -> str:
         print(f"[Gemini Audio Error]: {e}")
         return f"Audio translation error: {str(e)}"
 
-# Root Route: Full Frontend Terminal with All Restored Features
+# Root Route: Full Frontend Terminal with All Features Restored
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """<!DOCTYPE html>
@@ -164,7 +164,6 @@ def read_root():
         .main-input { flex: 1; background: var(--surface-card); border: 1px solid var(--border-graphite); padding: 10px 14px; border-radius: 20px; color: #fff; outline: none; font-size: 14px; }
         .icon-btn { background: transparent; border: none; color: var(--accent-amber); font-size: 18px; cursor: pointer; padding: 5px; }
 
-        /* Modal for Voice/Translation confirmation */
         .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; display: none; align-items: center; justify-content: center; padding: 20px; }
         .modal-card { background: var(--surface-panel); border: 1px solid var(--border-graphite); border-radius: 16px; width: 100%; max-width: 350px; padding: 20px; text-align: center; }
         .lang-select { width: 100%; background: var(--surface-card); border: 1px solid var(--border-graphite); padding: 10px; border-radius: 8px; color: #fff; margin: 12px 0; outline: none; }
@@ -182,14 +181,13 @@ def read_root():
         </div>
     </div>
 
-    <!-- Send/Translation Modal -->
     <div class="modal-backdrop" id="send-modal">
         <div class="modal-card">
             <h3 style="color: var(--accent-amber); font-size: 16px;">Dispatch Voice Note</h3>
-            <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;" id="modal-desc">Select target language for translation</p>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Select target language for translation</p>
             <select class="lang-select" id="target-lang">
-                <option value="ur">Urdu (اردو)</option>
-                <option value="en" selected>English</option>
+                <option value="ur" selected>Urdu (اردو)</option>
+                <option value="en">English</option>
                 <option value="ar">Arabic (العربية)</option>
             </select>
             <button class="btn-modal" style="background: var(--accent-amber); color: #000;" onclick="confirmSendVoice()">🌐 Translate & Send</button>
@@ -371,7 +369,6 @@ def read_root():
                 const data = await res.json();
                 const translationResult = data.translated_text || "Voice translation completed.";
                 
-                // Update last bubble translation
                 const boxes = document.querySelectorAll(".messages-box .bubble.sent");
                 if(boxes.length > 0) {
                     const last = boxes[boxes.length - 1];
