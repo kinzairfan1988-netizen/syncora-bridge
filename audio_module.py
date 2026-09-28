@@ -8,9 +8,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Final Bulletproof Server")
+app = FastAPI(title="Syncora Terminal - Final Direct Fix")
 
-# Directories setup
 os.makedirs("uploads", exist_ok=True)
 os.makedirs("static", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
@@ -55,23 +54,22 @@ def read_root():
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Syncora Terminal</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg: #0b0e14; --panel: #121721; --card: #1a202c; --border: #2d3748;
             --accent: #f59e0b; --text: #f7fafc; --muted: #718096; --green: #10b981;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100vh; width: 100vw; overflow: hidden; font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--text); }
-        .auth-overlay { position: fixed; inset: 0; background: rgba(11, 14, 20, 0.98); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        html, body { height: 100vh; width: 100vw; overflow: hidden; font-family: sans-serif; background: var(--bg); color: var(--text); }
+        .auth-overlay { position: fixed; inset: 0; background: #0b0e14; z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px; }
         .auth-card { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: 32px; width: 100%; max-width: 380px; text-align: center; }
         .auth-input { width: 100%; background: var(--card); border: 1px solid var(--border); padding: 14px; border-radius: 12px; color: #fff; font-size: 15px; margin-bottom: 14px; outline: none; }
         .btn-auth { width: 100%; background: var(--accent); color: #000; font-weight: 700; border: none; padding: 14px; border-radius: 12px; cursor: pointer; font-size: 15px; }
         .workspace { display: flex; width: 100%; height: 100%; }
         .sidebar { width: 360px; border-right: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; }
-        .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); font-family: 'Space Grotesk'; color: var(--accent); font-size: 18px; display: flex; justify-content: space-between; }
+        .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); color: var(--accent); font-size: 18px; font-weight: bold; display: flex; justify-content: space-between; }
         .chat-list { flex: 1; overflow-y: auto; }
         .chat-item { padding: 14px 18px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; gap: 12px; align-items: center; }
         .chat-item:hover { background: #232b3b; }
@@ -92,7 +90,7 @@ def read_root():
 
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-card">
-            <h2 style="font-family: 'Space Grotesk'; color: var(--accent); margin-bottom: 6px;">Syncora Terminal</h2>
+            <h2 style="color: var(--accent); margin-bottom: 6px;">Syncora Terminal</h2>
             <p style="font-size: 12px; color: var(--muted); margin-bottom: 20px;">Enter your phone to start</p>
             <input type="tel" id="my-phone-input" class="auth-input" placeholder="e.g. 03001234567">
             <button class="btn-auth" onclick="forceLogin()">Enter Terminal →</button>
@@ -149,30 +147,18 @@ def read_root():
         let socket = null;
         let pendingText = "";
 
-        // Safe URL parameters handler to prevent syntax errors
-        try {
-            const urlParams = new URLSearchParams(window.location.search);
-            const chatParam = urlParams.get('chat');
-            if (chatParam) {
-                activePartner = chatParam;
-            }
-        } catch(e) {}
-
-        window.onload = () => {
+        window.onload = function() {
             if (myPhone) {
                 document.getElementById("auth-overlay").style.display = "none";
                 document.getElementById("my-phone-display").innerText = myPhone;
                 initSocket();
-                if (activePartner) {
-                    selectChat(activePartner);
-                }
             }
         };
 
         function forceLogin() {
-            const val = document.getElementById("my-phone-input").value.trim();
+            const val = document.getElementById("my-phone-input").value;
             if (!val) { alert("Number enter karein!"); return; }
-            myPhone = val;
+            myPhone = val.trim();
             localStorage.setItem("syncora_phone", myPhone);
             document.getElementById("auth-overlay").style.display = "none";
             document.getElementById("my-phone-display").innerText = myPhone;
@@ -182,8 +168,8 @@ def read_root():
         function initSocket() {
             if (!myPhone) return;
             const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
-            socket = new WebSocket(`${proto}${window.location.host}/ws/${myPhone}`);
-            socket.onmessage = (e) => {
+            socket = new WebSocket(proto + window.location.host + "/ws/" + myPhone);
+            socket.onmessage = function(e) {
                 const data = JSON.parse(e.data);
                 if (data.action === "new_message" && data.sender === activePartner) {
                     appendBubble(data.content, "received", data.translated);
@@ -198,10 +184,10 @@ def read_root():
         }
 
         function stageMessage() {
-            const txt = document.getElementById("text-input").value.trim();
+            const txt = document.getElementById("text-input").value;
             if (!txt || !activePartner) { alert("Pehle contact select karein aur message likhein!"); return; }
-            pendingText = txt;
-            document.getElementById("modal-text-preview").innerText = `"${txt}"`;
+            pendingText = txt.trim();
+            document.getElementById("modal-text-preview").innerText = '"' + pendingText + '"';
             document.getElementById("send-modal").style.display = "flex";
         }
 
@@ -242,10 +228,10 @@ def read_root():
         function appendBubble(text, dir, translated) {
             const box = document.getElementById("messages-container");
             const div = document.createElement("div");
-            div.className = `bubble ${dir}`;
-            let html = `<div>${text}</div>`;
+            div.className = "bubble " + dir;
+            let html = "<div>" + text + "</div>";
             if (translated && translated.trim()) {
-                html += `<div style="font-size:11px; margin-top:4px; padding-top:4px; border-top:1px dashed rgba(0,0,0,0.2); font-weight:700;">Translation: ${translated}</div>`;
+                html += "<div style='font-size:11px; margin-top:4px; padding-top:4px; border-top:1px dashed rgba(0,0,0,0.2); font-weight:700;'>Translation: " + translated + "</div>";
             }
             div.innerHTML = html;
             box.appendChild(div);
