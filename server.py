@@ -3,48 +3,63 @@ import shutil
 import json
 import urllib.request
 import urllib.parse
+import base64
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, File, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-# Stable Google Generative AI Import for Railway deployment
-try:
-    import google.generativeai as genai
-    GENAI_AVAILABLE = True
-except ImportError:
-    GENAI_AVAILABLE = False
-
-def handle_audio_stream(audio_data: bytes, target_lang: str = "Urdu") -> str:
-    if not GENAI_AVAILABLE:
-        return "Audio translation error: google-generativeai library not installed."
+# Direct REST API approach for Gemini Audio Translation (No SDK version conflicts)
+def handle_audio_stream(audio_bytes: bytes, target_lang: str = "Urdu") -> str:
     try:
-        api_key = os.environ.get("GEMINI_API_KEY")
+        api_key = (os.environ.get("GEMINI_API_KEY") or "").strip()
         if not api_key:
             return "Audio translation error: GEMINI_API_KEY missing in environment variables."
         
-        genai.configure(api_key=api_key)
+        # Encode audio bytes to base64
+        audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
         
-        # Upload audio file temporarily for Gemini processing
-        temp_file_path = "temp_audio.webm"
-        with open(temp_file_path, "wb") as f:
-            f.write(audio_data)
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        
+        payload = {
+            "contents": [{
+                "parts": [
+                    {
+                        "inline_data": {
+                            "mime_type": "audio/webm",
+                            "data": audio_b64
+                        }
+                    },
+                    {
+                        "text": f"Listen to this audio carefully. Transcribe it and translate it accurately into {target_lang}."
+                    }
+                ]
+            }]
+        }
+        
+        req_data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(
+            url, 
+            data=req_data, 
+            headers={'Content-Type': 'application/json'}, 
+            method='POST'
+        )
+        
+        with urllib.request.urlopen(req, timeout=15) as response:
+            res_body = response.read().decode('utf-8')
+            res_json = json.loads(res_body)
             
-        audio_file = genai.upload_file(temp_file_path, mime_type="audio/webm")
-        
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content([
-            audio_file,
-            f"Listen to this audio carefully. Transcribe it and translate it accurately into {target_lang}."
-        ])
-        
-        # Cleanup temporary file
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
+            # Extract text from Gemini response structure
+            candidates = res_json.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if parts:
+                    return parts[0].get("text", "No translation text generated.")
             
-        return response.text
+            return "Audio translation error: Empty response from Gemini API."
+            
     except Exception as e:
-        print(f"[Gemini Audio Error Details]: {e}")
+        print(f"[Gemini Direct API Error]: {e}")
         return f"Audio translation error: {str(e)}"
 
 app = FastAPI(title="Syncora Terminal - Complete Stable Server")
@@ -108,7 +123,8 @@ def translate_text_engine(text: str, target_lang: str) -> str:
         print(f"[Translation Error]: {e}")
         fallback_dict = {
             "kahan ho": "Where are you" if t_lang == "en" else "آپ کہاں ہیں",
-            "what are you doing": "آپ کیا کر رہے ہیں" if t_lang == "ur" else "What are you doing"
+            "what are you doing": "آپ کیا کر رہے ہیں" if t_lang == "ur" else "What are you doing",
+            "hello": "Hello" if t_lang == "en" else "ہیلو"
         }
         if clean.lower() in fallback_dict:
             return fallback_dict[clean.lower()]
@@ -526,7 +542,6 @@ def read_root():
             const data = await res.json();
             const box = document.getElementById("messages-container");
             box.innerHTML = "";
-            data.messages.messages?.forEach?.(m => {}) || [];
             (data.messages || []).forEach(m => {
                 appendBubble(m.content, m.sender === myPhone ? "sent" : "received", m.translated_content, m.msg_type, m.time, m.id, m.lang || "en");
             });
