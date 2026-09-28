@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Full Stable Version")
+app = FastAPI(title="Syncora Terminal - Complete Stable Version")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -115,28 +115,29 @@ def handle_audio_stream(audio_bytes: bytes, target_lang: str = "Urdu") -> str:
         print(f"[Gemini Audio Error]: {e}")
         return f"Audio translation error: {str(e)}"
 
-# Root Route: Full Frontend Terminal with Chat & Voice Support
+# Root Route: Full Frontend Terminal with All Restored Features
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Syncora Terminal</title>
     <style>
         :root {
             --bg-obsidian: #0b0e14;
             --surface-panel: #121721;
             --surface-card: #1a202c;
+            --surface-hover: #232b3b;
             --border-graphite: #2d3748;
             --accent-amber: #f59e0b;
+            --danger-red: #ef4444;
             --text-primary: #f7fafc;
             --text-muted: #718096;
             --online-green: #10b981;
-            --danger-red: #ef4444;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
         html, body { height: 100vh; width: 100vw; overflow: hidden; font-family: sans-serif; background-color: var(--bg-obsidian); color: var(--text-primary); }
         
         .auth-overlay { position: fixed; inset: 0; background: rgba(11, 14, 20, 0.96); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -148,8 +149,8 @@ def read_root():
         .sidebar { width: 320px; border-right: 1px solid var(--border-graphite); background: var(--surface-panel); display: flex; flex-direction: column; }
         .sidebar-header { padding: 15px; border-bottom: 1px solid var(--border-graphite); display: flex; justify-content: space-between; align-items: center; }
         .chat-list { flex: 1; overflow-y: auto; padding: 10px; }
-        .chat-item { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; border-radius: 8px; }
-        .chat-item:hover { background: var(--surface-card); }
+        .chat-item { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; border-radius: 8px; margin-bottom: 4px; }
+        .chat-item:hover, .chat-item.active { background: var(--surface-card); }
 
         .stage { flex: 1; display: flex; flex-direction: column; background: var(--bg-obsidian); }
         .stage-header { padding: 15px; background: var(--surface-panel); border-bottom: 1px solid var(--border-graphite); display: flex; justify-content: space-between; align-items: center; }
@@ -162,6 +163,12 @@ def read_root():
         .input-bar { padding: 12px; background: var(--surface-panel); border-top: 1px solid var(--border-graphite); display: flex; gap: 8px; align-items: center; }
         .main-input { flex: 1; background: var(--surface-card); border: 1px solid var(--border-graphite); padding: 10px 14px; border-radius: 20px; color: #fff; outline: none; font-size: 14px; }
         .icon-btn { background: transparent; border: none; color: var(--accent-amber); font-size: 18px; cursor: pointer; padding: 5px; }
+
+        /* Modal for Voice/Translation confirmation */
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .modal-card { background: var(--surface-panel); border: 1px solid var(--border-graphite); border-radius: 16px; width: 100%; max-width: 350px; padding: 20px; text-align: center; }
+        .lang-select { width: 100%; background: var(--surface-card); border: 1px solid var(--border-graphite); padding: 10px; border-radius: 8px; color: #fff; margin: 12px 0; outline: none; }
+        .btn-modal { width: 100%; padding: 10px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; margin-top: 6px; }
     </style>
 </head>
 <body>
@@ -175,11 +182,26 @@ def read_root():
         </div>
     </div>
 
+    <!-- Send/Translation Modal -->
+    <div class="modal-backdrop" id="send-modal">
+        <div class="modal-card">
+            <h3 style="color: var(--accent-amber); font-size: 16px;">Dispatch Voice Note</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;" id="modal-desc">Select target language for translation</p>
+            <select class="lang-select" id="target-lang">
+                <option value="ur">Urdu (اردو)</option>
+                <option value="en" selected>English</option>
+                <option value="ar">Arabic (العربية)</option>
+            </select>
+            <button class="btn-modal" style="background: var(--accent-amber); color: #000;" onclick="confirmSendVoice()">🌐 Translate & Send</button>
+            <button class="btn-modal" style="background: transparent; color: var(--text-muted);" onclick="closeModal()">Cancel</button>
+        </div>
+    </div>
+
     <div class="workspace">
         <aside class="sidebar">
             <div class="sidebar-header">
                 <span style="font-weight: bold; color: var(--accent-amber);">CHATS</span>
-                <button onclick="addContactPrompt()" style="background:none; border:none; color:var(--accent-amber); cursor:pointer; font-size:16px;">＋</button>
+                <button onclick="addContactPrompt()" style="background:none; border:none; color:var(--accent-amber); cursor:pointer; font-size:18px;">＋</button>
             </div>
             <div class="chat-list" id="chat-list"></div>
         </aside>
@@ -192,7 +214,7 @@ def read_root():
             <div class="messages-box" id="messages-box"></div>
             <footer class="input-bar">
                 <input type="text" id="msg-input" class="main-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendMessage()">
-                <button class="icon-btn" onclick="recordVoice()" title="Record Voice">🎙️</button>
+                <button class="icon-btn" onclick="toggleVoiceRecording()" title="Record Voice Note">🎙️</button>
                 <button class="icon-btn" onclick="sendMessage()" title="Send">➤</button>
             </footer>
         </main>
@@ -201,15 +223,19 @@ def read_root():
     <script>
         let myPhone = localStorage.getItem("syncora_phone") || "";
         let activePartner = localStorage.getItem("syncora_partner") || "";
-        let contacts = [];
+        let contacts = JSON.parse(localStorage.getItem("syncora_contacts") || "[]");
         let socket = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let recordedBlob = null;
 
         window.onload = async () => {
+            renderChatList();
             if (myPhone) {
                 document.getElementById("auth-overlay").style.display = "none";
                 initSocket();
-                await loadChats();
-                if(contacts.length > 0) selectChat(contacts[0]);
+                if(contacts.length > 0 && !activePartner) selectChat(contacts[0]);
+                else if(activePartner) selectChat(activePartner);
             }
         };
 
@@ -220,7 +246,7 @@ def read_root():
             localStorage.setItem("syncora_phone", myPhone);
             document.getElementById("auth-overlay").style.display = "none";
             initSocket();
-            loadChats();
+            renderChatList();
         }
 
         function initSocket() {
@@ -235,15 +261,12 @@ def read_root():
             };
         }
 
-        async function loadChats() {
-            const res = await fetch(`/api/chats/${myPhone}`);
-            const data = await res.json();
-            contacts = data.chats || [];
+        function renderChatList() {
             const list = document.getElementById("chat-list");
             list.innerHTML = "";
             contacts.forEach(c => {
                 const div = document.createElement("div");
-                div.className = "chat-item";
+                div.className = `chat-item ${c === activePartner ? 'active' : ''}`;
                 div.innerText = c;
                 div.onclick = () => selectChat(c);
                 list.appendChild(div);
@@ -253,11 +276,16 @@ def read_root():
         async function addContactPrompt() {
             const target = prompt("Enter contact phone number:");
             if(!target) return;
+            if(!contacts.includes(target)) {
+                contacts.push(target);
+                localStorage.setItem("syncora_contacts", JSON.stringify(contacts));
+            }
             await fetch("/api/contacts/add", {
                 method: "POST", headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({user_phone: myPhone, contact_phone: target})
             });
-            loadChats();
+            renderChatList();
+            if(!activePartner) selectChat(target);
         }
 
         function selectChat(partner) {
@@ -265,13 +293,14 @@ def read_root():
             localStorage.setItem("syncora_partner", partner);
             document.getElementById("active-chat-label").innerText = partner;
             document.getElementById("messages-box").innerHTML = "";
+            renderChatList();
         }
 
         async function sendMessage() {
             const text = document.getElementById("msg-input").value.trim();
-            if(!text || !activePartner) return;
+            if(!text) { alert("Type a message first."); return; }
+            if(!activePartner) { alert("Please select or add a chat contact first."); return; }
             
-            // Translate text to Urdu as default or keep original
             let translated = text;
             try {
                 const tRes = await fetch("/translate", {
@@ -301,8 +330,62 @@ def read_root():
             box.scrollTop = box.scrollHeight;
         }
 
-        async function recordVoice() {
-            alert("Voice recording module active. Use mic button to record and translate via Gemini.");
+        async function toggleVoiceRecording() {
+            if(!activePartner) { alert("Please select a chat contact first."); return; }
+            if (!mediaRecorder || mediaRecorder.state === "inactive") {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                    mediaRecorder.onstop = async () => {
+                        recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        document.getElementById("send-modal").style.display = "flex";
+                    };
+                    mediaRecorder.start();
+                    alert("Recording started... Tap mic again to stop.");
+                } catch(err) {
+                    alert("Microphone access error: " + err.message);
+                }
+            } else {
+                mediaRecorder.stop();
+            }
+        }
+
+        function closeModal() {
+            document.getElementById("send-modal").style.display = "none";
+        }
+
+        async function confirmSendVoice() {
+            closeModal();
+            if(!recordedBlob) return;
+            const targetLang = document.getElementById("target-lang").value;
+            const formData = new FormData();
+            formData.append("file", recordedBlob, "voice.webm");
+            formData.append("target_lang", targetLang);
+
+            appendBubble("🎙️ [Voice Note Sent]", "sent", "Translating via Gemini...");
+
+            try {
+                const res = await fetch("/api/translate-audio", { method: "POST", body: formData });
+                const data = await res.json();
+                const translationResult = data.translated_text || "Voice translation completed.";
+                
+                // Update last bubble translation
+                const boxes = document.querySelectorAll(".messages-box .bubble.sent");
+                if(boxes.length > 0) {
+                    const last = boxes[boxes.length - 1];
+                    last.innerHTML = `<div>🎙️ Voice Note</div><div class="bubble-trans">Gemini: ${translationResult}</div>`;
+                }
+
+                if(socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        action: "chat_message", receiver: activePartner, content: "🎙️ Voice Note", translated: translationResult
+                    }));
+                }
+            } catch(e) {
+                alert("Audio translation failed.");
+            }
         }
     </script>
 </body>
