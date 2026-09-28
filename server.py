@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Seamless WhatsApp Link")
+app = FastAPI(title="Syncora Terminal - WhatsApp Desktop App Integration")
 
 # Directories and Database setup
 os.makedirs("uploads", exist_ok=True)
@@ -513,12 +513,10 @@ def read_root():
             const phoneInput = document.getElementById("wa-phone-input").value.trim();
             if (!phoneInput) { alert("Enter WhatsApp number!"); return; }
             const cleanNum = phoneInput.replace(/[^0-9]/g, '');
-            const waUrl = `https://wa.me/${cleanNum}`;
             
-            // Seamless handling: Instead of forcing background tab issues, ask user or open smoothly
-            if (confirm("Open WhatsApp chat with +" + cleanNum + "?")) {
-                window.location.href = waUrl;
-            }
+            // Shifted directly to desktop WhatsApp application protocol
+            const waDesktopUrl = `whatsapp://send?phone=${cleanNum}`;
+            window.location.href = waDesktopUrl;
         }
 
         function sendWhatsAppLinkOption() {
