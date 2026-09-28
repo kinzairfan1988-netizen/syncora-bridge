@@ -6,3 +6,4 @@ requests
 uvicorn[standard]
 websockets
 google-generativeai
+google-genai
