@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Clean Production Server")
+app = FastAPI(title="Syncora Terminal - Final Bulletproof Server")
 
 # Directories setup
 os.makedirs("uploads", exist_ok=True)
@@ -149,11 +149,23 @@ def read_root():
         let socket = null;
         let pendingText = "";
 
+        // Safe URL parameters handler to prevent syntax errors
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const chatParam = urlParams.get('chat');
+            if (chatParam) {
+                activePartner = chatParam;
+            }
+        } catch(e) {}
+
         window.onload = () => {
             if (myPhone) {
                 document.getElementById("auth-overlay").style.display = "none";
                 document.getElementById("my-phone-display").innerText = myPhone;
                 initSocket();
+                if (activePartner) {
+                    selectChat(activePartner);
+                }
             }
         };
 
