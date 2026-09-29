@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Restored UI & Stable WS")
+app = FastAPI(title="Syncora Terminal - Stable Core & Copy Link")
 
 # Directories and Database setup
 os.makedirs("uploads", exist_ok=True)
@@ -223,7 +223,7 @@ def read_root():
         .search-input { width: 100%; background: var(--card); border: 1px solid var(--border); padding: 10px 14px; border-radius: 8px; color: #fff; outline: none; font-size: 13px; }
         .action-row { display: flex; gap: 6px; }
         .btn-invite { background: var(--accent); color: #000; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 12px; flex: 1; }
-        .wa-direct-btn { background: #25D366; color: #fff; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 12px; flex-shrink: 0; }
+        .btn-copy { background: var(--green); color: #000; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 12px; flex: 1; }
         .chat-list { flex: 1; overflow-y: auto; }
         .chat-item { padding: 14px 18px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; gap: 12px; align-items: center; }
         .chat-item:hover { background: #232b3b; }
@@ -293,8 +293,7 @@ def read_root():
                 <input type="text" class="search-input" placeholder="Search chats..." id="search-chats" onkeyup="filterChats()">
                 <div class="action-row">
                     <button class="btn-invite" onclick="generateInviteLink()">🔗 Invite Link</button>
-                    <input type="text" class="search-input" placeholder="WA number..." id="wa-phone-input" style="flex:1;">
-                    <button class="wa-direct-btn" onclick="openWhatsAppDirect()" title="Invite on WhatsApp">WA</button>
+                    <button class="btn-copy" onclick="copyInviteLink()">📋 Copy Link</button>
                 </div>
             </div>
             <div class="chat-list" id="chat-list"></div>
@@ -327,7 +326,7 @@ def read_root():
                     <button class="attach-item" onclick="triggerMediaUpload()">📷 Photos & Videos</button>
                     <button class="attach-item" onclick="triggerDocUpload()">📄 Document</button>
                     <button class="attach-item" onclick="sendLocation()">📍 Location</button>
-                    <button class="attach-item" onclick="sendWhatsAppLinkOption()">💬 Send WhatsApp Link</button>
+                    <button class="attach-item" onclick="sendInviteLinkInChat()">🔗 Send Invite Link</button>
                 </div>
 
                 <button class="btn-action" onclick="toggleAttachMenu()" title="Attach">📎</button>
@@ -419,12 +418,10 @@ def read_root():
             if (!myUserId) return;
             const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
             const wsUrl = proto + window.location.host + "/ws/" + encodeURIComponent(myUserId);
-            console.log("SYNCORA WebSocket connecting:", wsUrl);
 
             socket = new WebSocket(wsUrl);
 
             socket.onopen = function() {
-                console.log("SYNCORA WebSocket connected");
                 const status = document.getElementById("active-chat-status");
                 if (status) { 
                     status.innerText = "Online"; 
@@ -443,7 +440,6 @@ def read_root():
             };
 
             socket.onerror = function(error) {
-                console.error("SYNCORA WebSocket error:", error);
                 const status = document.getElementById("active-chat-status");
                 if (status) { 
                     status.innerText = "Connection Error"; 
@@ -452,7 +448,6 @@ def read_root():
             };
 
             socket.onclose = function(event) {
-                console.warn("SYNCORA WebSocket closed:", event.code);
                 const status = document.getElementById("active-chat-status");
                 if (status) { 
                     status.innerText = "Offline"; 
@@ -474,7 +469,7 @@ def read_root():
             const listEl = document.getElementById("chat-list");
             listEl.innerHTML = "";
             if (list.length === 0) {
-                listEl.innerHTML = `<div style="padding:20px; text-align:center; color:var(--muted); font-size:13px;">No contacts yet.<br>Click 'Invite Link' to add friends!</div>`;
+                listEl.innerHTML = `<div style="padding:20px; text-align:center; color:var(--muted); font-size:13px;">No contacts yet.<br>Click 'Invite Link' or 'Copy Link' to add friends!</div>`;
                 return;
             }
             list.forEach(c => {
@@ -504,6 +499,16 @@ def read_root():
             prompt("Copy your invite link:", inviteUrl);
         }
 
+        function copyInviteLink() {
+            if (!myInviteToken) { alert("Not registered yet!"); return; }
+            const inviteUrl = `${window.location.origin}/?invite=${myInviteToken}`;
+            navigator.clipboard.writeText(inviteUrl).then(() => {
+                alert("Invite link copied to clipboard! You can now paste it into WhatsApp.");
+            }).catch(err => {
+                prompt("Copy your invite link:", inviteUrl);
+            });
+        }
+
         function selectContact(c) {
             activePartner = c.user_id;
             activeConvId = c.conv_id;
@@ -526,23 +531,7 @@ def read_root():
             }
         }
 
-        function openWhatsAppDirect() {
-            if (!myInviteToken) { alert("Please wait, generating invite token..."); return; }
-            const phoneInput = document.getElementById("wa-phone-input").value.trim();
-            const inviteUrl = `${window.location.origin}/?invite=${myInviteToken}`;
-            const messageText = `Join me on Syncora:\n${inviteUrl}`;
-            
-            let waUrl = "";
-            if (phoneInput) {
-                const cleanNum = phoneInput.replace(/[^0-9]/g, '');
-                waUrl = `https://wa.me/${cleanNum}?text=${encodeURIComponent(messageText)}`;
-            } else {
-                waUrl = `https://wa.me/?text=${encodeURIComponent(messageText)}`;
-            }
-            window.open(waUrl, '_blank');
-        }
-
-        function sendWhatsAppLinkOption() {
+        function sendInviteLinkInChat() {
             document.getElementById("attach-menu").style.display = "none";
             if(!activePartner) { alert("Select contact first!"); return; }
             const inviteUrl = `${window.location.origin}/?invite=${myInviteToken}`;
