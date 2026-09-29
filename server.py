@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Syncora Terminal - Reliable WhatsApp Desktop & Web Pre-fill")
+app = FastAPI(title="Syncora Terminal - Restored UI & Stable WS")
 
 # Directories and Database setup
 os.makedirs("uploads", exist_ok=True)
@@ -358,12 +358,14 @@ def read_root():
                 localStorage.setItem("syncora_user_id", myUserId);
             }
             
+            const urlParams = new URLSearchParams(window.location.search);
+            const inviteToken = urlParams.get('invite');
+
             if (myName && myName.trim() !== "") {
                 document.getElementById("my-name-input").value = myName;
                 document.getElementById("auth-overlay").style.display = "none";
                 document.getElementById("my-name-display").innerText = myName;
-                const urlParams = new URLSearchParams(window.location.search);
-                await registerAndInit(urlParams.get('invite'));
+                await registerAndInit(inviteToken);
             }
         };
 
@@ -416,11 +418,18 @@ def read_root():
         function initSocket() {
             if (!myUserId) return;
             const proto = window.location.protocol === "https:" ? "wss://" : "ws://";
-            socket = new WebSocket(proto + window.location.host + "/ws/" + encodeURIComponent(myUserId));
+            const wsUrl = proto + window.location.host + "/ws/" + encodeURIComponent(myUserId);
+            console.log("SYNCORA WebSocket connecting:", wsUrl);
+
+            socket = new WebSocket(wsUrl);
 
             socket.onopen = function() {
+                console.log("SYNCORA WebSocket connected");
                 const status = document.getElementById("active-chat-status");
-                if (status) { status.innerText = "Online"; status.style.color = "var(--green)"; }
+                if (status) { 
+                    status.innerText = "Online"; 
+                    status.style.color = "var(--green)"; 
+                }
             };
 
             socket.onmessage = function(e) {
@@ -434,13 +443,21 @@ def read_root():
             };
 
             socket.onerror = function(error) {
+                console.error("SYNCORA WebSocket error:", error);
                 const status = document.getElementById("active-chat-status");
-                if (status) { status.innerText = "Connection Error"; status.style.color = "var(--red)"; }
+                if (status) { 
+                    status.innerText = "Connection Error"; 
+                    status.style.color = "var(--red)"; 
+                }
             };
 
             socket.onclose = function(event) {
+                console.warn("SYNCORA WebSocket closed:", event.code);
                 const status = document.getElementById("active-chat-status");
-                if (status) { status.innerText = "Offline"; status.style.color = "var(--muted)"; }
+                if (status) { 
+                    status.innerText = "Offline"; 
+                    status.style.color = "var(--muted)"; 
+                }
             };
         }
 
@@ -487,7 +504,7 @@ def read_root():
             prompt("Copy your invite link:", inviteUrl);
         }
 
-        async function selectContact(c) {
+        function selectContact(c) {
             activePartner = c.user_id;
             activeConvId = c.conv_id;
             document.getElementById("active-chat-title").innerText = c.name;
@@ -497,14 +514,15 @@ def read_root():
             msgContainer.innerHTML = "";
             
             if (activeConvId) {
-                try {
-                    const res = await fetch(`/api/messages/${activeConvId}`);
-                    const data = await res.json();
-                    (data.messages || []).forEach(m => {
-                        const dir = m.sender_id === myUserId ? "sent" : "received";
-                        appendBubble(m.content, dir, m.translated, m.msg_type);
-                    });
-                } catch(e) {}
+                fetch(`/api/messages/${activeConvId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        (data.messages || []).forEach(m => {
+                            const dir = m.sender_id === myUserId ? "sent" : "received";
+                            appendBubble(m.content, dir, m.translated, m.msg_type);
+                        });
+                    })
+                    .catch(e => {});
             }
         }
 
